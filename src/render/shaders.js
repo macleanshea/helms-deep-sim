@@ -4,6 +4,29 @@ const NOISE = `
 float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
 float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*noise(p); p=p*2.03+17.; a*=.5; } return s/0.97; }
+float fbm3(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*noise(p); p=p*2.07+11.; a*=.5; } return s/0.875; }
+vec2 hash2(vec2 p){ return fract(sin(vec2(dot(p,vec2(127.1,311.7)), dot(p,vec2(269.5,183.3))))*43758.5453); }
+// cellular noise: x = distance to the nearest cell edge, y = a random value per cell (blocks, flagstones, fractured rock)
+vec2 voro(vec2 p){
+  vec2 i = floor(p), f = fract(p), mg = vec2(0.), mr = vec2(0.); float md = 8.;
+  for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x++){ vec2 g = vec2(x,y), r = g + hash2(i+g) - f; float d = dot(r,r); if (d < md){ md = d; mr = r; mg = g; } }
+  md = 8.;
+  for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x++){ vec2 g = mg + vec2(x,y), r = g + hash2(i+g) - f; if (dot(mr-r,mr-r) > 1e-4) md = min(md, dot(0.5*(mr+r), normalize(r-mr))); }
+  return vec2(md, hash(i+mg));
+}
+// weathered rock face, seen side-on: big fractured blocks, finer cracks, bedding, lichen and rain streaks
+vec3 rockFace(vec2 q){
+  vec2 b = voro(q*vec2(0.075, 0.11) + fbm3(q*0.02)*1.3);
+  vec2 s = voro(q*vec2(0.24, 0.32));
+  float grain = fbm(q*0.55);
+  vec3 c = mix(vec3(0.29,0.285,0.28), vec3(0.50,0.49,0.465), 0.35 + 0.5*b.y);
+  c *= mix(0.45, 1., smoothstep(0., 0.09, b.x)) * mix(0.72, 1., smoothstep(0., 0.06, s.x));
+  c *= 0.8 + 0.38*grain;
+  c *= 0.9 + 0.1*sin(q.y*0.7 + fbm3(q*0.05)*9.);
+  c = mix(c, vec3(0.37,0.38,0.27), smoothstep(0.62, 0.82, fbm3(q*0.06 + 7.))*0.32);
+  c *= 1. - 0.3*smoothstep(0.58, 0.95, noise(vec2(q.x*0.3, q.y*0.012 + 3.)));
+  return c;
+}
 `;
 
 // sun + ambient + shadow map + a handful of point lights (explosion flashes, fires)
@@ -44,19 +67,38 @@ void main(){ vW = aPos; vN = aNormal; gl_Position = uVP*vec4(aPos,1.); }`;
 export const FS_TERRAIN = `#version 300 es
 precision highp float;
 in vec3 vW; in vec3 vN; out vec4 o;
-uniform sampler2D uAlbedo; uniform sampler2D uDecal; uniform vec4 uAlbRect; uniform float uDetail;
+uniform sampler2D uAlbedo; uniform sampler2D uDecal; uniform sampler2D uHM; uniform vec4 uAlbRect; uniform float uDetail; uniform float uTime;
 ${NOISE}${LIGHT}
 void main(){
   vec3 n = normalize(vN);
-  vec3 c = texture(uAlbedo, (vW.xy - uAlbRect.xy)/uAlbRect.zw).rgb;
-  // steep faces: the top-down texture smears, so lay strata over it
-  float steep = smoothstep(0.16, 0.42, 1.-n.z);
+  vec2 uv = (vW.xy - uAlbRect.xy)/uAlbRect.zw;
+  vec3 c = texture(uAlbedo, uv).rgb;
+  vec4 m = texture(uHM, uv);          // height, rock, dirt, water
+  // steep faces: the top-down texture smears, so texture them side-on as fractured rock
+  float steep = smoothstep(0.2, 0.5, 1.-n.z);
   if (steep > 0.) {
-    float s = noise(vec2(vW.z*0.55 + noise(vW.xy*0.07)*4., dot(vW.xy, vec2(0.05,0.03))));
-    vec3 rk = mix(vec3(0.27,0.26,0.26), vec3(0.5,0.48,0.45), s) * (0.8+0.4*noise(vW.xy*0.6+vW.z));
-    c = mix(c, rk, steep*0.92);
+    vec2 t = normalize(vec2(-n.y, n.x) + 1e-5);
+    vec3 rk = rockFace(vec2(dot(vW.xy, t), vW.z));
+    c = mix(c, rk, steep*0.94);
   }
-  if (uDetail > 0.) { float d = noise(vW.xy*1.3)*0.4 + noise(vec2(vW.x*3.1, vW.y*4.3))*0.35 + noise(vW.xy*9.1)*0.25; c *= 1. + (d-.5)*uDetail; }
+  // a dusting of old snow on the high shelves of the mountain
+  float snow = smoothstep(175., 230., vW.z + (fbm3(vW.xy*0.015)-.5)*70.) * smoothstep(0.6, 0.85, n.z) * smoothstep(0.35, 0.6, fbm3(vW.xy*0.05));
+  c = mix(c, vec3(0.72,0.74,0.78)*(0.85+0.2*noise(vW.xy*0.4)), snow*0.75);
+  if (uDetail > 0.) {
+    float grass = (1.-m.g)*(1.-m.b)*(1.-m.a)*(1.-steep);
+    float blades = noise(vec2(vW.x*3.7 + noise(vW.xy*0.8)*2., vW.y*3.1))*0.55 + noise(vW.xy*11.)*0.45;
+    float pebbles = 1. - smoothstep(0., 0.12, voro(vW.xy*1.6).x)*0.5;
+    float d = mix(noise(vW.xy*1.3)*0.5 + noise(vW.xy*6.1)*0.5, blades, grass);
+    c *= 1. + (d-.5)*uDetail*1.6;
+    c *= mix(1., pebbles, m.b*(1.-grass)*uDetail*1.4);
+  }
+  // water: a dark, moving surface that catches what light there is
+  if (m.a > 0.3) {
+    float w = smoothstep(0.3, 0.7, m.a);
+    float rip = noise(vec2(vW.x*0.5, vW.y*1.6 - uTime*1.7)) * noise(vec2(vW.x*1.3 + uTime*0.6, vW.y*0.7));
+    vec3 wc = vec3(0.05,0.08,0.09) + uFog*1.4 + uSunCol*0.12*pow(rip, 2.)*2.4;
+    c = mix(c, wc, w*0.85);
+  }
   if (vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
   o = vec4(fogged(lighting(c, n, vW, 1.), vW.xy), 1.);
 }`;
@@ -66,7 +108,7 @@ precision highp float;
 uniform sampler2D uHM; uniform vec4 uRect;
 in vec2 vUV; out vec4 o;
 ${NOISE}
-float D(vec2 w, float rock){ return rock*((fbm(w/11.)-.5)*9. + (fbm(vec2(w.x/3.,w.y/1.6))-.5)*1.6) + (1.-rock)*(fbm(w/4.)-.5)*0.5; }
+float D(vec2 w, float rock){ return rock*((fbm(w/11.)-.5)*9. + (fbm(vec2(w.x/3.,w.y/1.6))-.5)*1.6 - smoothstep(0.,0.15,voro(w/7.).x)*1.4) + (1.-rock)*((fbm(w/4.)-.5)*0.5 + (noise(w*1.7)-.5)*0.12); }
 void main(){
   vec2 w = uRect.xy + vUV*uRect.zw; vec4 m = texture(uHM, vUV);
   float e = 0.8;
@@ -74,20 +116,35 @@ void main(){
   vec3 n = normalize(vec3(-hx, -hy, 2.*e*0.9));
   float dif = max(dot(n, normalize(vec3(-0.5,0.4,0.76))),0.);
   float rock = smoothstep(0.3,0.7, m.g + (fbm(w/13.)-.5)*.35);
-  float g1 = fbm(w/70.), g2 = fbm(w/9.+31.), g3 = noise(w*1.9);
-  vec3 grass = mix(vec3(0.17,0.24,0.11), vec3(0.37,0.40,0.19), smoothstep(0.25,0.75,g1));
-  grass = mix(grass, vec3(0.24,0.30,0.14), smoothstep(0.55,0.7,fbm(w/26.+70.))*0.6);
-  grass = mix(grass, vec3(0.40,0.37,0.21), smoothstep(.5,.8,g2)*.55);
-  grass *= 0.84+0.32*g3;
-  vec3 dirt = mix(vec3(0.33,0.27,0.19), vec3(0.47,0.40,0.30), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
-  vec3 rk = mix(vec3(0.28,0.27,0.27), vec3(0.5,0.48,0.45), fbm(vec2(w.x/30., w.y/7.)+m.r*0.12));
-  rk = mix(rk, vec3(0.42,0.40,0.36), smoothstep(.45,.75,fbm(w/20.+9.))*.5);
-  rk *= 0.75+0.5*fbm(w/3.5);
+  // rough upland pasture: tussocky, part green, part bleached, with clover-dark hollows and heather
+  float g1 = fbm(w/90.), g2 = fbm(w/11.+31.), g3 = noise(w*1.9), g4 = fbm(w/3.2+5.);
+  vec3 grass = mix(vec3(0.19,0.24,0.12), vec3(0.33,0.35,0.18), smoothstep(0.25,0.75,g1));
+  grass = mix(grass, vec3(0.15,0.2,0.1), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.55);
+  grass = mix(grass, vec3(0.43,0.40,0.25), smoothstep(.52,.82,g2)*.6);
+  grass = mix(grass, vec3(0.27,0.21,0.2), smoothstep(.66,.8,fbm(w/17.+120.))*.35);
+  grass *= 0.8 + 0.28*g3 + 0.18*(g4-.5);
+  // trampled earth and mud: darker and wetter in the ruts
+  vec3 dirt = mix(vec3(0.27,0.22,0.16), vec3(0.45,0.38,0.28), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
+  dirt *= 0.86 + 0.14*smoothstep(0.2, 0.6, abs(sin(w.x*0.9 + fbm3(w/6.)*6.)));
+  // rock seen from above: fractured slabs with lichen and gravel in the joints
+  vec2 wq = w + vec2(fbm3(w/23.), fbm3(w/23.+40.))*16.;
+  vec2 vb = voro(wq/16.), vs = voro(wq/5.);
+  float macro = fbm(w/60.+3.);
+  vec3 rk = mix(vec3(0.29,0.28,0.27), vec3(0.53,0.51,0.48), clamp(0.15 + 0.45*macro + 0.35*vb.y, 0., 1.));
+  rk *= mix(0.62, 1., smoothstep(0., 0.08, vb.x)) * mix(0.84, 1., smoothstep(0., 0.07, vs.x));
+  rk = mix(rk, vec3(0.42,0.43,0.32), smoothstep(.55,.78,fbm(w/14.+9.))*.35);
+  rk *= 0.78+0.44*fbm(w/3.5);
+  // scree where the cliff meets the grass
+  float scree = smoothstep(0.15, 0.45, m.g) * (1. - smoothstep(0.55, 0.9, m.g));
+  vec3 grav = mix(vec3(0.33,0.31,0.29), vec3(0.5,0.48,0.45), noise(w*3.1)) * (0.8 + 0.3*noise(w*0.7));
   float dm = clamp(m.b*(0.55+0.9*fbm(w/8.+3.)),0.,1.);
   vec3 c = mix(grass, dirt, dm);
+  c = mix(c, grav, scree*0.7);
   c = mix(c, rk, rock);
-  vec3 wat = vec3(0.10,0.16,0.18) + 0.10*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);
-  c = mix(c, vec3(0.30,0.27,0.2), smoothstep(0.02,0.35,m.a)*(1.-smoothstep(0.35,0.7,m.a))*0.7);
+  vec3 wat = vec3(0.07,0.11,0.12) + 0.06*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);
+  // muddy banks with pebbles at the waterline
+  float bank = smoothstep(0.02,0.35,m.a)*(1.-smoothstep(0.35,0.7,m.a));
+  c = mix(c, vec3(0.24,0.21,0.16)*(0.75+0.5*noise(w*2.2)), bank*0.8);
   c = mix(c, wat, smoothstep(0.35,0.75,m.a));
   c *= 0.62 + 0.62*dif;
   o = vec4(c,1.);
@@ -112,22 +169,43 @@ ${NOISE}${LIGHT}
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
   if (vMat < 0.5) {
-    // dressed stone: running-bond blocks on faces, flagstones on top
-    vec2 uv;
-    if (abs(n.z) > 0.6) uv = vW.xy*0.62;
-    else { vec2 t = normalize(vec2(-n.y, n.x)+1e-4); uv = vec2(dot(vW.xy, t)*0.5, vW.z*0.95); }
-    float row = floor(uv.y); uv.x += mod(row,2.)*0.5;
-    vec2 id = floor(uv), f = fract(uv);
-    float joint = smoothstep(0.,0.05,f.x)*smoothstep(0.,0.05,1.-f.x)*smoothstep(0.,0.09,f.y)*smoothstep(0.,0.09,1.-f.y);
-    c *= (0.8+0.34*hash(id+row*7.)) * mix(0.66,1.,joint);
-    c *= 0.9+0.2*noise(vW.xy*2.7+vW.z*2.1);
-    c *= 0.9+0.1*noise(vec2(vW.z*0.3, 1.));
+    if (abs(n.z) > 0.6) {
+      // flagstones: irregular slabs, worn and stained
+      vec2 v = voro(vW.xy*0.45);
+      float fa = 1. - smoothstep(0.12, 0.35, fwidth(vW.x*0.45) + fwidth(vW.y*0.45));
+      c *= mix(0.97, (0.82 + 0.3*v.y) * mix(0.62, 1., smoothstep(0., 0.07, v.x)), fa);
+      c *= 0.88 + 0.24*fbm3(vW.xy*1.7);
+      c = mix(c, c*vec3(0.85,0.9,0.8), smoothstep(0.6,0.8,fbm3(vW.xy*0.15))*0.5);
+    } else {
+      // dressed ashlar in running bond, every course a little different
+      vec2 t = normalize(vec2(-n.y, n.x)+1e-4);
+      float u = dot(vW.xy, t);
+      vec2 uv = vec2(u*0.46, vW.z*0.9);
+      float row = floor(uv.y); uv.x += mod(row,2.)*0.5 + hash(vec2(row, 5.))*0.3;
+      vec2 id = floor(uv), f = fract(uv);
+      float chip = 0.04 + 0.05*noise(vW.xy*3.+vW.z*3.);
+      float joint = smoothstep(0.,chip,f.x)*smoothstep(0.,chip,1.-f.x)*smoothstep(0.,chip*1.6,f.y)*smoothstep(0.,chip*1.6,1.-f.y);
+      float hv = hash(id+row*7.);
+      float fa = 1. - smoothstep(0.18, 0.45, fwidth(uv.y));
+      c *= mix(0.92, (0.8+0.32*hv) * mix(0.55,1.,joint), fa);
+      c *= mix(vec3(1.), vec3(1.04,1.0,0.94), step(0.7, hash(id+3.1)));     // the odd warmer stone
+      c *= 0.88+0.24*fbm3(vec2(u, vW.z)*2.3);
+      // rain streaks running down from the parapets, damp and moss at the foot
+      c *= 1. - 0.22*smoothstep(0.5, 0.9, noise(vec2(u*0.9, vW.z*0.06)));
+      c = mix(c, vec3(0.2,0.24,0.15), smoothstep(3.5, 0., vW.z - 0.5*noise(vec2(u*0.5, 1.)))*0.35*smoothstep(0.4,0.7,noise(vec2(u*0.35, 7.))));
+    }
   } else if (vMat < 1.5) {
+    // timber: planks with grain and iron-dark gaps
     float pl = dot(vW.xy, vec2(0.71,0.71))*2.2 + vW.z*0.2;
-    c *= (0.78+0.3*hash(vec2(floor(pl), 3.))) * (0.85+0.15*smoothstep(0.,0.12,fract(pl)));
+    float g = noise(vec2(pl*0.6, vW.z*7. + hash(vec2(floor(pl),1.))*20.));
+    c *= (0.72+0.36*hash(vec2(floor(pl), 3.))) * (0.7+0.3*smoothstep(0.,0.1,fract(pl))) * (0.85 + 0.3*g);
   } else if (vMat > 2.5) {
-    float sl = vW.z*1.6 + hash(floor(vW.xy*1.5))*0.3;
-    c *= 0.8+0.25*hash(vec2(floor(sl), floor(dot(vW.xy,vec2(1.3,0.4)))));
+    // slate: overlapping courses of small tiles
+    vec2 t = normalize(vec2(-n.y, n.x)+1e-4);
+    float u = dot(vW.xy, t)*2.2, row = floor(vW.z*2.6);
+    float tile = fract(u + mod(row,2.)*0.5);
+    float fs = 1. - smoothstep(0.2, 0.5, fwidth(vW.z*2.6));
+    c *= mix(0.9, 1., 1.-fs) * mix(1., (0.78 + 0.3*hash(vec2(floor(u + mod(row,2.)*0.5), row))), fs) * (0.7 + 0.3*smoothstep(0., 0.15, fract(vW.z*2.6))) * (0.85+0.15*smoothstep(0.,0.08,tile)*smoothstep(0.,0.08,1.-tile));
   }
   if (n.z > 0.7 && vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
   o = vec4(fogged(lighting(c, n, vW, 1.), vW.xy), 1.);

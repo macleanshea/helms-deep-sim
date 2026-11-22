@@ -17,7 +17,9 @@ const ICONS = {
   supply: I('<path d="M4 8.500a8 8 0 0116 0z" fill="currentColor" stroke="none"/><path d="M4 8.500l6 7M20 8.500l-6 7M12 8.500v7"/><rect x="8.500" y="15.500" width="7" height="6" rx="1" fill="currentColor" stroke="none"/>'),
   reinforce: I('<circle cx="6" cy="8" r="2.200" fill="currentColor" stroke="none"/><circle cx="12" cy="6.500" r="2.400" fill="currentColor" stroke="none"/><circle cx="18" cy="8" r="2.200" fill="currentColor" stroke="none"/><path d="M2.500 19c0-4 1.500-6.500 3.500-6.500s2.300 1.200 2.800 2.500M21.500 19c0-4-1.500-6.500-3.500-6.500s-2.300 1.200-2.800 2.500M7.500 20.500c0-5.500 2-8.500 4.500-8.500s4.500 3 4.500 8.500"/>'),
   focus: I('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="3.200"/><circle cx="12" cy="12" r=".9" fill="currentColor"/>'),
-  hold: I('<path d="M6 19.500l2.500-11 3 .7-2.500 11z" fill="currentColor" stroke="none"/><path d="M4 20.500h9"/><circle cx="16.500" cy="8" r="5"/><path d="M13 11.500l7-7"/>'),
+  fire: I('<path d="M5 20.500l3.500-12.500 3 .8-3.500 12.500z" fill="currentColor" stroke="none"/><path d="M3 21h8"/><circle cx="17" cy="7" r="4.200"/><path d="M17 1.500v3M17 9.500v3M11.500 7h3M19.500 7h3"/>'),
+  zones: I('<path d="M3 19a9 9 0 0118 0"/><path d="M7 19a5 5 0 0110 0" stroke-dasharray="2 2"/><circle cx="12" cy="19" r="1.400" fill="currentColor"/>'),
+  ranges: I('<path d="M12 20L4.500 7.500A13 13 0 0119.500 7.500z" fill="currentColor" fill-opacity=".22"/><path d="M12 20L4.500 7.500A13 13 0 0119.500 7.500z"/><circle cx="12" cy="20" r="1.400" fill="currentColor"/>'),
   retreat: I('<path d="M11 21V9.500l2-1.500 1.200 1.500h3.600L19 8l2 1.500V21h-3.500v-3.500a1.500 1.500 0 00-3 0V21z" fill="currentColor" stroke="none"/><path d="M2.500 14h6M6 11l3 3-3 3"/>'),
   losses: I('<path d="M12 3v18M7 8h10" /><circle cx="6" cy="17" r="1.300" fill="currentColor"/><circle cx="18" cy="16" r="1.300" fill="currentColor"/><circle cx="16.500" cy="20" r="1.300" fill="currentColor"/><circle cx="8" cy="20.500" r="1.300" fill="currentColor"/>'),
 };
@@ -158,20 +160,85 @@ export function buildUI(app, atlas) {
   // --------------------------------------------------------- command bar
   const cmdbar = $('cmdbar');
   const cmds = {};
+  let group = null;
+  const addGroup = (title) => {
+    const g = el('div', 'cgroup');
+    g.append(el('div', 'cg-label', title));
+    group = el('div', 'cg-btns'); g.append(group);
+    cmdbar.append(g);
+  };
   const addCmd = (id, name, key, svg, title, body, fn) => {
     const b = el('button', 'cmd', `<span class="key">${key}</span><span class="uses"></span>${svg}<span class="name">${name}</span><i class="cool"></i>`);
     b.addEventListener('click', () => { fn(); b.blur(); });
     bindTip(b, `${title} <kbd>${key}</kbd>`, body);
-    cmdbar.append(b);
+    group.append(b);
     cmds[id] = { b, uses: b.querySelector('.uses'), cool: b.querySelector('.cool') };
   };
-  for (const k in SUPPORT) addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, SUPPORT[k].desc, () => app.armSupport(k));
-  cmdbar.append(el('div', 'sep'));
+  const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, SUPPORT[k].desc, () => app.armSupport(k));
+  addGroup('Strike');
+  sup('air'); sup('gunship'); sup('arty');
+  addCmd('fire', 'Fire Mission', 'T', ICONS.fire, 'Fire Mission', 'Direct your own mortars and howitzers. Opens the artillery panel; click the map to put every section that can reach onto the target, or task, hold and release sections one by one.', () => app.toggleFireMission());
   addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map. Every weapon in range concentrates on targets inside it for 30 s. Press again to cancel.', () => app.armFocus());
-  addCmd('hold', 'Hold Mortars', 'H', ICONS.hold, 'Hold Indirect Fire', 'Mortars and howitzers cease fire to save shells until you release them.', () => app.toggleHold());
+  addGroup('Resupply &amp; Reinforce');
+  sup('supply'); sup('reinforce');
   addCmd('retreat', 'Fall Back', 'R', ICONS.retreat, 'Retreat to the Keep', 'All infantry outside the Hornburg leave their posts, cross the wall walk and man the keep.', () => app.retreat());
-  cmdbar.append(el('div', 'sep'));
+  addGroup('Overlays');
+  addCmd('zones', 'Fire Zones', 'Z', ICONS.zones, 'Artillery Fire Zones', 'Show where each mortar and howitzer section can land its rounds: everything between its minimum and maximum range.', () => app.toggleOverlay('zones'));
+  addCmd('ranges', 'Ranges', 'V', ICONS.ranges, 'Weapon Ranges', 'Show how far the rest of the garrison can reach, by weapon. With troops selected, shows just theirs. Troops on a wall see a little further.', () => app.toggleOverlay('ranges'));
   addCmd('losses', 'Losses', 'L', ICONS.losses, 'Show Losses', 'Overlay where soldiers and attackers have fallen so far.', () => app.toggleLosses());
+
+  // ------------------------------------------------------ artillery panel
+  const artyPanel = $('artyPanel'), overlayKey = $('overlayKey');
+  let artyRows = null, artyKey = '';
+  const MODES = [['free', 'Free'], ['target', 'Target'], ['hold', 'Hold']];
+  const modeSeg = (onPick) => {
+    const seg = el('div', 'mseg');
+    for (const [m, t] of MODES) { const b = el('button', null, t); b.dataset.mode = m; b.addEventListener('click', () => { onPick(m); b.blur(); }); seg.append(b); }
+    return seg;
+  };
+  const buildArty = (list) => {
+    artyPanel.innerHTML = '';
+    const head = el('div', 'ap-head', '<b>Artillery</b><span class="dim">click the map to fire</span>');
+    const x = el('button', 'x', '✕'); x.title = 'Close (T)'; x.addEventListener('click', () => app.closeArtyPanel()); head.append(x);
+    artyPanel.append(head);
+    const all = el('div', 'ap-row all');
+    all.append(el('div', 'ap-name', '<b>All sections</b>'), modeSeg((m) => app.artyOrder(null, m)));
+    artyPanel.append(all);
+    artyRows = list.map((a, k) => {
+      const row = el('div', 'ap-row');
+      const nm = el('div', 'ap-name', `<i style="background:rgb(${app.artyColor(k)})"></i><b>${a.label}</b><small></small>`);
+      const seg = modeSeg((m) => app.artyOrder([a.g], m));
+      row.append(nm, seg);
+      artyPanel.append(row);
+      return { row, info: nm.querySelector('small'), seg, a };
+    });
+    artyPanel.append(el('p', 'tip', '<b>Target</b> then click the map. Sections that cannot reach keep picking their own targets.'));
+  };
+  ui.refreshArty = () => {
+    const sim = app.sim;
+    if (!sim || app.mode !== 'battle' || !app.artyPanel) { artyPanel.hidden = true; return; }
+    const list = sim.arty;
+    const key = list.map((a) => a.g).join(',');
+    if (key !== artyKey || !artyRows) { artyKey = key; buildArty(list); }
+    artyPanel.hidden = false;
+    const armed = app.tool && app.tool.kind === 'fire' ? app.tool.groups : undefined;
+    for (const r of artyRows) {
+      const a = r.a, dead = !a.n;
+      r.row.classList.toggle('dead', dead);
+      r.info.textContent = dead ? 'destroyed' : `${a.n} ${a.key === 'howitzer' ? 'guns' : 'tubes'} · ${Math.round(a.ammo * 100)}% ammo · ${a.key === 'howitzer' ? 'map-wide' : a.w.range + ' m'}${a.mode === 'hold' ? ' · holding' : a.mode === 'target' ? ' · on target' : ''}`;
+      for (const b of r.seg.children) {
+        const m = b.dataset.mode;
+        b.classList.toggle('active', m === 'target' ? a.mode === 'target' || (armed !== undefined && (armed === null || armed.includes(a.g))) : a.mode === m);
+        b.disabled = dead;
+      }
+    }
+    artyPanel.querySelector('.ap-row.all').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === 'target' ? armed === null : list.length > 0 && list.every((a) => !a.n || a.mode === b.dataset.mode)));
+  };
+  ui.setOverlayKey = (items) => {
+    if (!items || !items.length) { overlayKey.hidden = true; return; }
+    overlayKey.hidden = false;
+    overlayKey.innerHTML = items.map(([col, name, val]) => `<div class="ok-row"><i style="background:rgb(${col})"></i><span>${name}</span><b>${val}</b></div>`).join('');
+  };
 
   // ------------------------------------------------------ toasts & hints
   const feed = $('feed'), bannerEl = $('banner'), hintEl = $('hint');
@@ -182,6 +249,9 @@ export function buildUI(app, atlas) {
 
   // ----------------------------------------------------------------- HUD
   const defCount = $('defCount'), orcCount = $('orcCount'), defBar = $('defBar'), orcBar = $('orcBar');
+  const pauseBtn = document.querySelector('#speedCtl .seg[data-speed="0"]');
+  const PAUSE_SVG = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>';
+  const PLAY_SVG = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 2.2v11.6L13.6 8z" fill="currentColor"/></svg>';
   const ammoPct = $('ammoPct'), ammoBar = $('ammoBar'), clock = $('clock'), dawn = $('dawn'), selinfo = $('selinfo');
   ui.updateHud = () => {
     const sim = app.sim;
@@ -202,6 +272,12 @@ export function buildUI(app, atlas) {
     clock.textContent = mmss(sim.time);
     dawn.textContent = sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }
+    // the pause button turns into a play button while the battle is paused
+    if (pauseBtn.dataset.state !== String(app.paused)) {
+      pauseBtn.dataset.state = String(app.paused);
+      pauseBtn.innerHTML = app.paused ? PLAY_SVG : PAUSE_SVG;
+      pauseBtn.title = app.paused ? 'Resume (Space)' : 'Pause (Space)';
+    }
     for (const k in SUPPORT) {
       const s = sim.support[k], c = cmds[k];
       c.uses.textContent = s.left;
@@ -214,9 +290,15 @@ export function buildUI(app, atlas) {
     cmds.focus.b.classList.toggle('armed', !!app.tool && app.tool.kind === 'focus');
     cmds.focus.b.classList.toggle('on', !!sim.focus);
     cmds.focus.b.querySelector('.name').textContent = sim.focus ? 'Cancel Focus' : 'Focus Fire';
-    cmds.hold.b.classList.toggle('on', sim.holdIndirect);
-    cmds.hold.b.querySelector('.name').textContent = sim.holdIndirect ? 'Mortars Held' : 'Hold Mortars';
+    const missions = sim.arty.some((a) => a.n && a.mode === 'target');
+    cmds.fire.b.classList.toggle('armed', !!app.tool && app.tool.kind === 'fire');
+    cmds.fire.b.classList.toggle('on', missions && !(app.tool && app.tool.kind === 'fire'));
+    cmds.fire.b.classList.toggle('spent', !sim.arty.some((a) => a.n));
+    cmds.fire.uses.textContent = sim.arty.filter((a) => a.n).length || '';
     cmds.losses.b.classList.toggle('armed', !!app.showLosses);
+    cmds.zones.b.classList.toggle('armed', !!app.overlay.zones);
+    cmds.ranges.b.classList.toggle('armed', !!app.overlay.ranges);
+    ui.refreshArty();
     // selection summary
     const sel = app.selection;
     if (!sel.length) { selinfo.hidden = true; return; }
@@ -246,7 +328,7 @@ export function buildUI(app, atlas) {
       <h4>Setting up</h4>
       <div class="keys"><div><kbd>Click</kbd></div><span>With a unit picked: drop a block of troops</span><div><kbd>Drag</kbd></div><span>Draw a line — along a wall top to man the battlements, or across the valley to lay wire, mines or a moat</span><div><kbd>Click formation</kbd></div><span>Select it; drag to move, <kbd>[</kbd> <kbd>]</kbd> rotate, <kbd>Del</kbd> remove</span><div><kbd>Enter</kbd></div><span>Begin the battle</span></div>
       <h4>In battle</h4>
-      <div class="keys"><div><kbd>Space</kbd> <kbd>−</kbd> <kbd>+</kbd></div><span>Pause · slower · faster</span><div><kbd>1</kbd>–<kbd>5</kbd></div><span>Call support, then click the target (drag to aim an air strike)</span><div><kbd>F</kbd></div><span>Focus fire: drag a circle over the enemy you want dead</span><div><kbd>H</kbd> · <kbd>R</kbd> · <kbd>L</kbd></div><span>Hold mortars · fall back to the Hornburg · show where the fallen lie</span><div><kbd>Drag</kbd> then <kbd>Right-click</kbd></div><span>Box-select defenders and order them to move (<kbd>X</kbd> halts them)</span></div>
+      <div class="keys"><div><kbd>Space</kbd> <kbd>−</kbd> <kbd>+</kbd></div><span>Pause · slower · faster</span><div><kbd>1</kbd>–<kbd>5</kbd></div><span>Call support, then click the target (drag to aim an air strike)</span><div><kbd>T</kbd></div><span>Fire mission: open the artillery panel, then click a target for your mortars and howitzers (or task, hold and release each section)</span><div><kbd>F</kbd></div><span>Focus fire: drag a circle over the attackers to concentrate on</span><div><kbd>R</kbd></div><span>Fall back to the Hornburg</span><div><kbd>Z</kbd> · <kbd>V</kbd> · <kbd>L</kbd></div><span>Overlays: artillery fire zones · weapon ranges · where the fallen lie</span><div><kbd>Drag</kbd> then <kbd>Right-click</kbd></div><span>Box-select defenders and order them to move (<kbd>X</kbd> halts them)</span></div>
       <h4>What to watch for</h4>
       <div class="keys"><div>Ammunition</div><span>Troops re-arm within 60 m of a cache or supply drop. Amber dots are out of rounds.</span><div>Dead ground</div><span>Men on a wall can barely hit attackers hugging its foot. Guns on the Hornburg can — and so can grenades.</span><div>Captains</div><span>Uruk captains (banners) keep their companies steady. Kill one and those around him waver; companies that lose too many too fast break and run.</span><div>Siege works</div><span>Ladders and towers put attackers on the wall walk, sappers blow the culvert, a ram breaks the gate. Wire, moats and obstacles slow or stop them.</span></div>
       <div class="actions"><button class="primary" id="mClose">Got it</button></div></div>`;

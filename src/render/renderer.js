@@ -20,7 +20,7 @@ const ISTRIDE = 32;                  // mesh instance bytes
 const GRID = 4;                      // terrain mesh spacing (m)
 const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v.map((q) => q / l); })();
 // region covered by the shadow map: the fortress and its approaches
-const SB = { x0: 620, x1: 1190, y0: 120, y1: 800, z0: -8, z1: 90 };
+const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
 // simulation unit type -> mesh name and drawing scale
 const MESH_OF = { rifle: ['rifle', 1.3], mg: ['mg', 1.3], marksman: ['marksman', 1.3], grenadier: ['grenadier', 1.3], at: ['at', 1.3], cmd: ['cmd', 1.4], mortar: ['mortar', 1.3], howitzer: ['howitzer', 1.15],
@@ -235,7 +235,8 @@ export class Renderer {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, this.albedo); gl.generateMipmap(gl.TEXTURE_2D);
-    gl.deleteFramebuffer(fbo); gl.deleteTexture(hm);
+    gl.deleteFramebuffer(fbo);
+    this.hmTex = hm; // kept: the terrain shader reads its material masks (rock, dirt, water) at run time
     gl.enable(gl.DEPTH_TEST);
   }
 
@@ -422,8 +423,9 @@ export class Renderer {
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
     let p = this.pTerrain;
     gl.useProgram(p.p); this._common(p.u, env);
-    gl.uniform4fv(p.u.uAlbRect, this.albRect); gl.uniform1f(p.u.uDetail, detail);
+    gl.uniform4fv(p.u.uAlbRect, this.albRect); gl.uniform1f(p.u.uDetail, detail); gl.uniform1f(p.u.uTime, this.clock || 0);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.albedo); gl.uniform1i(p.u.uAlbedo, 0);
+    gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.hmTex); gl.uniform1i(p.u.uHM, 3);
     gl.bindVertexArray(this.terrain.vao);
     gl.drawElements(gl.TRIANGLES, this.terrain.count, gl.UNSIGNED_INT, 0);
     p = this.pStruct;
@@ -469,6 +471,7 @@ export class Renderer {
    */
   render(cam, sim, fx, al, env, clock) {
     const gl = this.gl, vw = this.canvas.width, vh = this.canvas.height;
+    this.clock = clock;
     if (sim && sim.structVersion !== this.structVersion) { this.structVersion = sim.structVersion; this._updateStructures(sim); }
     if (sim && (sim !== this.propSim || sim.propVersion !== this.propVersion)) { this.propSim = sim; this.propVersion = sim.propVersion; this._updateProps(sim); }
     if (fx) this._flushDecals(fx);
@@ -622,12 +625,11 @@ export class Renderer {
       this._put(M.chute, d.x + (1 - u) * 14, d.y, g + (1 - u) * 95, 0.4, 1, 0, 255, 255, 255, 0, 0, 0, 0);
     }
     for (const a of sim.aircraft) {
-      const x = a.px + (a.x - a.px) * al, y = a.py + (a.y - a.py) * al;
-      if (a.kind === 'jet') this._put(M.jet, x, y, 125, a.rot, 1.7, 0, 235, 235, 235, 0, 0, 0, 0);
-      else if (a.kind === 'cargo') this._put(M.cargo, x, y, 105, a.rot, 1, 0, 235, 235, 235, 0, 0, 0, 0);
-      else if (a.kind === 'helo') this._put(M.helo, x, y, 52 + Math.sin(clock * 1.3 + x) * 1.5, a.rot, 1.25, 0, 235, 235, 235, 0, 0, 0, 0);
-      else this._put(M.transport, x, y, a.st === 1 ? 26 : 48, a.rot, 1.2, 0, 235, 235, 235, 0, 0, 0, 0);
-      a.z = a.kind === 'jet' ? 125 : a.kind === 'cargo' ? 105 : a.kind === 'helo' ? 52 : a.st === 1 ? 26 : 48;
+      const x = a.px + (a.x - a.px) * al, y = a.py + (a.y - a.py) * al, z = a.z == null ? 100 : (a.pz ?? a.z) + (a.z - (a.pz ?? a.z)) * al;
+      if (a.kind === 'jet') this._put(M.jet, x, y, z, a.rot, 1.7, 0, 235, 235, 235, 0, 0, 0, 0);
+      else if (a.kind === 'cargo') this._put(M.cargo, x, y, z, a.rot, 1, 0, 235, 235, 235, 0, 0, 0, 0);
+      else if (a.kind === 'helo') this._put(M.helo, x, y, z + Math.sin(clock * 1.3 + x) * 1.5, a.rot, 1.25, 0, 235, 235, 235, 0, 0, 0, 0);
+      else this._put(M.transport, x, y, z, a.rot, 1.2, 0, 235, 235, 235, 0, 0, 0, 0);
     }
     if (!fx) return;
     for (const ch of fx.chunks) {

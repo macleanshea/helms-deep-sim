@@ -1,7 +1,7 @@
 // Application glue: state machine (setup -> battle -> debrief), isometric camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT } from './config.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS } from './config.js';
 import { buildMap, KEEP } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, PRESETS } from './scenarios.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
@@ -43,6 +43,7 @@ const app = {
   speed: 1, paused: false, tool: null, brushCount: 50,
   selGroup: null, hoverGroup: null, selection: [], markers: [],
   previewDirty: false, clock: 0, acc: 0, slowT: 0, showLosses: false,
+  overlay: { zones: false, ranges: false }, artyPanel: false,
   env: { amb: MOOD.setup[0].slice(), sun: MOOD.setup[1].slice(), fog: MOOD.setup[2].slice(), lift: 0.03, flash: 0, shadows: true },
   bolt: -1, nextBolt: 14,
   mouse: { sx: 0, sy: 0, wx: 0, wy: 0, wz: 0, inside: false },
@@ -58,7 +59,7 @@ const heightAt = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 :
 const S = (x, y, z = 0) => toScreen(app.cam, vw, vh, x, y, z, T2);
 const labXY = new Float32Array(160);
 function pickAt(sx, sy) { const p = pick(app.cam, vw, vh, sx, sy, heightAt, T3); return { x: p[0], y: p[1], z: p[2] }; }
-function insets() { return app.mode === 'setup' ? { l: 316, r: 336, t: 54, b: 0 } : { l: 0, r: 0, t: 54, b: 96 }; }
+function insets() { return app.mode === 'setup' ? { l: 316, r: 336, t: 54, b: 0 } : { l: 0, r: 0, t: 54, b: 120 }; }
 function fitZoom() {
   const i = insets(), c = Math.abs(Math.cos(app.cam.yaw)), s = Math.abs(Math.sin(app.cam.yaw));
   const ew = WORLD_W * c + WORLD_H * s, eh = (WORLD_W * s + WORLD_H * c) * SIN_P;
@@ -66,7 +67,7 @@ function fitZoom() {
 }
 function fitCamera() {
   const i = insets(), c = app.cam;
-  c.zoom = fitZoom() * 1.32; c.x = WORLD_W / 2 + 60; c.y = WORLD_H / 2 - 20;
+  c.zoom = fitZoom() * 1.32; c.x = WORLD_W / 2 + 60; c.y = WORLD_H / 2 + 20;
   const g = toGround(c, vw, vh, vw - (i.l + (vw - i.l - i.r) / 2), vh - (i.t + (vh - i.t - i.b) / 2), 0, T2);
   c.x = g[0]; c.y = g[1];
 }
@@ -155,6 +156,7 @@ app.startBattle = () => {
   app.sim = new Sim(map, app.setup, fx);
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
+  app.overlay.zones = false; app.overlay.ranges = false; app.artyPanel = false; rangeCache.t = -1; ui.setOverlayKey(null);
   app.tool = null; app.selGroup = null; app.selection = []; app.markers = []; app.drag = null; app.bolt = -1; app.nextBolt = 10;
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   fitCamera();
@@ -166,6 +168,7 @@ app.startBattle = () => {
 };
 app.backToSetup = () => {
   app.mode = 'setup'; app.tool = null; app.selection = []; app.markers = []; app.drag = null; app.showLosses = false;
+  app.artyPanel = false; ui.setOverlayKey(null); ui.refreshArty();
   fx.reset(); renderer.clearDecals(); audio.setRoar(0);
   ui.setMode('setup'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   rebuildPreview(); fitCamera();
@@ -192,12 +195,37 @@ app.armFocus = () => {
   audio.play('click');
   ui.hint('<b>Focus Fire</b> — drag a circle over the enemy · right-click to cancel');
 };
-app.toggleHold = () => {
-  if (app.mode !== 'battle') return;
-  app.sim.holdIndirect = !app.sim.holdIndirect;
-  ui.toast(app.sim.holdIndirect ? 'Mortars and howitzers: hold fire.' : 'Mortars and howitzers: fire at will.', app.sim.holdIndirect ? 'warn' : 'good');
+// ---- artillery: the garrison's own mortars and howitzers
+const ARTY_COLS = ['240,179,74', '255,122,217', '122,255,193', '159,168,255', '255,210,122', '127,224,255', '255,140,100', '200,255,120'];
+app.artyColor = (k) => ARTY_COLS[k % ARTY_COLS.length];
+const liveArty = () => (app.sim ? app.sim.arty.filter((a) => a.n > 0) : []);
+/** Arm the targeting cursor for the listed sections (null = every section). */
+app.armFireMission = (groups = null) => {
+  if (app.mode !== 'battle' || app.sim.result) return;
+  if (!liveArty().length) { ui.toast('No mortars or howitzers left on the field.', 'warn'); audio.play('deny'); return; }
+  app.artyPanel = true;
+  app.tool = { kind: 'fire', groups };
   audio.play('click');
+  const one = groups && groups.length === 1 ? app.sim.arty.find((a) => a.g === groups[0]) : null;
+  ui.hint(`<b>Fire Mission</b>${one ? ` · ${one.label}` : ' · all sections'} — click the target · right-click to cancel`);
+  ui.updateHud();
 };
+app.toggleFireMission = () => {
+  if (app.mode !== 'battle') return;
+  if (app.tool && app.tool.kind === 'fire') { app.tool = null; ui.hint(null); ui.updateHud(); return; }
+  app.armFireMission(null);
+};
+app.closeArtyPanel = () => { app.artyPanel = false; if (app.tool && app.tool.kind === 'fire') { app.tool = null; ui.hint(null); } ui.updateHud(); };
+app.artyOrder = (groups, mode) => {
+  if (app.mode !== 'battle' || app.sim.result) return;
+  if (mode === 'target') { app.armFireMission(groups); return; }
+  for (const a of app.sim.arty) if (!groups || groups.includes(a.g)) app.sim.setArtyMode(a.g, mode);
+  app.sim.updateArtillery();
+  const who = groups && groups.length === 1 ? app.sim.arty.find((a) => a.g === groups[0]).label : 'All artillery';
+  ui.toast(mode === 'hold' ? `${who}: hold fire.` : `${who}: fire at will.`, mode === 'hold' ? 'warn' : 'good');
+  audio.play('click'); ui.updateHud();
+};
+app.toggleOverlay = (k) => { app.overlay[k] = !app.overlay[k]; rangeCache.t = -1; audio.play('click'); ui.updateHud(); };
 app.retreat = () => {
   if (app.mode !== 'battle' || app.sim.result) return;
   const n = app.sim.orderRetreat();
@@ -209,7 +237,14 @@ function marker(x, y, r, dur, col, label, x2, y2) { app.markers.push({ x, y, z: 
 
 function fireTool(x0, y0, x1, y1) {
   const t = app.tool, sim = app.sim;
-  if (t.kind === 'focus') {
+  if (t.kind === 'fire') {
+    const n = sim.setArtyTarget(t.groups, x0, y0, 24);
+    if (!n) { ui.toast('Out of range — no section can reach that point.', 'warn'); audio.play('deny'); return; }
+    const total = (t.groups ? sim.arty.filter((a) => t.groups.includes(a.g)) : sim.arty).filter((a) => a.n).length;
+    ui.toast(`Fire mission: ${n} section${n > 1 ? 's' : ''} firing${n < total ? ` (${total - n} out of range)` : ''}.`, 'good');
+    audio.play('confirm');
+    sim.updateArtillery(); rangeCache.t = -1;
+  } else if (t.kind === 'focus') {
     sim.setFocus(x0, y0, Math.max(28, Math.hypot(x1 - x0, y1 - y0)));
     ui.toast('All guns: concentrate fire on the marked area.', 'good');
     audio.play('confirm');
@@ -353,7 +388,9 @@ window.addEventListener('keydown', (e) => {
   else if (k === '-' || k === '_') app.setSpeed(Math.max(1, app.speed / 2));
   else if (k >= '1' && k <= '5') { const name = Object.keys(SUPPORT)[+k - 1]; if (name) app.armSupport(name); }
   else if (k === 'f') app.armFocus();
-  else if (k === 'h') app.toggleHold();
+  else if (k === 't') app.toggleFireMission();
+  else if (k === 'z') app.toggleOverlay('zones');
+  else if (k === 'v') app.toggleOverlay('ranges');
   else if (k === 'r') app.retreat();
   else if (k === 'l') app.toggleLosses();
   else if (k === 'x' && app.selection.length) app.sim.stop(app.selection);
@@ -367,11 +404,156 @@ window.addEventListener('resize', resize);
 const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
 function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.max(2, r * app.cam.zoom), Math.max(1.4, r * app.cam.zoom * SIN_P), 0, 0, 6.2832); return p; }
 
+// ---- range overlays: unions of many circles, drawn through an offscreen layer so overlaps don't stack up
+const rl = document.createElement('canvas'), rctx = rl.getContext('2d');
+const rangeCache = { t: -1, zones: [], ranges: [], key: [] };
+/** pts: [x, y, z, rOuter, rInner]. Fills the union of the annuli and outlines its edges. */
+function unionArea(c, pts, col, fillA, lineA) {
+  if (!pts.length) return;
+  if (rl.width !== overlay.width || rl.height !== overlay.height) { rl.width = overlay.width; rl.height = overlay.height; }
+  const r = rctx, z = app.cam.zoom;
+  r.setTransform(dpr, 0, 0, dpr, 0, 0); r.globalCompositeOperation = 'source-over'; r.clearRect(0, 0, vw, vh);
+  const path = (shrink) => {
+    r.beginPath();
+    for (const p of pts) {
+      const s = S(p[0], p[1], p[2]), ro = Math.max(0.5, p[3] * z - shrink), ri = p[4] > 0 ? p[4] * z + shrink : 0;
+      if (s[0] + ro < -50 || s[0] - ro > vw + 50 || s[1] + ro * SIN_P < -50 || s[1] - ro * SIN_P > vh + 50) continue;
+      r.moveTo(s[0] + ro, s[1]); r.ellipse(s[0], s[1], ro, ro * SIN_P, 0, 0, 6.2832);
+      if (ri > 0) { r.moveTo(s[0] + ri, s[1]); r.ellipse(s[0], s[1], ri, ri * SIN_P, 0, 6.2832, 0, true); }
+    }
+  };
+  r.fillStyle = `rgb(${col})`; path(0); r.fill('nonzero');
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = fillA; c.drawImage(rl, 0, 0); c.restore();
+  r.globalCompositeOperation = 'destination-out'; path(1.8); r.fill('nonzero'); r.globalCompositeOperation = 'source-over';
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = lineA; c.drawImage(rl, 0, 0); c.restore();
+}
+const WCOL = { rifle: '94,200,242', mg: '240,179,74', sniper: '200,150,255', gl: '111,220,154', rocket: '255,110,90', autocannon: '255,225,130', tankgun: '255,160,60' };
+/** Sample the live positions behind both overlays a few times a second rather than every frame. */
+function refreshRangeCache() {
+  const sim = app.sim;
+  if (rangeCache.t >= 0 && app.clock - rangeCache.t < 0.25) return rangeCache;
+  rangeCache.t = app.clock;
+  const arty = sim.updateArtillery();
+  rangeCache.zones = arty.map((a, k) => ({ a, k, pts: a.n ? sim.groupUnits(a.g, 18).map((i) => [sim.x[i], sim.y[i], sim.unitZ(i) + 0.3, a.w.range, a.w.min]) : [] }));
+  const by = {}, sel = app.selection.length ? app.selection : null;
+  const list = sel || Array.from({ length: sim.n }, (_, i) => i);
+  for (const i of list) {
+    if (!sim.alive[i] || sim.team[i] !== DEF) continue;
+    const w = UNITS[sim.type[i]].wdef;
+    if (!w || w.arc || !w.range) continue;
+    const c = app.map.cellOf(sim.x[i], sim.y[i]), el = sim.elevD[c];
+    const r = el ? w.range * (sim.segTop[sim.mseg[c]] > 15 ? 1.2 : 1.12) : w.range;
+    (by[w.key] ||= []).push([sim.x[i], sim.y[i], sim.unitZ(i) + 0.3, r, w.min || 0]);
+  }
+  rangeCache.ranges = Object.entries(by).map(([k, pts]) => {
+    if (pts.length > 260) { const st = pts.length / 260; pts = Array.from({ length: 260 }, (_, q) => pts[Math.floor(q * st)]); }
+    return { k, pts, max: Math.max(...pts.map((p) => p[3])) };
+  }).sort((a, b) => b.max - a.max);
+  return rangeCache;
+}
+function artyCanReach(groups, x, y) {
+  let n = 0;
+  for (const zn of refreshRangeCache().zones) {
+    if (!zn.a.n || (groups && !groups.includes(zn.a.g))) continue;
+    if (zn.pts.some((p) => { const d = Math.hypot(p[0] - x, p[1] - y); return d <= p[3] && d >= p[4]; })) n++;
+  }
+  return n;
+}
+function tag(c, x, y, txt, col, bg = 'rgba(10,13,16,0.84)') {
+  c.font = `700 11px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  const tw = c.measureText(txt).width + 14;
+  c.fillStyle = bg; c.beginPath(); c.roundRect(x - tw / 2, y - 10, tw, 20, 5); c.fill();
+  c.strokeStyle = `rgba(${col},0.7)`; c.lineWidth = 1; c.stroke();
+  c.fillStyle = `rgb(${col})`; c.fillText(txt, x, y + 0.5);
+}
+/** Fire-mission markers; sections sharing a target share one label. */
+function drawMissionMarks(c, zones, groups) {
+  const seen = new Map();
+  for (const zn of zones) {
+    const a = zn.a;
+    if (a.mode !== 'target' || !a.n || (groups && !groups.includes(a.g))) continue;
+    const k = `${a.x.toFixed(1)},${a.y.toFixed(1)}`;
+    drawMissionMark(c, a, app.artyColor(zn.k), !seen.has(k));
+    seen.set(k, (seen.get(k) || []).concat(a));
+  }
+  const z = app.cam.zoom;
+  for (const list of seen.values()) {
+    const a = list[0], p = S(a.x, a.y, heightAt(a.x, a.y) + 0.3);
+    tag(c, p[0], p[1] - a.r * z * SIN_P - 14, list.length > 1 ? `FIRE MISSION · ${list.length} sections` : `${a.label} · FIRE MISSION`, list.length > 1 ? '240,179,74' : app.artyColor(zones.findIndex((q) => q.a === a)));
+  }
+}
+function drawMissionMark(c, a, col, first) {
+  const z = app.cam.zoom, h = heightAt(a.x, a.y) + 0.3;
+  const from = S(a.cx, a.cy, heightAt(a.cx, a.cy) + 1), fx = from[0], fy = from[1];
+  const to = S(a.x, a.y, h), tx = to[0], ty = to[1];
+  c.strokeStyle = `rgba(${col},0.55)`; c.lineWidth = 1.2; c.setLineDash([3, 6]); c.beginPath(); c.moveTo(fx, fy); c.lineTo(tx, ty); c.stroke(); c.setLineDash([]);
+  c.strokeStyle = `rgba(${col},0.95)`; c.lineWidth = 1.8; c.beginPath(); ring(c, a.x, a.y, h, a.r); c.stroke();
+  const q = 10;
+  if (first) { c.beginPath(); c.moveTo(tx - q, ty); c.lineTo(tx + q, ty); c.moveTo(tx, ty - q); c.lineTo(tx, ty + q); c.stroke(); }
+}
+/** Just the active fire missions (always shown, so the player can see where their guns are landing). */
+function drawMissions(c) {
+  if (!app.sim.arty.some((a) => a.mode === 'target')) return;
+  drawMissionMarks(c, refreshRangeCache().zones, null);
+}
+function drawZones(c, groups) {
+  const zones = refreshRangeCache().zones;
+  for (const zn of zones) {
+    const a = zn.a, col = app.artyColor(zn.k);
+    if (!a.n || (groups && !groups.includes(a.g))) continue;
+    unionArea(c, zn.pts, col, a.mode === 'hold' ? 0.04 : 0.09, 0.85);
+  }
+  for (const zn of zones) {
+    const a = zn.a, col = app.artyColor(zn.k);
+    if (!a.n || (groups && !groups.includes(a.g))) continue;
+    const p = S(a.cx, a.cy, heightAt(a.cx, a.cy) + 6);
+    const st = a.mode === 'hold' ? ' · HOLDING' : '';
+    tag(c, p[0], p[1] - 10, `${a.label} · ${a.w.min}–${a.w.range} m${st}`, col);
+  }
+  drawMissionMarks(c, zones, groups);
+}
+function drawRanges(c) {
+  const rc = refreshRangeCache();
+  const key = [];
+  for (const r of rc.ranges) {
+    const col = WCOL[r.k] || '230,230,230';
+    unionArea(c, r.pts, col, 0.05, 0.75);
+    key.push([col, WEAPONS[r.k].name, `${WEAPONS[r.k].range} m`]);
+  }
+  const ks = key.map((q) => q[1]).join();
+  if (ks !== rangeCache.keyStr) { rangeCache.keyStr = ks; ui.setOverlayKey(key.length ? key : null); }
+}
+/** Every forced gate and every gap in the walls gets a marker, so the state of the defences reads at a glance. */
+function drawBreaches(c) {
+  const segs = app.sim.segs, z = app.cam.zoom;
+  for (let k = 0; k < segs.length; k++) {
+    const s = segs[k];
+    if (s.kind === 'wall' && !s.breached && s.hp < s.maxHp && z > 0.9 && s.valid) {
+      const p = S(s.x, s.y, s.top + 4);
+      if (p[0] > -40 && p[1] > -40 && p[0] < vw + 40 && p[1] < vh + 40) {
+        const f = s.hp / s.maxHp;
+        c.fillStyle = 'rgba(0,0,0,0.65)'; c.fillRect(p[0] - 17, p[1] - 1, 34, 5);
+        c.fillStyle = f > 0.5 ? '#c9c2b4' : f > 0.25 ? '#f0b34a' : '#ff8b73'; c.fillRect(p[0] - 16, p[1], 32 * f, 3);
+      }
+    }
+    if (!s.breached || !s.valid) continue;
+    if (s.kind === 'wall' && k > 0 && segs[k - 1].kind === 'wall' && segs[k - 1].breached) continue;
+    let k2 = k;
+    while (s.kind === 'wall' && segs[k2 + 1] && segs[k2 + 1].kind === 'wall' && segs[k2 + 1].breached) k2++;
+    const e = segs[k2], x = (s.x + e.x) / 2, y = (s.y + e.y) / 2;
+    const p = S(x, y, s.top + 9);
+    if (p[0] < -80 || p[1] < -40 || p[0] > vw + 80 || p[1] > vh + 40) continue;
+    const txt = s.kind === 'gate' ? '✕ GATE DESTROYED' : s.kind === 'postern' ? '✕ POSTERN BROKEN' : s.culvert || e.culvert || (k <= app.map.CULVERT && k2 >= app.map.CULVERT) ? '✕ CULVERT BLOWN' : `✕ WALL BREACHED${k2 > k ? ` · ${(k2 - k + 1) * Math.round(s.len)} m` : ''}`;
+    c.strokeStyle = 'rgba(255,110,80,0.8)'; c.lineWidth = 1; c.beginPath(); const g = S(x, y, s.top * 0.3); c.moveTo(g[0], g[1]); c.lineTo(p[0], p[1] + 10); c.stroke();
+    tag(c, p[0], p[1], txt, '255,139,115', 'rgba(40,10,6,0.88)');
+  }
+}
+
 function drawOverlay(dtReal) {
   const c = octx, z = app.cam.zoom, sim = app.sim, m = app.mouse;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.clearRect(0, 0, vw, vh);
-  c.lineJoin = 'round';
+  c.lineJoin = 'round'; c.textBaseline = 'middle';
 
   if (app.mode === 'setup') {
     // place names
@@ -474,6 +656,10 @@ function drawOverlay(dtReal) {
     c.fillStyle = '#e8573d'; c.fillText(`● attackers fallen  ${fmt(sim.initial[1] - sim.count[ORC] - sim.stats.fled)}`, vw - 234, 80);
     c.fillStyle = '#5ec8f2'; c.fillText(`● defenders fallen  ${fmt(sim.initial[0] - sim.defCombat < 0 ? 0 : Object.values(sim.stats.lostDef).reduce((a, b) => a + b, 0))}`, vw - 234, 96);
   }
+  if (app.overlay.ranges) drawRanges(c);
+  const firing = app.tool && app.tool.kind === 'fire';
+  if (app.overlay.zones || firing) drawZones(c, firing ? app.tool.groups : null);
+  else drawMissions(c);
   // support / order markers
   for (let k = app.markers.length - 1; k >= 0; k--) {
     const mk = app.markers[k];
@@ -521,9 +707,9 @@ function drawOverlay(dtReal) {
     if (clash || nLab >= 80) continue;
     labXY[nLab++] = p[0]; labXY[nLab++] = p[1];
     const tw = c.measureText(txt).width + 10;
-    c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 17, 4); c.fill();
+    c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 18, 4); c.fill();
     c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : orc ? '#f0b34a' : '#ffb86a';
-    c.fillText(txt, p[0], p[1] + 4);
+    c.fillText(txt, p[0], p[1] + 0.5); // middle baseline: vertically centred in the tag
   }
   // commanders: a star over each so they can be found (and hunted)
   for (const team of [DEF, ORC]) for (const i of sim.cmds[team]) {
@@ -573,6 +759,7 @@ function drawOverlay(dtReal) {
     bar(p[0], p[1], 54, s.hp / s.maxHp, '#f0b34a');
     c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : 'POSTERN', p[0], p[1] - 5);
   }
+  drawBreaches(c);
   // drag visuals
   const d = app.drag;
   if (d && d.kind === 'box') {
@@ -580,12 +767,19 @@ function drawOverlay(dtReal) {
     c.fillRect(d.sx, d.sy, m.sx - d.sx, m.sy - d.sy); c.strokeRect(d.sx + 0.5, d.sy + 0.5, m.sx - d.sx, m.sy - d.sy);
   }
   if (app.tool && m.inside) {
-    const k = app.tool.kind === 'focus' ? 'focus' : app.tool.name;
+    const k = app.tool.kind === 'support' ? app.tool.name : app.tool.kind;
     const ax = d && d.kind === 'tool' ? d.x0 : m.wx, ay = d && d.kind === 'tool' ? d.y0 : m.wy, az = heightAt(ax, ay) + 0.3;
     const col = k === 'focus' ? '255,90,70' : k === 'supply' || k === 'gunship' ? '111,220,154' : k === 'reinforce' ? '94,200,242' : '240,179,74';
     c.strokeStyle = `rgba(${col},0.95)`; c.fillStyle = `rgba(${col},0.1)`; c.lineWidth = 1.6;
     const circle = (r, dash) => { c.setLineDash(dash ? [7, 6] : []); c.beginPath(); ring(c, ax, ay, az, r); c.fill(); c.stroke(); c.setLineDash([]); };
-    if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
+    if (k === 'fire') {
+      const ok = artyCanReach(app.tool.groups, ax, ay);
+      c.strokeStyle = ok ? 'rgba(240,179,74,0.95)' : 'rgba(255,90,70,0.95)'; c.fillStyle = ok ? 'rgba(240,179,74,0.12)' : 'rgba(255,90,70,0.1)';
+      circle(24, true);
+      const p = S(ax, ay, az);
+      c.font = `700 11px ${FONT}`; c.textAlign = 'center'; c.fillStyle = ok ? '#f0b34a' : '#ff8b73';
+      c.fillText(ok ? `${ok} section${ok > 1 ? 's' : ''} in range` : 'Out of range', p[0], p[1] - 24 * z * SIN_P - 12);
+    } else if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
     else if (k === 'arty') circle(45, true);
     else if (k === 'gunship') { circle(150, true); c.beginPath(); ring(c, ax, ay, az, 85); c.stroke(); }
     else if (k === 'supply') circle(60, true);
@@ -652,6 +846,7 @@ function drawMinimap() {
   [[0, 54], [vw, 54], [vw, vh], [0, vh]].forEach(([sx, sy], n) => { const g = toGround(app.cam, vw, vh, sx, sy, 0, T2); if (n) mctx.lineTo(g[0] * kx, g[1] * ky); else mctx.moveTo(g[0] * kx, g[1] * ky); });
   mctx.closePath(); mctx.stroke();
   if (sim.focus) { mctx.strokeStyle = '#ff5a46'; mctx.beginPath(); mctx.arc(sim.focus.x * kx, sim.focus.y * ky, Math.max(3, sim.focus.r * kx), 0, 6.2832); mctx.stroke(); }
+  for (const a of sim.arty) if (a.n && a.mode === 'target') { mctx.strokeStyle = '#f0b34a'; mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 3, 0, 6.2832); mctx.moveTo(a.x * kx - 5, a.y * ky); mctx.lineTo(a.x * kx + 5, a.y * ky); mctx.moveTo(a.x * kx, a.y * ky - 5); mctx.lineTo(a.x * kx, a.y * ky + 5); mctx.stroke(); }
   for (const mk of app.markers) { if (!mk.label) continue; mctx.strokeStyle = `rgb(${mk.col})`; mctx.beginPath(); mctx.arc(mk.x * kx, mk.y * ky, 3.5, 0, 6.2832); mctx.stroke(); }
 }
 

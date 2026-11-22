@@ -28,7 +28,9 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 ## Playing
 
 The battlefield is shown in an isometric 3D view modelled on the film's set: the Hornburg on
-its rock against the cliff, the causeway up to the gate, and the Deeping Wall with its culvert.
+its rock against the southern cliff (on your right as you look up the valley), its inner ward
+climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
+its culvert.
 
 **Camera.** Scroll to zoom, right-drag or `WASD` to pan, middle-drag or `Q`/`E` to rotate,
 `Home` to reset the view.
@@ -46,15 +48,20 @@ horde gives up).
 
 | Input | Action |
 | --- | --- |
-| `Space`, `-`, `+` | Pause, slower, faster (1× to 8×) |
+| `Space`, `-`, `+` | Pause / resume, slower, faster (1× to 8×) |
+| **Strike** | |
 | `1` Air Strike | Click a target, or drag to set the run-in heading |
 | `2` Gunships | Two helicopters orbit the target for 40 s |
 | `3` Artillery | Off-map battery covers a 45 m circle |
+| `T` Fire Mission | Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
+| `F` Focus Fire | Drag a circle; every weapon in range concentrates on it |
+| **Resupply & reinforce** | |
 | `4` Resupply Drop | Parachuted crates; troops within 60 m re-arm |
 | `5` Air Assault | A helicopter inserts a fresh platoon |
-| `F` Focus Fire | Drag a circle; every weapon in range concentrates on it |
-| `H` Hold Mortars | Mortars and howitzers pause until released |
 | `R` Fall Back | All infantry outside the Hornburg withdraw to the keep |
+| **Overlays** | |
+| `Z` Fire Zones | Where each mortar and howitzer section can land rounds (between minimum and maximum range) |
+| `V` Ranges | How far the rest of the garrison reaches, by weapon (just the selection, if troops are selected) |
 | `L` Losses | Shows where units of each side have been knocked out |
 | Drag, then right-click | Box-select defenders and order them to move (`X` halts) |
 
@@ -70,6 +77,8 @@ Orders can be given while paused.
   and lose morale. Any company that takes heavy losses in a short time may break and run,
   and can rally later.
 - Siege towers carry 50 attackers each and unload them onto the wall walk when they dock.
+- A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
+  through the gap. Aircraft climb over the mountains and the keep rather than through them.
 - Win by breaking the horde or by holding until the relief column arrives at dawn.
 
 Rendering quality steps down automatically on slower machines; add `?q=low` or `?q=high` to

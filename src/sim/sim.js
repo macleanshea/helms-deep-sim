@@ -96,7 +96,8 @@ export class Sim {
     this.time = 0; this.tick = 0;
     this.projectiles = []; this.aircraft = []; this.timed = []; this.drops = [];
     this.events = [];
-    this.focus = null; this.holdIndirect = false; this.retreated = false;
+    this.focus = null; this.retreated = false;
+    this.artyOrd = []; this.arty = []; // per-group orders for mortars and howitzers: { mode: 'free' | 'target' | 'hold', x, y, r }
     this.hvt = []; this.caches = []; this.heavy = []; this.cmds = [[], []];
     this.count = [0, 0]; this.initial = [0, 0]; this.defCombat = 0;
     this.result = null; this.routing = false; this.routT = 0;
@@ -124,6 +125,7 @@ export class Sim {
       }
     }
     this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
+    this._findArtillery();
     for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
     this._startMorale();
   }
@@ -968,8 +970,18 @@ export class Sim {
     const cdA = slot ? this.cd2 : this.cd, el = eg ? 1 : 0;
     const z0 = (eg ? this.segTop[this.mseg[c]] : this.map.groundZ(x, y)) + (d.cls === C.INF ? 1.4 : 2.2);
     if (w.arc) {
-      if (this.holdIndirect) { cdA[i] = 0.5; return; }
-      if (!this._acquireIndirect(i, w, x, y)) { cdA[i] = 0.6 + this.rand() * 0.8; return; }
+      const o = this.artyOrd[this.grp[i]];
+      if (o && o.mode === 'hold') { cdA[i] = 0.5; return; }
+      let aimed = false;
+      if (o && o.mode === 'target') {
+        // a fire mission: walk rounds around the ordered point (sections out of range keep choosing their own targets)
+        const ex = o.x - x, ey = o.y - y, e2 = ex * ex + ey * ey;
+        if (e2 <= w.range * w.range && e2 >= w.min * w.min) {
+          const a = this.rand() * 6.2832, rr = o.r * Math.sqrt(this.rand());
+          this.tx[i] = o.x + Math.cos(a) * rr; this.ty[i] = o.y + Math.sin(a) * rr; aimed = true;
+        }
+      }
+      if (!aimed && !this._acquireIndirect(i, w, x, y)) { cdA[i] = 0.6 + this.rand() * 0.8; return; }
       const tx = this.tx[i] + (this.rand() + this.rand() - 1) * w.scatter, ty = this.ty[i] + (this.rand() + this.rand() - 1) * w.scatter;
       const dist = Math.hypot(tx - x, ty - y);
       this.ammo[i]--; cdA[i] = w.reload * (0.9 + 0.25 * this.rand()); this.fireT[i] = this.time; this.stats.shots++;
@@ -1303,7 +1315,7 @@ export class Sim {
     if (!this._keepField || this.time - this._keepField.t > 2) {
       const ring = [];
       for (let c = 0; c < GW * GH; c++) if (this.elev[c] === 2) ring.push(c);
-      this._keepField = { t: this.time, court: this._orderField(KEEP.cx - 20, KEEP.cy + 30, false, 6), ring: this._orderField(ring, 0, false, 6) };
+      this._keepField = { t: this.time, court: this._orderField(KEEP.cx - 24, KEEP.cy - 34, false, 6), ring: this._orderField(ring, 0, false, 6) };
     }
     const kf = this._keepField, slots = this.map.keepSlots;
     let s = this._slotCursor || 0;
@@ -1316,7 +1328,7 @@ export class Sim {
         for (let j = this.dcHead[c]; j >= 0; j = this.cnext[j]) { const dx = this.x[j] - q.x, dy = this.y[j] - q.y; if (dx * dx + dy * dy < 1.2) { occ = true; break; } }
         if (!occ) slot = q;
       }
-      if (!slot) slot = { x: KEEP.cx - 20 + (this.rand() - 0.5) * 60, y: KEEP.cy + 30 + (this.rand() - 0.5) * 40 };
+      if (!slot) slot = { x: KEEP.cx - 30 + (this.rand() - 0.5) * 40, y: KEEP.cy - 34 + (this.rand() - 0.5) * 30 };
       this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1;
       this.ord[i] = this.elev[this.map.cellOf(slot.x, slot.y)] === 2 ? kf.ring : kf.court;
       this.aux[i] = this.time + 40 + Math.hypot(slot.x - this.x[i], slot.y - this.y[i]) / UNITS[this.type[i]].speed * 4;
@@ -1341,6 +1353,88 @@ export class Sim {
     this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn' });
     return list.length;
   }
+
+  // ------------------------------------------------------------ artillery
+  /** List the mortar and howitzer sections the garrison starts with, and name them by where they stand. */
+  _findArtillery() {
+    const seen = new Map();
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i] || this.team[i] !== DEF) continue;
+      const w = UNITS[this.type[i]].wdef;
+      if (!w || !w.arc) continue;
+      const g = this.grp[i];
+      if (!seen.has(g)) seen.set(g, { g, key: UNITS[this.type[i]].key, w, sx: 0, sy: 0, n: 0 });
+      const a = seen.get(g); a.sx += this.x[i]; a.sy += this.y[i]; a.n++;
+    }
+    const names = new Map();
+    for (const a of seen.values()) {
+      const cx = a.sx / a.n, cy = a.sy / a.n;
+      const where = Math.hypot(cx - KEEP.cx, cy - KEEP.cy) < KEEP.r ? 'Hornburg' : cx > this.map.wallAt(0.5).x + 10 ? 'the Deep' : 'the field';
+      let label = `${a.key === 'howitzer' ? 'Howitzers' : 'Mortars'} · ${where}`;
+      const k = (names.get(label) || 0) + 1; names.set(label, k);
+      if (k > 1) label += ` ${k}`;
+      this.arty.push({ g: a.g, key: a.key, w: a.w, label, n: 0, cx, cy, ammo: 1 });
+      this.artyOrd[a.g] = { mode: 'free', x: 0, y: 0, r: 0 };
+    }
+    this.updateArtillery();
+  }
+
+  /** Refresh each section's strength, centre and ammunition (cheap enough to call a few times a second). */
+  updateArtillery() {
+    const A = this.arty;
+    if (!A.length) return A;
+    const by = new Map(A.map((a) => [a.g, a]));
+    for (const a of A) { a.n = 0; a.sx = 0; a.sy = 0; a.am = 0; a.mx = 0; }
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i] || this.team[i] !== DEF) continue;
+      const a = by.get(this.grp[i]);
+      if (!a) continue;
+      a.n++; a.sx += this.x[i]; a.sy += this.y[i]; a.am += Math.min(this.ammo[i], this.maxAmmo(i)); a.mx += this.maxAmmo(i);
+    }
+    for (const a of A) {
+      if (a.n) { a.cx = a.sx / a.n; a.cy = a.sy / a.n; }
+      a.ammo = a.mx ? a.am / a.mx : 0;
+      const o = this.artyOrd[a.g]; a.mode = o.mode; a.x = o.x; a.y = o.y; a.r = o.r;
+    }
+    return A;
+  }
+
+  /** Positions of the live guns of one section (for range overlays). */
+  groupUnits(g, max = 24) {
+    const out = [];
+    for (let i = 0; i < this.n; i++) if (this.alive[i] && this.grp[i] === g && this.team[i] === DEF) out.push(i);
+    if (out.length <= max) return out;
+    const step = out.length / max, s = [];
+    for (let k = 0; k < max; k++) s.push(out[Math.floor(k * step)]);
+    return s;
+  }
+
+  /** Order the listed sections (all when null) onto a point. Returns how many sections can reach it. */
+  setArtyTarget(groups, x, y, r = 24) {
+    let reach = 0;
+    for (const a of this.arty) {
+      if (groups && !groups.includes(a.g)) continue;
+      if (!a.n) continue;
+      const o = this.artyOrd[a.g];
+      o.mode = 'target'; o.x = x; o.y = y; o.r = r;
+      // reset the reload so the first rounds go out promptly on the new target
+      for (let i = 0; i < this.n; i++) if (this.alive[i] && this.grp[i] === a.g && this.cd[i] > 1.5) this.cd[i] = 0.5 + this.rand() * 1.2;
+      if (this.artyReach(a, x, y)) reach++;
+    }
+    return reach;
+  }
+
+  /** Can any gun of this section reach x,y? */
+  artyReach(a, x, y) {
+    const w = a.w;
+    for (const i of this.groupUnits(a.g, 12)) {
+      const d = Math.hypot(this.x[i] - x, this.y[i] - y);
+      if (d <= w.range && d >= w.min) return true;
+    }
+    return false;
+  }
+
+  setArtyMode(g, mode) { const o = this.artyOrd[g]; if (o) o.mode = mode; }
 
   // -------------------------------------------------------------- outcome
   _checkEnd() {

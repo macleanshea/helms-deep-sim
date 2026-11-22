@@ -5,7 +5,7 @@
 
 export const PITCH = 0.84;                 // radians below the horizon (~48 deg)
 export const SIN_P = Math.sin(PITCH), COS_P = Math.cos(PITCH);
-export const DEFAULT_YAW = Math.PI / 4;    // viewer stands south-west of the wall, looking north-east
+export const DEFAULT_YAW = 1.2;        // viewer stands in the valley looking up it (east), the Hornburg on the right
 
 /** World point -> screen pixels (same units as vw/vh and cam.zoom). */
 export function toScreen(cam, vw, vh, x, y, z, out) {

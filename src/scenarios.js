@@ -120,7 +120,7 @@ export function horde(total, mix = {}) {
     const next = (d) => { if (d > 0) x -= d + 6; };
     next(column('berserker', share(Math.round(total * m.berserker), w)));
     next(column('ladder', share(ladders, w)));
-    next(column('tower', share(towers, w), [lanes[3], lanes[4], lanes[2]], 40));
+    next(column('tower', share(towers, w), [lanes[2], lanes[1], lanes[3]], 40));
     next(column('uruk', share(Math.round(total * m.uruk), w)));
     next(column('archer', share(Math.round(total * m.archer), w)));
     // the siege train and the captains bring up the rear of each wave
@@ -128,8 +128,8 @@ export function horde(total, mix = {}) {
     const d1 = Math.max(
       column('troll', share(trolls, w), [lanes[0], lanes[2], lanes[3], lanes[5]], 60),
       column('chief', share(chiefs, w), [gaps[0], gaps[2], gaps[4]], 20),
-      sp ? column('sapper', sp, [517], 36) : 0,
-      rm ? column('ram', rm, [gaps[1] + 4], 30) : 0);
+      sp ? column('sapper', sp, [443], 36) : 0,
+      rm ? column('ram', rm, [gaps[3] - 4], 30) : 0);
     next(d1);
     next(Math.max(column('catapult', share(cats, w), [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('warg', share(Math.round(total * m.warg), w), [lanes[1], lanes[4]], 70)));
     x -= 22;
@@ -163,21 +163,21 @@ function garrison(map, scale = 1) {
   const mid = map.wallAt(0.47);
   g.push(makeGroup('cmd', 1, mid.x + 1, mid.y));
   // Hornburg curtain wall, valley side: it enfilades the foot of the Deeping Wall
-  g.push(...alongRing('rifle', s(150), 92, 208));
-  g.push(...alongRing('mg', s(18), 98, 200));
-  g.push(...alongRing('at', s(8), 130, 195));
-  g.push(...alongRing('grenadier', s(14), 100, 190));
-  g.push(...alongRing('marksman', s(8), 120, 200));
-  g.push(makeGroup('cmd', 1, KEEP.cx - KEEP.r + 1, KEEP.cy + 6));
+  g.push(...alongRing('rifle', s(150), 152, 268));
+  g.push(...alongRing('mg', s(18), 160, 262));
+  g.push(...alongRing('at', s(8), 165, 230));
+  g.push(...alongRing('grenadier', s(14), 170, 260));
+  g.push(...alongRing('marksman', s(8), 160, 240));
+  g.push(makeGroup('cmd', 1, KEEP.cx - KEEP.r + 1, KEEP.cy - 6));
   // courtyard
-  g.push(makeGroup('mortar', s(8), KEEP.cx - 22, KEEP.cy + 40, 0, 44));
-  g.push(makeGroup('cache', 1, KEEP.cx - 44, KEEP.cy + 22));
-  g.push(makeGroup('rifle', s(60), KEEP.cx - 40, KEEP.cy + 4, V, 44));
+  g.push(makeGroup('mortar', s(8), KEEP.cx - 24, KEEP.cy - 40, 0, 40));
+  g.push(makeGroup('cache', 1, KEEP.cx - 44, KEEP.cy - 22));
+  g.push(makeGroup('rifle', s(60), KEEP.cx - 46, KEEP.cy - 10, V, 40));
   // the Deep, behind the wall
   g.push(makeGroup('mortar', s(16), 1090, 480, V, 110));
-  g.push(makeGroup('howitzer', s(4), 1220, 470, V, 70));
+  g.push(makeGroup('howitzer', s(4), 1220, 490, V, 70));
   for (const t of [0.22, 0.5, 0.78]) { const p = map.wallAt(t); g.push(makeGroup('cache', 1, p.x + 26, p.y)); }
-  g.push(makeGroup('rifle', s(90), 1030, 500, V, 130));
+  g.push(makeGroup('rifle', s(90), 1030, 460, V, 130));
   return g;
 }
 
@@ -186,7 +186,7 @@ export const PRESETS = [
     key: 'garrison', name: 'The Hornburg Garrison',
     blurb: 'A reinforced battalion behind wire and mines, against eighteen thousand Uruk-hai.',
     build: (map) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 420, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 560, Math.PI / 2, 50), ...fieldWorks(map), ...horde(18000)],
+      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(18000)],
       options: {},
     }),
   },
@@ -196,8 +196,8 @@ export const PRESETS = [
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
-        ...alongRing('rifle', 70, 100, 200), ...alongRing('mg', 6, 110, 190), ...alongRing('at', 6, 140, 190),
-        makeGroup('mortar', 6, 1080, 470, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y), makeGroup('rifle', 24, KEEP.cx - 40, KEEP.cy + 10, Math.PI / 2, 24),
+        ...alongRing('rifle', 70, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
+        makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y), makeGroup('rifle', 24, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(8000),
       ],
@@ -210,9 +210,9 @@ export const PRESETS = [
     build: (map) => ({
       groups: [
         ...garrison(map, 1.14),
-        makeGroup('tank', 4, 850, 560, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 690, Math.PI / 2, 90),
-        makeGroup('tank', 2, 1080, 420, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 470, Math.PI / 2, 60),
-        makeGroup('mortar', 12, 1130, 520, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 520),
+        makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
+        makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
+        makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
         ...fieldWorks(map, 1.3), ...horde(30000),
       ],
       options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 } },
@@ -224,7 +224,7 @@ export const PRESETS = [
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 26, 0.35, 0.65), ...alongWall(map, 'mg', 4, 0.4, 0.6), ...alongWall(map, 'marksman', 3, 0.42, 0.58),
-        ...alongRing('rifle', 8, 150, 180), makeGroup('mortar', 2, 1070, 500, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        ...alongRing('rifle', 8, 180, 210), makeGroup('mortar', 2, 1070, 460, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
         ...horde(2000, { ladders: 10, trolls: 3, rams: 1, sappers: 3, catapults: 2, chiefs: 2, towers: 1 }),
