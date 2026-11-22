@@ -905,7 +905,7 @@ function frame(now) {
     } else if (sim.result) fx.update(rdt * 0.6);
     for (const e of sim.events) {
       const loc = e.x != null ? { x: e.x, y: e.y } : null;
-      if (loc && (e.type === 'banner' || e.type === 'log')) noteAlert(e);
+      if (loc && (e.cls === 'bad' || e.cls === 'warn') && (e.type === 'banner' || e.type === 'log')) noteAlert(e); // good news does not need a ping
       if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
@@ -973,7 +973,7 @@ resize();
 app.loadPreset('garrison');
 fitCamera();
 requestAnimationFrame((t) => { last = t; frame(t); $('loading').classList.add('done'); });
-if (!localStorage.getItem('hd-seen-help-2')) { localStorage.setItem('hd-seen-help-2', '1'); ui.showHelp(); }
+if (!localStorage.getItem('hd-seen-help-3')) { localStorage.setItem('hd-seen-help-3', '1'); ui.showHelp(); }
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };

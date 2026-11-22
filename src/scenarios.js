@@ -226,15 +226,15 @@ function garrison(map, scale = 1) {
 export const PRESETS = [
   {
     key: 'garrison', name: 'The Hornburg Garrison',
-    blurb: 'A reinforced battalion behind wire and mines, against eighteen thousand Uruk-hai.',
+    blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
     build: (map) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 420, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 560, Math.PI / 2, 50), ...fieldWorks(map), ...horde(18000, { waves: 5 })],
-      options: { dawn: 1200 },
+      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 420, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 560, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { waves: 5 })],
+      options: { dawn: 1200, cpRate: 0.035 },
     }),
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles',
-    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — air support will decide this.',
+    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — how you spend your support will decide this.',
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
@@ -243,12 +243,12 @@ export const PRESETS = [
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(8000, { waves: 4 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 10, cpRate: 0.045 },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 8, cpRate: 0.035 },
     }),
   },
   {
     key: 'combined', name: 'Combined Arms vs. the Host',
-    blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming.',
+    blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
     build: (map) => ({
       groups: [
         ...garrison(map, 1.14),
@@ -257,21 +257,21 @@ export const PRESETS = [
         makeGroup('mortar', 12, 1130, 520, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 520),
         ...fieldWorks(map, 1.3), ...horde(30000, { waves: 6 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200 },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200, cpStart: 10, cpRate: 0.045 },
     }),
   },
   {
     key: 'recon', name: 'Recon Platoon',
-    blurb: 'Forty soldiers, two thousand orcs. A quick skirmish to learn the controls.',
+    blurb: 'Forty-odd soldiers and twenty-two hundred orcs in three waves. A short night to learn the controls.',
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 26, 0.35, 0.65), ...alongWall(map, 'mg', 4, 0.4, 0.6), ...alongWall(map, 'marksman', 3, 0.42, 0.58),
-        ...alongRing('rifle', 8, 150, 180), makeGroup('mortar', 2, 1070, 500, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        ...alongRing('rifle', 8, 150, 180), ...alongRing('at', 2, 160, 185), makeGroup('mortar', 2, 1070, 500, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(2000, { waves: 3, ladders: 10, trolls: 3, rams: 1, sappers: 3, catapults: 2, chiefs: 2, towers: 1 }),
+        ...horde(2200, { waves: 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
       ],
-      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 8, cpRate: 0.035 },
+      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 10, cpRate: 0.045 },
     }),
   },
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },

@@ -185,7 +185,7 @@ export const directorMethods = {
     const d = this.dir;
     if (!d) return null;
     const w = d.waves[d.cur], nx = d.waves[d.cur + 1] || null;
-    const approaching = this.time < w.contactT && !d.contact;
+    const approaching = this.time < w.contactT && (w.k > 0 || !d.contact); // stragglers of the last wave do not count as contact
     const phase = approaching ? 'approach' : d.lull ? 'lull' : !nx && w.state === COMMITTED && !d.contact ? 'last' : 'engaged';
     return {
       W: d.W, k: w.k, name: w.name, phase, eta: Math.max(0, w.contactT - this.time), reserve: d.reserveN, lullS: d.lullS,
