@@ -1,0 +1,4 @@
+# Local-only tooling: the site is static, Vercel serves it straight from the repo root.
+server.js
+tools
+README.md

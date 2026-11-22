@@ -20,6 +20,11 @@ served over HTTP rather than opened from `file://`, because it uses ES modules.
 
 A recent desktop Chrome, Edge, Firefox or Safari with WebGL2 is required.
 
+### Deploying
+
+The repository root is the site, so any static host works. `vercel.json` configures Vercel to
+serve it as-is with no build step; importing the repository in Vercel is all that is needed.
+
 ## Playing
 
 **Setup.** Pick a scenario from the top bar or build your own. Choose a unit on the left, set
