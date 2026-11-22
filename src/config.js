@@ -42,22 +42,23 @@ export const ARMOR_MULT = [
 // tracer styles (see fx.js)
 export const TR = { RIFLE: 0, MG: 1, SNIPER: 2, CANNON: 3, ARROW: 4 };
 
+// `sup`: how much a shot or burst suppresses the company it lands on (see morale.js)
 export const WEAPONS = {
-  rifle:      { name: 'Rifle',            range: 210, min: 0,   reload: 1.4,  dmg: 60,  acc: 0.55, accFar: 0.18, kind: K.BULLET, tracer: TR.RIFLE,  flash: 1.0, snd: 'rifle' },
-  mg:         { name: 'Machine gun',      range: 360, min: 0,   reload: 0.2,  dmg: 50,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG,     flash: 1.4, snd: 'mg', multi: 0.3 },
+  rifle:      { name: 'Rifle', sup: 0.05,            range: 210, min: 0,   reload: 1.4,  dmg: 60,  acc: 0.55, accFar: 0.18, kind: K.BULLET, tracer: TR.RIFLE,  flash: 1.0, snd: 'rifle' },
+  mg:         { name: 'Machine gun', sup: 1,      range: 360, min: 0,   reload: 0.2,  dmg: 50,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG,     flash: 1.4, snd: 'mg', multi: 0.3 },
   sniper:     { name: 'Marksman rifle',   range: 360, min: 0,   reload: 2.4,  dmg: 260, acc: 0.95, accFar: 0.75, kind: K.BULLET, tracer: TR.SNIPER, flash: 1.2, snd: 'sniper', pref: 1 },
-  gl:         { name: 'Grenade launcher', range: 200, min: 14,  reload: 2.8,  dmg: 130, aoe: 4.5,   speed: 75,  kind: K.HE, flash: 1.0, snd: 'thump', fxk: 3 },
-  rocket:     { name: 'Guided rocket',    range: 340, min: 20,  reload: 7,    dmg: 950, aoe: 5,   speed: 150, kind: K.AP, flash: 2.2, snd: 'rocket', pref: 2, prefOnly: true, fxk: 0, trail: true },
-  mortar:     { name: 'Mortar',           range: 650, min: 60,  reload: 5.0,  dmg: 170, aoe: 6.5, arc: true, flight: 2.6, scatter: 6,  kind: K.HE, flash: 1.6, snd: 'mortar', fxk: 0 },
-  howitzer:   { name: 'Howitzer',         range: 2400, min: 150, reload: 9,   dmg: 420, aoe: 11,  arc: true, flight: 3.6, scatter: 9,  kind: K.HE, flash: 3.5, snd: 'cannon', fxk: 1 },
-  autocannon: { name: 'Autocannon',       range: 400, min: 0,   reload: 0.25, dmg: 110, aoe: 2.6, speed: 420, kind: K.HEAVY, flash: 1.8, snd: 'autocannon', fxk: 3, tracer: TR.CANNON },
-  tankgun:    { name: 'Tank gun',         range: 600, min: 25,  reload: 5,    dmg: 750, aoe: 6.5, speed: 520, kind: K.AP, flash: 4, snd: 'cannon', pref: 2, fxk: 0 },
-  coax:       { name: 'Coaxial MG',       range: 320, min: 0,   reload: 0.25, dmg: 45,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG, flash: 1.2, snd: 'mg', multi: 0.4 },
+  gl:         { name: 'Grenade launcher', sup: 0.4, range: 200, min: 14,  reload: 2.8,  dmg: 130, aoe: 4.5,   speed: 75,  kind: K.HE, flash: 1.0, snd: 'thump', fxk: 3 },
+  rocket:     { name: 'Guided rocket', sup: 0.3,    range: 340, min: 20,  reload: 7,    dmg: 950, aoe: 5,   speed: 150, kind: K.AP, flash: 2.2, snd: 'rocket', pref: 2, prefOnly: true, fxk: 0, trail: true },
+  mortar:     { name: 'Mortar', sup: 0.6,           range: 650, min: 60,  reload: 5.0,  dmg: 170, aoe: 6.5, arc: true, flight: 2.6, scatter: 6,  kind: K.HE, flash: 1.6, snd: 'mortar', fxk: 0 },
+  howitzer:   { name: 'Howitzer', sup: 1,         range: 2400, min: 150, reload: 9,   dmg: 420, aoe: 11,  arc: true, flight: 3.6, scatter: 9,  kind: K.HE, flash: 3.5, snd: 'cannon', fxk: 1 },
+  autocannon: { name: 'Autocannon', sup: 0.6,       range: 400, min: 0,   reload: 0.25, dmg: 110, aoe: 2.6, speed: 420, kind: K.HEAVY, flash: 1.8, snd: 'autocannon', fxk: 3, tracer: TR.CANNON },
+  tankgun:    { name: 'Tank gun', sup: 1,         range: 600, min: 25,  reload: 5,    dmg: 750, aoe: 6.5, speed: 520, kind: K.AP, flash: 4, snd: 'cannon', pref: 2, fxk: 0 },
+  coax:       { name: 'Coaxial MG', sup: 1,       range: 320, min: 0,   reload: 0.25, dmg: 45,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG, flash: 1.2, snd: 'mg', multi: 0.4 },
   // player-called support
-  bomb:       { name: 'Air strike',       dmg: 1000, aoe: 16, kind: K.HE, fxk: 1, ff: true },
-  arty:       { name: 'Artillery barrage', dmg: 800, aoe: 12, kind: K.HE, fxk: 1, ff: true },
-  heli_gun:   { name: 'Gunship cannon',   dmg: 130, aoe: 3,  kind: K.HEAVY, fxk: 3 },
-  heli_rkt:   { name: 'Gunship rockets',  dmg: 420, aoe: 7,  kind: K.HE, fxk: 0 },
+  bomb:       { name: 'Air strike', sup: 1.5,       dmg: 1000, aoe: 16, kind: K.HE, fxk: 1, ff: true },
+  arty:       { name: 'Artillery barrage', sup: 1, dmg: 800, aoe: 12, kind: K.HE, fxk: 1, ff: true },
+  heli_gun:   { name: 'Gunship cannon', sup: 0.6,   dmg: 130, aoe: 3,  kind: K.HEAVY, fxk: 3 },
+  heli_rkt:   { name: 'Gunship rockets', sup: 1,  dmg: 420, aoe: 7,  kind: K.HE, fxk: 0 },
   bayonet:    { name: 'Close combat',     dmg: 30, kind: K.BULLET },
   // attackers
   melee:      { name: 'Blades',           kind: K.MELEE },
@@ -66,8 +67,8 @@ export const WEAPONS = {
   rock:       { name: 'Catapults',        range: 400, min: 80, reload: 8, dmg: 150, aoe: 7, arc: true, flight: 3.4, scatter: 9, kind: K.ROCK, fxk: 4, sdmg: 260 },
   blast:      { name: 'Blast charge',     dmg: 900, aoe: 22, kind: K.HE, fxk: 2, ff: true },
   // defensive works
-  mine:       { name: 'Mines',            dmg: 340, aoe: 5.5, kind: K.HE, fxk: 0 },
-  claymore:   { name: 'Claymores',        dmg: 280, range: 42, kind: K.HE },
+  mine:       { name: 'Mines', sup: 0.3,            dmg: 340, aoe: 5.5, kind: K.HE, fxk: 0 },
+  claymore:   { name: 'Claymores', sup: 0.5,        dmg: 280, range: 42, kind: K.HE },
 };
 for (const k in WEAPONS) WEAPONS[k].key = k;
 
@@ -81,7 +82,7 @@ export const UNITS = [
   { key: 'rifle', cost: 10, team: DEF, name: 'Rifleman', cls: C.INF, hp: 100, speed: 3.4, rad: 0.5, size: 3.4, spr: 0, w: 'rifle', ammo: 60, spacing: 2.0, supply: 1,
     desc: 'Backbone of the line. Effective out to 210 m in the dark.' },
   { key: 'mg', cost: 30, team: DEF, name: 'Machine Gun Team', cls: C.INF, hp: 110, speed: 2.8, rad: 0.6, size: 3.9, spr: 1, w: 'mg', ammo: 320, spacing: 2.6, supply: 2,
-    desc: 'Sustained fire to 360 m. Shreds packed formations.' },
+    desc: 'Sustained fire to 360 m. Pins down the companies it rakes: they slow, waver and stop shooting.' },
   { key: 'marksman', cost: 25, team: DEF, name: 'Marksman', cls: C.INF, hp: 90, speed: 3.4, rad: 0.5, size: 3.4, spr: 2, w: 'sniper', ammo: 40, spacing: 2.4, supply: 1,
     desc: 'Picks off captains, sappers, berserkers and ladder crews at 360 m.' },
   { key: 'grenadier', cost: 25, team: DEF, name: 'Grenadier', cls: C.INF, hp: 100, speed: 3.3, rad: 0.5, size: 3.4, spr: 3, w: 'gl', ammo: 30, spacing: 2.2, supply: 2,
@@ -117,12 +118,12 @@ export const UNITS = [
     desc: 'Armoured heavy infantry. The body of the horde.' },
   { key: 'archer', team: ORC, name: 'Crossbow Uruk', role: R.ARCHER, hp: 90, speed: 4.5, rad: 0.5, size: 3.2, spr: 17, w: 'xbow', mdmg: 18, mreload: 1.2, reach: 1.3, spacing: 1.8, armor: A.FLESH,
     desc: 'Volleys bolts at 110 m. Weak against troops behind battlements.' },
-  { key: 'berserker', team: ORC, name: 'Berserker', role: R.MELEE, hp: 320, speed: 6.4, rad: 0.55, size: 3.7, spr: 18, mdmg: 50, mreload: 0.8, reach: 1.5, spacing: 2.2, armor: A.FLESH, hvt: 1, pri: 1.4,
-    desc: 'Fast, frenzied and very hard to drop. First up the ladders.' },
+  { key: 'berserker', team: ORC, name: 'Berserker', role: R.MELEE, hp: 320, speed: 6.4, rad: 0.55, size: 3.7, spr: 18, mdmg: 50, mreload: 0.8, reach: 1.5, spacing: 2.2, armor: A.FLESH, hvt: 1, pri: 1.4, fearless: true,
+    desc: 'Fast, frenzied and very hard to drop. First up the ladders, and cannot be pinned down.' },
   { key: 'warg', team: ORC, name: 'Warg Rider', role: R.MELEE, hp: 240, speed: 10.5, rad: 0.9, size: 5.4, spr: 19, mdmg: 40, mreload: 0.9, reach: 1.8, spacing: 3.2, armor: A.FLESH,
     desc: 'Cavalry. Closes the killing ground in seconds.' },
-  { key: 'chief', team: ORC, name: 'Uruk Captain', role: R.MELEE, hp: 650, speed: 4.6, rad: 0.65, size: 4.4, spr: 29, mdmg: 60, mreload: 0.9, reach: 1.6, spacing: 7, armor: A.FLESH, hvt: 1, pri: 0.35, cmd: true, aura: 95,
-    desc: 'Drives the companies around him forward. Kill him and they waver.' },
+  { key: 'chief', team: ORC, name: 'Uruk Captain', role: R.MELEE, hp: 650, speed: 4.6, rad: 0.65, size: 4.4, spr: 29, mdmg: 60, mreload: 0.9, reach: 1.6, spacing: 7, armor: A.FLESH, hvt: 1, pri: 3, cmd: true, aura: 95,
+    desc: 'Drives the companies around him forward from the rear. Mark him with focus fire: kill him and they waver.' },
   { key: 'troll', team: ORC, name: 'Siege Troll', role: R.TROLL, hp: 3600, speed: 3.6, rad: 1.8, size: 8.6, spr: 20, mdmg: 260, mreload: 1.8, reach: 2.6, maoe: 3.5, sdmg: 240, spacing: 7, armor: A.HEAVY, big: true, hvt: 2,
     desc: 'Shrugs off rifle fire. Smashes gates, walls and vehicles.' },
   { key: 'ladder', team: ORC, name: 'Ladder Crew', role: R.LADDER, hp: 520, speed: 3.9, rad: 1.2, size: 13, spr: 21, spacing: 9, armor: A.FLESH, big: true, hvt: 1, pri: 1.2,

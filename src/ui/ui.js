@@ -275,8 +275,9 @@ export function buildUI(app, atlas) {
       const nx = wi.next;
       waveName.textContent = `Wave ${wi.k + 1} of ${wi.W} · ${wi.name}`;
       let note;
-      if (wi.phase === 'approach') note = `contact in about ${mmss(wi.eta)}`;
-      else if (nx && nx.forming) note = `${nx.name} steps off in ${mmss(nx.in)}`;
+      const at = (w) => (w && w.sector ? ` → ${w.sector.name.replace('the ', '')}` : '');
+      if (wi.phase === 'approach') note = `contact in about ${mmss(wi.eta)}${at(wi)}`;
+      else if (nx && nx.forming) note = `${nx.name} steps off in ${mmss(nx.in)}${at(nx)}`;
       else if (wi.phase === 'lull') note = `lull — ${nx.name} within ${mmss(nx.in)}`;
       else if (nx) note = `engaged · next: ${nx.name} in ${mmss(nx.in)}`;
       else note = sim.opt.dawn > 0 ? 'the last of them — hold until dawn' : 'the last of them';

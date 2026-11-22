@@ -50,7 +50,7 @@ export const supportMethods = {
       if (this.ammo[i] < 1) { dry[k]++; sx[k] += this.x[i]; sy[k] += this.y[i]; }
     }
     for (let k = 0; k < 4; k++) {
-      if (armed[k] >= 4 && dry[k] * 2 >= armed[k]) this._alert('dry' + k, 45, `${this.sectors[k].name.replace(/^t/, 'T')} is out of ammunition`, 'bad', sx[k] / dry[k], sy[k] / dry[k]);
+      if (armed[k] >= 4 && dry[k] * 2 >= armed[k]) this._alert('dry' + k, 90, `${this.sectors[k].name.replace(/^t/, 'T')} is out of ammunition`, 'bad', sx[k] / dry[k], sy[k] / dry[k]);
     }
   },
 

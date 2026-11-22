@@ -38,6 +38,7 @@ export class Sim {
     const o = setup.options || {};
     this.opt = { ...DEFAULT_OPTIONS, ...o, support: { ...DEFAULT_OPTIONS.support, ...(o.support || {}) } };
     this.rand = mulberry(this.opt.seed || 1);
+    this.rand2 = mulberry((this.opt.seed || 1) ^ 0x9e3779b9); // the horde's own dice: the director's choices
     this.mtype = map.type; this.mseg = map.seg; this.cz = map.cz; this.portal = map.portal;
 
     const N = MAX_UNITS;
@@ -64,6 +65,7 @@ export class Sim {
     this.danger = new Uint8Array(OW * OH);
     this.navCnt = new Uint8Array(GW * GH);
     this.loss = [new Uint16Array(OW * OH), new Uint16Array(OW * OH)];
+    this.hot = new Float32Array(OW * OH); this.hotList = []; // where the garrison's mortars and guns have been firing from
 
     // fortification state
     const NC = GW * GH;
@@ -147,6 +149,7 @@ export class Sim {
     if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
     if (!n) return 0;
     const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
+    if (d.fearless) this.gFearless[gid] = 1;
     const face = d.team === DEF ? Math.PI : 0;
     let made = 0;
     for (let k = 0; k < n; k++) {
@@ -575,6 +578,11 @@ export class Sim {
     if (this.drops.length) this._drops();
     if (this.tick % 10 === 3) this._supply();
     if (this.tick % 20 === 7) this._ammoWatch();
+    if (this.tick % 50 === 9) {
+      // firing positions cool off; the ones still hot are what the catapults go looking for
+      const hot = this.hot, list = this.hotList; list.length = 0;
+      for (let c = 0; c < hot.length; c++) { if (hot[c] <= 0) continue; if ((hot[c] *= 0.8) < 1) hot[c] = 0; else if (hot[c] >= 48 && list.length < 64) list.push(c); }
+    }
     if (this.clays.length && this.tick % 3 === 0) this._claymores();
     if (this.tick % 5 === 2) this._morale();
     if (this.dir && this.tick % 5 === 4) this._director();
@@ -675,6 +683,8 @@ export class Sim {
       return;
     }
     let speed = d.speed;
+    const pin = this.gPin[g];
+    if (pin) speed *= pin === 2 ? 0.3 : 0.65; // heads down under fire
     if (this.gConf[g] > this.time) { if (((this.tick + i) & 7) < 5) { this.vx[i] *= 0.6; this.vy[i] *= 0.6; return; } speed *= 0.5; }
     switch (d.role) {
       case R.ARCHER: {
@@ -685,7 +695,7 @@ export class Sim {
             const dx = this.x[t] - x, dy = this.y[t] - y, d2 = dx * dx + dy * dy;
             if (d2 <= w.range * w.range) {
               this.vx[i] *= 0.5; this.vy[i] *= 0.5;
-              if (this.cd[i] <= 0) {
+              if (this.cd[i] <= 0 && pin < 2) {
                 this.cd[i] = w.reload * (0.8 + 0.4 * this.rand()); this.fireT[i] = this.time;
                 this.rot[i] = Math.atan2(dy, dx);
                 let acc = w.acc; if (this.el[t] && !el) acc *= 0.22;
@@ -779,7 +789,12 @@ export class Sim {
           }
           return;
         }
-        if (k < 0 || this.segs[k].breached) { if (k >= 0) this.segs[k].claimed--; k = this._pickLadderSeg(y); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++; }
+        if (k < 0 || this.segs[k].breached) {
+          if (k >= 0) this.segs[k].claimed--;
+          // most crews of a wave make for the stretch of wall it has been aimed at
+          const aim = this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
+          k = this._pickLadderSeg(aim); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++;
+        }
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, d.sz, 0); return; }
         const s = this.segs[k];
         const ax = s.ox + (tower ? s.nx * 2.2 : 0), ay = s.oy + (tower ? s.ny * 2.2 : 0);
@@ -861,6 +876,9 @@ export class Sim {
           this.rot[i] = Math.atan2(ty - y, tx - x);
           this._launch(x, y, this.cz[c] + 3, tx, ty, this.surfZ(tx, ty), w, ORC, 3, w.flight);
           this.fx.sound('catapult', x, y, 0.7);
+          // the alert points at the engine, not at where its rocks land: that is the thing to strike
+          const sec = this.sectorAt(tx, ty);
+          this._alert('catFire' + sec, 75, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
           return;
         }
         if ((this.tick + i) % 10 === 0 && this._catTarget(i, w)) { this.state[i] = S_ACT; this.vx[i] = this.vy[i] = 0; this.cd[i] = 2 + this.rand() * 3; return; }
@@ -914,6 +932,21 @@ export class Sim {
     const x = this.x[i], y = this.y[i];
     const b = this.defBox;
     if (x < b[0] - w.range || x > b[2] + w.range) return false;
+    // counter-battery: every other catapult hunts the mortars and guns that keep firing from one place
+    if ((i & 1) === 0 && this.hotList.length) {
+      const r2c = w.range * w.range, m2c = w.min * w.min;
+      let bestH = -1, bd = 1e12;
+      for (const c of this.hotList) {
+        const dx = (c % OW) * OCS + 8 - x, dy = ((c / OW) | 0) * OCS + 8 - y, d2 = dx * dx + dy * dy;
+        if (d2 <= r2c && d2 >= m2c && d2 < bd) { bd = d2; bestH = c; }
+      }
+      if (bestH >= 0) {
+        this.tx[i] = (bestH % OW) * OCS + 8; this.ty[i] = ((bestH / OW) | 0) * OCS + 8;
+        this._alert('cbat', 45, 'Catapults are ranging on your mortars — move them, hold their fire, or kill the catapults', 'warn', this.tx[i], this.ty[i]);
+        return true;
+      }
+      if (x < b[0] - 150) return false; // keep rolling forward until the guns are in reach
+    }
     const x0 = Math.max(0, ((x - w.range) / DCS) | 0), x1 = Math.min(DW - 1, ((x + w.range) / DCS) | 0);
     const y0 = Math.max(0, ((y - w.range) / DCS) | 0), y1 = Math.min(DH - 1, ((y + w.range) / DCS) | 0);
     const r2 = w.range * w.range, m2 = w.min * w.min;
@@ -1056,6 +1089,7 @@ export class Sim {
       const tx = this.tx[i] + (this.rand() + this.rand() - 1) * w.scatter, ty = this.ty[i] + (this.rand() + this.rand() - 1) * w.scatter;
       const dist = Math.hypot(tx - x, ty - y);
       this.ammo[i]--; cdA[i] = w.reload * (0.9 + 0.25 * this.rand()); this.fireT[i] = this.time; this.stats.shots++;
+      this.hot[((y / OCS) | 0) * OW + ((x / OCS) | 0)] += w.aoe > 8 ? 40 : 16; // muzzle flashes give the position away
       const ang = Math.atan2(ty - y, tx - x);
       if (d.cls === C.INF) this.rot[i] = ang; else this.trot[i] = ang;
       this._launch(x, y, z0, tx, ty, this.surfZ(tx, ty), w, DEF, 2, w.flight + dist / 400);
@@ -1108,6 +1142,7 @@ export class Sim {
         if (this.ob[tc] & OB.MOAT) acc *= el ? 1.15 : 0.45;
       }
     }
+    if (w.sup) this.gSup[this.grp[t]] += w.sup; // near misses keep heads down too
     const hit = this.rand() < acc;
     if (hit) this.damage(t, w.dmg, w);
     else if (this.rand() < 0.3) {
@@ -1150,6 +1185,22 @@ export class Sim {
     if (f) {
       const dx = f.x - x, dy = f.y - y, rr = range + f.r;
       if (dx * dx + dy * dy < rr * rr) {
+        if (w.pref) {
+          // marksmen and anti-armour go for whatever of theirs stands inside the marked circle: this is how a captain is hunted
+          const hv = this.hvt, f2 = f.r * f.r;
+          let best = -1, bs = 1e18;
+          for (let k = 0; k < hv.length; k++) {
+            const j = hv[k];
+            if (!this.alive[j] || !(UNITS[this.type[j]].hvt & w.pref)) continue;
+            const fx = this.x[j] - f.x, fy = this.y[j] - f.y;
+            if (fx * fx + fy * fy > f2) continue;
+            const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
+            if (e2 > r2 || e2 < m2) continue;
+            const sc = e2 * (0.5 + this.rand());
+            if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+          }
+          if (best >= 0) return best;
+        }
         for (let k = 0; k < 3; k++) {
           const j = this._randOrcNear(f.x, f.y, f.r);
           if (j < 0) break;
@@ -1263,7 +1314,7 @@ export class Sim {
     this.fx.explosion(x, y, z, r, w.fxk || 0);
     const x0 = Math.max(0, ((x - r) / FINE) | 0), x1 = Math.min(FW - 1, ((x + r) / FINE) | 0);
     const y0 = Math.max(0, ((y - r) / FINE) | 0), y1 = Math.min(FH - 1, ((y + r) / FINE) | 0);
-    const r2 = r * r, enemy = team === DEF ? ORC : DEF;
+    const r2 = r * r, enemy = team === DEF ? ORC : DEF, sup = team === DEF ? w.sup || 0 : 0;
     const high = this.elev[this.map.cellOf(x, y)] ? 1 : 0;
     this._bx = x; this._by = y; this._bp = r;
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
@@ -1271,6 +1322,7 @@ export class Sim {
         if (!this.alive[j] || (!ff && this.team[j] !== enemy)) continue;
         const dx = this.x[j] - x, dy = this.y[j] - y, d2 = dx * dx + dy * dy;
         if (d2 >= r2) continue;
+        if (sup && this.team[j] === ORC) this.gSup[this.grp[j]] += sup;
         // fragmentation is patchy: small targets are either caught or spared, big ones soak the blast
         const f = 1 - Math.sqrt(d2) / r;
         let dm;

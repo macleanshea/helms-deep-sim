@@ -652,13 +652,13 @@ function drawOverlay(dtReal) {
   c.font = `700 12px ${FONT}`; c.textAlign = 'center';
   let nLab = 0;
   for (let g = 0; g < sim.ng; g++) {
-    const st = sim.gState[g], conf = sim.gConf[g] > sim.time;
-    if ((!st && !conf) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
+    const st = sim.gState[g], conf = sim.gConf[g] > sim.time, pin = sim.gPin[g] === 2;
+    if ((!st && !conf && !pin) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
     const gx = sim.gCx[g], gy = sim.gCy[g];
     const p = S(gx, gy, heightAt(gx, gy) + 5);
     if (p[0] < 0 || p[1] < 60 || p[0] > vw || p[1] > vh) continue;
     const orc = sim.gTeam[g] === ORC;
-    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : '! wavering';
+    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : st ? '! wavering' : '▼ pinned';
     // keep the field legible: never stack labels on top of one another
     let clash = false;
     for (let k = 0; k < nLab; k += 2) if (Math.abs(labXY[k] - p[0]) < 96 && Math.abs(labXY[k + 1] - p[1]) < 24) { clash = true; break; }
@@ -666,7 +666,7 @@ function drawOverlay(dtReal) {
     labXY[nLab++] = p[0]; labXY[nLab++] = p[1];
     const tw = c.measureText(txt).width + 10;
     c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 17, 4); c.fill();
-    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : orc ? '#f0b34a' : '#ffb86a';
+    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : !st && !conf ? '#8fd8ff' : orc ? '#f0b34a' : '#ffb86a';
     c.fillText(txt, p[0], p[1] + 4);
   }
   // commanders: a star over each so they can be found (and hunted)
@@ -830,7 +830,10 @@ function drawMinimap() {
   if (wv && !sim.result && ((wv.next && wv.next.forming) || wv.phase === 'approach')) {
     const hot = wv.phase === 'approach', a = 0.45 + 0.45 * Math.sin(app.clock * 5);
     mctx.strokeStyle = hot ? `rgba(255,110,90,${a})` : `rgba(240,179,74,${a})`; mctx.lineWidth = 2;
-    for (let k = 0; k < 3; k++) { const x = 5 + k * 7; mctx.beginPath(); mctx.moveTo(x, H * 0.5 - 9); mctx.lineTo(x + 6, H * 0.5); mctx.lineTo(x, H * 0.5 + 9); mctx.stroke(); }
+    // pointing at the stretch of wall it has been aimed at, when it has one
+    const sec = hot ? wv.sector : wv.next.sector, yy = sec ? sec.y * ky : H * 0.5;
+    for (let k = 0; k < 3; k++) { const x = 5 + k * 7; mctx.beginPath(); mctx.moveTo(x, yy - 9); mctx.lineTo(x + 6, yy); mctx.lineTo(x, yy + 9); mctx.stroke(); }
+    if (sec) { mctx.setLineDash([4, 4]); mctx.lineWidth = 1.2; mctx.beginPath(); mctx.moveTo(30, yy); mctx.lineTo(sec.x * kx - 8, yy); mctx.stroke(); mctx.setLineDash([]); }
   }
   // alert pings: a ring that opens out from where it happened
   mctx.lineWidth = 1.6;

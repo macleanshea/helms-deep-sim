@@ -13,6 +13,7 @@ import { KEEP } from '../map.js';
 const MAXG = 4096;
 export const G_OK = 0, G_SHAKEN = 1, G_ROUT = 2, G_GONE = 3;
 const HALF_LIFE = 0.5 ** (0.5 / 12); // per 0.5 s update
+const SUP_FADE = 0.5 ** (0.5 / 4);   // suppression halves every 4 s
 
 export const moraleMethods = {
   _initMorale() {
@@ -21,6 +22,8 @@ export const moraleMethods = {
     this.gAlive = new Int32Array(MAXG); this.gN0 = new Int32Array(MAXG);
     this.gRecent = new Float32Array(MAXG); this.gMorale = new Float32Array(MAXG).fill(100); this.gConf = new Float32Array(MAXG); this.gRoutT = new Float32Array(MAXG);
     this.gCx = new Float32Array(MAXG); this.gCy = new Float32Array(MAXG);
+    // suppression: fire landing on a company builds up, fades in a few seconds, and pins it down
+    this.gSup = new Float32Array(MAXG); this.gPin = new Uint8Array(MAXG); this.gFearless = new Uint8Array(MAXG);
     this._gsx = new Float64Array(MAXG); this._gsy = new Float64Array(MAXG); this._gn = new Int32Array(MAXG);
     this.hadCmd = [false, false];
     this._moraleLogT = [0, 0];
@@ -30,6 +33,7 @@ export const moraleMethods = {
   newGroup(team, exempt) {
     const g = this.ng < MAXG - 1 ? this.ng++ : MAXG - 1;
     this.gTeam[g] = team; this.gExempt[g] = exempt ? 1 : 0; this.gState[g] = G_OK; this.gMorale[g] = 100;
+    this.gSup[g] = 0; this.gPin[g] = 0; this.gFearless[g] = 0;
     return g;
   },
 
@@ -50,8 +54,15 @@ export const moraleMethods = {
       const cx = (this.gCx[g] = sx[g] / cnt), cy = (this.gCy[g] = sy[g] / cnt);
       if (init) continue;
       this.gRecent[g] *= HALF_LIFE;
-      if (this.gExempt[g] || !on) continue;
       const team = this.gTeam[g];
+      // suppression level: fire received lately against the men still standing
+      let sup = 0;
+      if (team === ORC) {
+        const s = (this.gSup[g] *= SUP_FADE);
+        sup = this.gExempt[g] || this.gFearless[g] ? 0 : Math.min(2.5, s / Math.max(8, cnt));
+        this.gPin[g] = sup >= 1.2 ? 2 : sup >= 0.5 ? 1 : 0;
+      }
+      if (this.gExempt[g] || !on) continue;
       let insp = 0;
       for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { insp = 1; break; } }
       this.gInsp[g] = insp;
@@ -61,7 +72,7 @@ export const moraleMethods = {
       if (this.hadCmd[team] && !this.cmds[team].length) regen *= 0.75; // leaderless
       if (st >= G_ROUT) regen += 2;
       const cap = 100 - 18 * this.gBreaks[g];
-      let m = this.gMorale[g] + (regen - pressure * (team === ORC ? 13 : 30)) * 0.5;
+      let m = this.gMorale[g] + (regen - pressure * (team === ORC ? 13 : 30) - 6 * Math.min(1.5, sup)) * 0.5;
       if (m > cap) m = cap; else if (m < 0) m = 0;
       this.gMorale[g] = m;
       if (st <= G_SHAKEN) {
@@ -69,7 +80,7 @@ export const moraleMethods = {
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
       } else if (st === G_ROUT && m >= 60 && this.time - this.gRoutT[g] > 20) {
         this.gState[g] = G_OK;
-        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 40; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
+        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 90; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
       }
     }
   },
@@ -87,7 +98,7 @@ export const moraleMethods = {
       }
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {
-        this._moraleLogT[0] = this.time + 20;
+        this._moraleLogT[0] = this.time + 45;
         this.events.push({ type: 'log', text: this._brokeN > 1 ? `${this._brokeN} Uruk companies have broken and run` : 'An Uruk company breaks and runs!', cls: 'good', x: this.gCx[g], y: this.gCy[g] });
         this._brokeN = 0;
       }

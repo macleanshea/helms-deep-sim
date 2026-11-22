@@ -9,7 +9,7 @@
 // Attacker formations placed by hand carry no wave tag and are left alone: they follow their
 // own "advance after" delay exactly as before.
 
-import { ORC, UNITS, U } from '../config.js';
+import { WORLD_W, WORLD_H, DEF, ORC, UNITS, U, C } from '../config.js';
 import { groupBounds, waveSummary } from '../scenarios.js';
 import { G_ROUT } from './morale.js';
 
@@ -21,6 +21,9 @@ const MIN_GAP = 90;      // least time between two releases (s)
 const EARLY = 60;        // how far ahead of schedule a wave may be sent in when the last is spent (s)
 const SPENT = 0.25;      // a wave is spent when this fraction of it is still in the fight
 const APPROACH = 4.6;    // typical pace up the valley, for contact estimates (m/s)
+
+// how hard each kind of wave leans on its chosen sector (0 = spread evenly)
+const AIMED = { escalade: 1.0, siege: 1.5, assault: 1.2 };
 
 // wave states
 const PENDING = 0, FORMING = 1, ARRIVING = 2, COMMITTED = 3;
@@ -34,7 +37,7 @@ export const directorMethods = {
     const W = sum.length;
     const dawnEff = this.opt.dawn > 0 ? this.opt.dawn : 1200;
     const span = Math.max(0, dawnEff - TAIL);
-    const waves = sum.map((s, k) => ({ ...s, rel: W > 1 ? (k / (W - 1)) * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0 }));
+    const waves = sum.map((s, k) => ({ ...s, sector: -1, rel: W > 1 ? (k / (W - 1)) * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0 }));
     let reserveN = 0, cmdReserve = 0;
     for (const g of reserve) {
       const d = UNITS[U[g.type]], n = g.count * (1 + (d.carry || 0));
@@ -49,7 +52,7 @@ export const directorMethods = {
     let front = 0;
     for (const g of groups) if (g.team === ORC && g.phase === 0 && g.x > front) front = g.x;
     waves[0].contactT = Math.max(0, (this.map.wallJoin.x - 250 - front) / APPROACH);
-    this.dir = { W, waves, cur: 0, reserveN, cmdReserve, lull: false, lullS: 0, contact: false };
+    this.dir = { W, waves, cur: 0, reserveN, cmdReserve, lull: false, lullS: 0, contact: false, aimY: -1, lossMark: null };
   },
 
   _director() {
@@ -77,12 +80,18 @@ export const directorMethods = {
       if (early || this.time >= next.rel - WARN) {
         next.state = FORMING;
         next.relT = early ? this.time + WARN * 0.6 : next.rel;
-        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${next.note ? ': ' + next.note : ''}`, 'warn', 40, 480, true);
+        // the assaults in the middle of the night are thrown at the stretch of wall that looks weakest
+        next.sector = AIMED[next.kind] ? this._weakSector() : -1;
+        const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
+        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${next.note ? ': ' + next.note : ''}${where}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
       }
     } else if (next.state === FORMING && this.time >= next.relT) {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
+      d.aimY = next.sector >= 0 ? this.sectors[next.sector].y : -1;
+      d.lossMark = this.loss[ORC].slice();
+      const groups = this._aimWave(next);
       // each rank comes over the edge when it would have marched that far
-      next.pend = next.groups.map((g) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH })).sort((a, b) => b.t - a.t);
+      next.pend = groups.map((g) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH);
       this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
     }
@@ -91,14 +100,69 @@ export const directorMethods = {
   /** Bring one reserve formation onto the field at the valley mouth. */
   _arrive(w, g) {
     const d = this.dir, def = UNITS[U[g.type]], per = 1 + (def.carry || 0);
-    const hd = g.hd || groupBounds(g).hd;
-    const got = this._spawnGroup(g, EDGE + hd, true);
+    const got = g.count > 0 ? this._spawnGroup(g, EDGE + groupBounds(g).hd, true) : 0;
     // anything that found no room to form up never arrives
     const short = (g.count - got) * per;
     if (short > 0) { this.count[ORC] -= short; this.initial[ORC] -= short; }
     this.count[ORC] -= got * per; // spawn() counted them again
     d.reserveN -= g.count * per; w.left -= g.count * per;
     if (def.cmd) d.cmdReserve -= g.count;
+  },
+
+  /**
+   * Which third of the Deeping Wall looks easiest: thinly held, already damaged, where defenders
+   * have been falling — and not where the last wave was cut down.
+   */
+  _weakSector() {
+    const d = this.dir, held = [0, 0, 0], dmg = [0, 0, 0], nseg = [0, 0, 0], fell = [0, 0, 0], bled = [0, 0, 0];
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i] || this.team[i] !== DEF) continue;
+      const u = UNITS[this.type[i]];
+      if (u.cls === C.CACHE || (u.ammo && this.ammo[i] < 1)) continue;
+      const k = this.sectorAt(this.x[i], this.y[i]);
+      if (k < 3 && this.x[i] < this.map.wallTop.x + 60) held[k] += u.supply || 1;
+    }
+    for (let k = 0; k < this.segs.length; k++) {
+      const sg = this.segs[k];
+      if (sg.kind !== 'wall') continue;
+      const q = this.segSector(k);
+      nseg[q]++; dmg[q] += sg.breached ? 3 : 1 - sg.hp / sg.maxHp;
+    }
+    const y0 = this.map.wallJoin.y, y1 = this.map.wallTop.y, lo = this.loss, mark = d.lossMark;
+    const cw = WORLD_W / 16, ch = WORLD_H / 16;
+    for (let cy = 0; cy < ch; cy++) {
+      const q = Math.max(0, Math.min(2, Math.floor((((cy + 0.5) * 16 - y0) / (y1 - y0)) * 3)));
+      for (let cx = (600 / 16) | 0; cx < cw; cx++) {
+        const c = cy * cw + cx;
+        fell[q] += lo[DEF][c];
+        if (cx * 16 < 980) bled[q] += lo[ORC][c] - (mark ? mark[c] : 0);
+      }
+    }
+    const mx = (a) => Math.max(1, a[0], a[1], a[2]);
+    const mh = mx(held), mf = mx(fell), mb = mx(bled);
+    let best = 0, bs = -1e9;
+    for (let k = 0; k < 3; k++) {
+      const sc = 1.0 * (1 - held[k] / mh) + 0.8 * (dmg[k] / Math.max(1, nseg[k])) + 0.5 * (fell[k] / mf) - 0.6 * (bled[k] / mb) + 0.15 * this.rand2();
+      if (sc > bs) { bs = sc; best = k; }
+    }
+    return best;
+  },
+
+  /** Copies of a wave's formations with their strength shifted toward the lanes that lead to its target. */
+  _aimWave(w) {
+    if (w.sector < 0) return w.groups;
+    const aimY = this.sectors[w.sector].y, B = AIMED[w.kind];
+    const wt = (g) => 1 + B * Math.exp(-(((g.y - aimY) / 150) ** 2));
+    const byType = new Map();
+    for (const g of w.groups) { if (!byType.has(g.type)) byType.set(g.type, []); byType.get(g.type).push(g); }
+    const out = [];
+    for (const list of byType.values()) {
+      let total = 0, wsum = 0;
+      for (const g of list) { total += g.count; wsum += g.count * wt(g); }
+      let acc = 0, done = 0;
+      for (const g of list) { acc += wsum > 0 ? (total * g.count * wt(g)) / wsum : g.count; const c = Math.round(acc) - done; done += c; out.push({ ...g, count: c }); }
+    }
+    return out;
   },
 
   /** When the horde breaks, whatever was still waiting beyond the valley melts away with it. */
@@ -125,7 +189,8 @@ export const directorMethods = {
     const phase = approaching ? 'approach' : d.lull ? 'lull' : !nx && w.state === COMMITTED && !d.contact ? 'last' : 'engaged';
     return {
       W: d.W, k: w.k, name: w.name, phase, eta: Math.max(0, w.contactT - this.time), reserve: d.reserveN, lullS: d.lullS,
-      next: nx ? { name: nx.name, note: nx.note, forming: nx.state === FORMING, in: Math.max(0, (nx.state === FORMING ? nx.relT : nx.rel) - this.time) } : null,
+      sector: w.sector >= 0 ? this.sectors[w.sector] : null,
+      next: nx ? { name: nx.name, note: nx.note, forming: nx.state === FORMING, sector: nx.sector >= 0 ? this.sectors[nx.sector] : null, in: Math.max(0, (nx.state === FORMING ? nx.relT : nx.rel) - this.time) } : null,
     };
   },
 };
