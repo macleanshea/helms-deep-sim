@@ -3,7 +3,7 @@
 //   node tools/headless.js [preset] [maxSeconds] [none|auto]        positional form
 //   node tools/headless.js --preset garrison --seed 3 --policy auto --opt dawn=900 --json
 //
-// Flags: --preset, --seed, --max (seconds), --policy none|auto, --horde n, --opt key=value (repeatable;
+// Flags: --preset, --seed, --max (seconds), --policy none|auto|dump, --horde n, --opt key=value (repeatable;
 // support.<kind>=n reaches the support table), --json (one summary line, nothing else), --quiet,
 // --verify (run twice and compare state hashes). HORDE=n in the environment still works.
 import { pathToFileURL } from 'node:url';
@@ -52,6 +52,8 @@ export function runBattle(cfg = {}) {
     def0: sim.initial[0], defEnd: sim.defCombat, orc0: sim.initial[1], orcEnd: sim.count[ORC],
     fled: sim.stats.fled, breaches: sim.stats.breaches, gateT: round(gateT, 0), ammoMin: round(ammoMin),
     calls: pilot ? pilot.calls : {},
+    cp: sim.opt.sandbox ? null : { earned: round(sim.cpStats.earned, 1), bounty: round(sim.cpStats.bounty, 1), spent: sim.cpStats.spent, left: round(sim.cp, 1) },
+    lullS: sim.dir ? sim.dir.lullS : 0,
     tickAvg: round(total / Math.max(1, sim.tick)), tickMax: round(worst, 1), hash: sim.hash(),
     stats: sim.stats,
   };

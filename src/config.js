@@ -147,16 +147,27 @@ UNITS.forEach((u, i) => {
   u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (no stairs or ladders), 2 heavy (also stopped by obstacles)
 });
 
+// Player-called support. In a challenge battle every call is paid for from one shared pool of
+// Command Points (`cost`, with the short `cpCd` between calls of the same kind); in the sandbox
+// each kind has its own number of uses (`def`) and the longer `cd`.
 export const SUPPORT = {
-  air:       { name: 'Air Strike',     key: '1', cd: 40, def: 4, drag: true,  desc: 'Two jets drop a stick of bombs along a line. Click a point, or drag to set the attack heading. Danger close: hits friendlies too.' },
-  gunship:   { name: 'Gunships',       key: '2', cd: 80, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
-  arty:      { name: 'Artillery',      key: '3', cd: 30, def: 5, desc: 'Off-map battery saturates a 45 m circle. Danger close: hits friendlies too.' },
-  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 60 m re-arm.' },
-  reinforce: { name: 'Air Assault',    key: '5', cd: 90, def: 2, desc: 'A transport helicopter inserts a fresh platoon at the marker.' },
+  air:       { name: 'Air Strike',     key: '1', cd: 40, cpCd: 20, cost: 5, def: 4, drag: true,  desc: 'Two jets drop a stick of bombs along a line. Click a point, or drag to set the attack heading. Danger close: hits friendlies too.' },
+  gunship:   { name: 'Gunships',       key: '2', cd: 80, cpCd: 45, cost: 6, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
+  arty:      { name: 'Artillery',      key: '3', cd: 30, cpCd: 12, cost: 3, def: 5, desc: 'Off-map battery saturates a 45 m circle. Danger close: hits friendlies too.' },
+  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, cpCd: 15, cost: 4, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 60 m re-arm.' },
+  reinforce: { name: 'Air Assault',    key: '5', cd: 90, cpCd: 60, cost: 8, def: 2, desc: 'A transport helicopter inserts a fresh platoon at the marker.' },
 };
+// Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
+// fixed pool shared over everything on this list in the attacker's order of battle.
+export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
+export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
 export const DEFAULT_OPTIONS = {
   ammoMult: 1,
+  sandbox: false, // free build: unlimited placement, support counted in uses rather than Command Points
+  cpStart: 6,     // Command Points in hand when the battle opens
+  cpRate: 0.025,  // Command Points gained per second
+  cpCap: 20,      // most that can be banked
   support: { air: 4, gunship: 2, arty: 5, supply: 4, reinforce: 2 },
   dawn: 1200, // seconds until relief arrives (0 = never)
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)

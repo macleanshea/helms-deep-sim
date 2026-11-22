@@ -193,7 +193,7 @@ app.armSupport = (k) => {
   if (app.mode !== 'battle' || app.sim.result) return;
   const s = app.sim.support[k];
   if (app.tool && app.tool.kind === 'support' && app.tool.name === k) { app.tool = null; ui.hint(null); return; }
-  if (s.left <= 0) { ui.toast(`No ${SUPPORT[k].name.toLowerCase()} left.`, 'warn'); audio.play('deny'); return; }
+  if (!app.sim.affordSupport(k)) { ui.toast(app.sim.opt.sandbox ? `No ${SUPPORT[k].name.toLowerCase()} left.` : `${SUPPORT[k].name} costs ${s.cost} Command Points — you have ${Math.floor(app.sim.cp)}.`, 'warn'); audio.play('deny'); return; }
   if (app.sim.time < s.ready) { ui.toast(`${SUPPORT[k].name} ready in ${Math.ceil(s.ready - app.sim.time)} s.`, 'warn'); audio.play('deny'); return; }
   app.tool = { kind: 'support', name: k };
   audio.play('click');
@@ -782,6 +782,7 @@ function frame(now) {
       if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
+      else if (e.type === 'cp' && e.amt >= 0.15) marker(e.x, e.y, 4, 3.5, '240,179,74', `+${e.amt.toFixed(1)} CP`);
       else if (e.type === 'end') { audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null); }
     }
     sim.events.length = 0;

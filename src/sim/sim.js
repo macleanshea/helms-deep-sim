@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { KEEP, N_WALL } from '../map.js';
@@ -103,7 +103,11 @@ export class Sim {
     this.result = null; this.routing = false; this.routT = 0;
     this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0 };
     this.support = {};
-    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: SUPPORT[k].cd };
+    const sb = !!this.opt.sandbox;
+    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
+    this.cp = sb ? 0 : this.opt.cpStart;
+    this.cpStats = { earned: this.cp, bounty: 0, spent: 0, calls: 0 };
+    this.bountyUnit = 0;
     this._cand = new Int32Array(24);
     this.defBox = [0, 0, 0, 0]; this.orcMaxX = 0;
     this.linkT = new Float32Array(N);
@@ -124,6 +128,12 @@ export class Sim {
     for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
     this._initDirector(setup.groups, reserve);
     this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
+    // what one bounty point is worth: the pool divided over every engine, troll and captain the horde has
+    if (!sb) {
+      let w = 0;
+      for (const k in BOUNTY) w += BOUNTY[k] * (this.stats.startOrc[k] || 0);
+      this.bountyUnit = w > 0 ? (BOUNTY_SHARE * this.opt.cpRate * (this.opt.dawn > 0 ? this.opt.dawn : 1200)) / w : 0;
+    }
     this._startMorale();
   }
 
@@ -228,6 +238,11 @@ export class Sim {
       if (!silent) {
         this.stats.kills[key] = (this.stats.kills[key] || 0) + 1;
         this.stats.lostOrc[d.key] = (this.stats.lostOrc[d.key] || 0) + 1;
+        if (this.bountyUnit && BOUNTY[d.key]) {
+          const amt = this.bountyUnit * BOUNTY[d.key];
+          this.cp = Math.min(this.opt.cpCap, this.cp + amt); this.cpStats.bounty += amt; this.cpStats.earned += amt;
+          this.events.push({ type: 'cp', amt, x, y });
+        }
       }
       if (d.role === R.LADDER || d.role === R.TOWER) {
         const k = this.aux2[i];
@@ -537,6 +552,7 @@ export class Sim {
   step() {
     if (this.result) return;
     this.tick++; this.time += DT;
+    if (!this.opt.sandbox && this.cp < this.opt.cpCap) { const inc = Math.min(this.opt.cpCap - this.cp, this.opt.cpRate * DT); this.cp += inc; this.cpStats.earned += inc; }
     if (this.tick % 5 === 1) this._buildAux();
     this._buildGrids();
     if ((this.navDirty && this.tick - this.lastNav >= 3) || this.tick - this.lastNav >= 20) this._nav();

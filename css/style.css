@@ -149,6 +149,14 @@ h3 { margin: 0 0 8px; }
 .cmd.spent { opacity: 0.38; }
 .cmd.cooling svg { opacity: 0.45; }
 .sep { width: 1px; background: var(--line); margin: 4px 2px; }
+.cpbox { width: 86px; padding: 5px 8px 4px; border-radius: 10px; background: rgba(240, 179, 74, 0.09); border: 1px solid rgba(240, 179, 74, 0.35); display: flex; flex-direction: column; justify-content: space-between; }
+.cpbox[hidden] { display: none; }
+.cpbox b { font-size: 26px; line-height: 1; color: var(--accent); font-variant-numeric: tabular-nums; }
+.cpbox small { white-space: nowrap; }
+.cpbox .bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.cpbox .bar i { display: block; height: 100%; background: var(--accent); }
+#cmdbar:not(.sandbox) .cmd .uses::before { content: "◆ "; font-size: 8px; vertical-align: 1px; }
+#tooltip .cost { display: block; margin-top: 4px; color: var(--accent); font-style: normal; }
 
 #minimap { left: 12px; bottom: 12px; padding: 5px; line-height: 0; z-index: 3; }
 .mode-setup #minimap { display: none; }

@@ -176,7 +176,11 @@ export function buildUI(app, atlas) {
     cmdbar.append(b);
     cmds[id] = { b, uses: b.querySelector('.uses'), cool: b.querySelector('.cool') };
   };
-  for (const k in SUPPORT) addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, SUPPORT[k].desc, () => app.armSupport(k));
+  // the purse every support call is paid from
+  const cpBox = el('div', 'cpbox', '<small>Command pts</small><b id="cpVal">0</b><div class="bar"><i id="cpBar"></i></div><small id="cpRate"></small>');
+  bindTip(cpBox, 'Command Points', 'Every support call is paid for from this one pool. It refills slowly through the night, and killing captains, trolls and siege engines pays a bounty — so what you spend now you cannot spend later.');
+  cmdbar.append(cpBox);
+  for (const k in SUPPORT) addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, `${SUPPORT[k].desc} <i class="cost">Costs ${SUPPORT[k].cost} Command Points.</i>`, () => app.armSupport(k));
   cmdbar.append(el('div', 'sep'));
   addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map. Every weapon in range concentrates on targets inside it for 30 s. Press again to cancel.', () => app.armFocus());
   addCmd('hold', 'Hold Mortars', 'H', ICONS.hold, 'Hold Indirect Fire', 'Mortars and howitzers cease fire to save shells until you release them.', () => app.toggleHold());
@@ -203,6 +207,7 @@ export function buildUI(app, atlas) {
   // ----------------------------------------------------------------- HUD
   const defCount = $('defCount'), orcCount = $('orcCount'), defBar = $('defBar'), orcBar = $('orcBar');
   const ammoPct = $('ammoPct'), ammoBar = $('ammoBar'), clock = $('clock'), dawn = $('dawn'), selinfo = $('selinfo');
+  const cpVal = $('cpVal'), cpBar = $('cpBar'), cpRate = $('cpRate');
   const orcRes = $('orcRes'), orcRout = $('orcRout'), orcLbl = $('orcLbl'), orcForce = $('orcForce');
   const waveBox = $('waveBox'), wavePips = $('wavePips'), waveName = $('waveName'), waveNote = $('waveNote'), btnSkip = $('btnSkip');
   ui.updateHud = () => {
@@ -248,13 +253,21 @@ export function buildUI(app, atlas) {
     clock.textContent = mmss(sim.time);
     dawn.textContent = sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }
+    const sb = !!sim.opt.sandbox;
+    cpBox.hidden = sb;
+    cmdbar.classList.toggle('sandbox', sb);
+    if (!sb) {
+      cpVal.textContent = Math.floor(sim.cp + 1e-6);
+      cpBar.style.width = (100 * (sim.cp - Math.floor(sim.cp + 1e-6))) + '%';
+      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'full' : `+${(sim.opt.cpRate * 60).toFixed(1)} / min`;
+    }
     for (const k in SUPPORT) {
-      const s = sim.support[k], c = cmds[k];
-      c.uses.textContent = s.left;
+      const s = sim.support[k], c = cmds[k], can = sim.affordSupport(k);
+      c.uses.textContent = sb ? s.left : s.cost;
       const cd = Math.max(0, s.ready - sim.time);
-      c.cool.style.height = s.left > 0 ? (100 * cd / s.cd) + '%' : '0';
-      c.b.classList.toggle('spent', s.left <= 0);
-      c.b.classList.toggle('cooling', cd > 0 && s.left > 0);
+      c.cool.style.height = can ? (100 * cd / s.cd) + '%' : '0';
+      c.b.classList.toggle('spent', !can);
+      c.b.classList.toggle('cooling', cd > 0 && can);
       c.b.classList.toggle('armed', !!app.tool && app.tool.kind === 'support' && app.tool.name === k);
     }
     cmds.focus.b.classList.toggle('armed', !!app.tool && app.tool.kind === 'focus');
