@@ -136,7 +136,7 @@ export class Fx {
     // permanent marks
     if (kind === 4) this.decal(SPR.scorch, x, y, r * 1.1, this.rnd() * 6, 60, 50, 40, 90);
     else if (kind === 3) { if (this.rnd() < 0.5) this.decal(SPR.scorch, x, y, r * 2.2, this.rnd() * 6, 255, 255, 255, 110); }
-    else { this.decal(SPR.scorch, x, y, r * 2.1, this.rnd() * 6, 255, 255, 255, 190); if (big) this.decal(SPR.crater, x, y, r * 0.75, this.rnd() * 6, 255, 255, 255, 220); }
+    else { this.decal(SPR.scorch, x, y, r * 2.3, this.rnd() * 6, 255, 255, 255, 120); if (big) this.decal(SPR.crater, x, y, r * 0.6, this.rnd() * 6, 255, 255, 255, 170); }
     if (!this.inView(x, y, r * 4)) return;
     if (this.expBudget <= 0) { this.p(SPR.glow, x, y, 0, 0, r * 3, r * 3, 0, 0.15, 255, 200, 120, 0.9, 1); return; }
     this.expBudget -= kind === 3 ? 0.35 : 1;
@@ -170,7 +170,7 @@ export class Fx {
     for (let k = 0; k < Math.min(10, r * 0.6); k++) { const a = rn() * 6.28, sp = r * (0.8 + rn() * 2.2); this.p(SPR.debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.5 + rn() * 0.8, 0.4 + rn() * 0.6, rn() * 6, 0.7 + rn() * 0.7, 46, 40, 32, 1, 0, 0, 0, 2.2, (rn() - 0.5) * 16, 2); }
     this.p(SPR.ring, x, y, 0, 0, r * 0.8, r * 0.8, 0, 0.32, 255, 240, 220, 0.5, 1, r * 7, r * 7);
     if (kind === 2) {
-      for (let k = 0; k < 46; k++) { const a = rn() * 6.28, sp = 10 + rn() * 55; const v = 100 + rn() * 70; this.p(SPR.debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, 1 + rn() * 2.4, 0.8 + rn() * 1.6, rn() * 6, 1.4 + rn() * 1.4, v, v - 4, v - 12, 1, 0, 0, 0, 1.6, (rn() - 0.5) * 12, 2); }
+      for (let k = 0; k < 46; k++) { const a = rn() * 6.28, sp = 10 + rn() * 55; const v = 100 + rn() * 70; const sz = 0.4 + rn() * rn() * 1.5; this.p(SPR.debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, sz, sz * 0.8, rn() * 6, 1.4 + rn() * 1.4, v, v - 4, v - 12, 1, 0, 0, 0, 1.6, (rn() - 0.5) * 12, 2); }
       for (let k = 0; k < 16; k++) { const a = rn() * 6.28, d = rn() * r, v = 110 + rn() * 50; this.p(SPR.smoke, x + Math.cos(a) * d, y + Math.sin(a) * d, Math.cos(a) * 6, Math.sin(a) * 6 - 2, r * 0.9, r * 0.9, rn() * 6, 4 + rn() * 4, v, v * 0.95, v * 0.86, 0.6, 0, r * 0.5, r * 0.5, 0.6, 0.2, 1); }
       this.emitters.push({ x, y, t: 30, rate: 5, acc: 0, size: 6, fire: true });
     } else if (big && this.rnd() < 0.5) this.emitters.push({ x, y, t: 5 + this.rnd() * 6, rate: 3, acc: 0, size: r * 0.35, fire: false });

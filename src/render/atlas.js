@@ -50,17 +50,17 @@ function soldier(c, o = {}) {
 const rifleW = (len = 44, th = 4) => (c) => { rect(c, 8, 2, len - 8, th + 3, OUT); rect(c, 9, 3.5, len - 10, th, '#23241f'); rect(c, 14, 2.5, 9, th + 2, '#3a3b33'); };
 
 function orc(c, o = {}) {
-  const arm = o.armor || '#2e2d31', skin = o.skin || '#5d5346';
-  if (o.shield) { ell(c, 13, -19, 13, 13, '#3d2420', '#0b0a0a', 2.5); ell(c, 13, -19, 8, 8, null, '#6b5a4d', 2); ell(c, 13, -19, 4, 5, '#d8d4c8'); }
+  const arm = o.armor || '#4b2c27', skin = o.skin || '#5d5346';
+  if (o.shield) { ell(c, 13, -19, 13, 13, '#7a2a20', '#0b0a0a', 2.5); ell(c, 13, -19, 8, 8, null, '#9a8a7d', 2); ell(c, 13, -19, 4, 5, '#d8d4c8'); }
   ell(c, 0, 0, 13, 22, arm, '#0a0a0b', 2.5);
-  c.strokeStyle = 'rgba(160,160,170,0.28)'; c.lineWidth = 2;
+  c.strokeStyle = 'rgba(190,180,175,0.4)'; c.lineWidth = 2;
   for (let k = -2; k <= 2; k++) { c.beginPath(); c.arc(-14, k * 7, 14, -0.5, 0.5); c.stroke(); }
-  if (!o.bare) { ell(c, 0, -17, 8, 8, '#4b4b51', '#0a0a0b', 2); ell(c, 0, 17, 8, 8, '#4b4b51', '#0a0a0b', 2); sheen(c, 0, -17, 7, 0.25); sheen(c, 0, 17, 7, 0.25); }
+  if (!o.bare) { ell(c, 0, -17, 8, 8, '#6a6a72', '#0a0a0b', 2); ell(c, 0, 17, 8, 8, '#6a6a72', '#0a0a0b', 2); sheen(c, 0, -17, 7, 0.25); sheen(c, 0, 17, 7, 0.25); }
   else { ell(c, 0, -17, 8, 8, skin, '#0a0a0b', 2); ell(c, 0, 17, 8, 8, skin, '#0a0a0b', 2); }
   if (o.weapon) o.weapon(c);
   if (o.bare) { ell(c, 4, 0, 10, 10, skin, '#0a0a0b', 2.5); line(c, -2, -3, 12, -3, '#a5281c', 3); line(c, -2, 4, 12, 4, '#a5281c', 2); }
   else {
-    ell(c, 4, 0, 10.5, 10.5, '#3b3b40', '#0a0a0b', 2.5); sheen(c, 4, 0, 10, 0.22);
+    ell(c, 4, 0, 10.5, 10.5, '#55555c', '#0a0a0b', 2.5); sheen(c, 4, 0, 10, 0.3);
     line(c, -5, 0, 13, 0, '#19191b', 2.5);
     // the White Hand
     ell(c, 3, 0, 4, 5, '#e4e0d4');
@@ -70,7 +70,6 @@ function orc(c, o = {}) {
 const blade = (c) => { line(c, 8, 19, 46, 25, '#0a0a0b', 7); line(c, 14, 20, 46, 25, '#aeb2b6', 4); line(c, 8, 19, 14, 20, '#4a3524', 5); };
 
 function vehicleHull(c, L, Wd, col, dark, tracks) {
-  c.fillStyle = 'rgba(0,0,0,0.001)';
   rect(c, -L / 2, -Wd / 2 - 5, L, 9, '#1d1e1a', '#0c0d0a', 2, 3);
   rect(c, -L / 2, Wd / 2 - 4, L, 9, '#1d1e1a', '#0c0d0a', 2, 3);
   if (tracks) { c.strokeStyle = 'rgba(90,90,80,0.7)'; c.lineWidth = 1.5; for (let x = -L / 2 + 4; x < L / 2; x += 5) { c.beginPath(); c.moveTo(x, -Wd / 2 - 5); c.lineTo(x, -Wd / 2 + 4); c.moveTo(x, Wd / 2 - 4); c.lineTo(x, Wd / 2 + 5); c.stroke(); } }
@@ -84,7 +83,6 @@ function vehicleHull(c, L, Wd, col, dark, tracks) {
   for (let k = 0; k < 5; k++) { const x = -L / 2 + 8 + k * 4; c.beginPath(); c.moveTo(x, -Wd / 2 + 8); c.lineTo(x, Wd / 2 - 8); c.stroke(); }
   line(c, L / 2 - 13, -Wd / 2 + 3, L / 2 - 13, Wd / 2 - 3, 'rgba(0,0,0,0.35)', 1.5);
   // camouflage blotches
-  c.save(); c.clip(); c.restore();
   c.fillStyle = 'rgba(40,46,28,0.45)';
   for (let k = 0; k < 6; k++) { c.beginPath(); c.ellipse((rnd() - 0.5) * L * 0.8, (rnd() - 0.5) * Wd * 0.7, 6 + rnd() * 8, 3 + rnd() * 5, rnd() * 3, 0, 6.28); c.fill(); }
 }
@@ -155,7 +153,7 @@ export function drawAtlas() {
 
   // ---------------------------------------------------------- attackers
   cell(ctx, S.uruk, (c) => orc(c, { shield: true, weapon: blade }));
-  cell(ctx, S.archer, (c) => orc(c, { armor: '#33302c', weapon: (q) => { line(q, 6, 6, 44, 6, '#0a0a0b', 6); line(q, 8, 6, 44, 6, '#4d3a28', 3); q.beginPath(); q.arc(26, 6, 20, -1.25, 1.25); q.strokeStyle = '#0a0a0b'; q.lineWidth = 5; q.stroke(); q.strokeStyle = '#6b6d70'; q.lineWidth = 2.5; q.stroke(); line(q, 32, -13, 32, 25, 'rgba(220,220,210,0.6)', 1); } }));
+  cell(ctx, S.archer, (c) => orc(c, { armor: '#43362a', weapon: (q) => { line(q, 6, 6, 44, 6, '#0a0a0b', 6); line(q, 8, 6, 44, 6, '#4d3a28', 3); q.beginPath(); q.arc(26, 6, 20, -1.25, 1.25); q.strokeStyle = '#0a0a0b'; q.lineWidth = 5; q.stroke(); q.strokeStyle = '#6b6d70'; q.lineWidth = 2.5; q.stroke(); line(q, 32, -13, 32, 25, 'rgba(220,220,210,0.6)', 1); } }));
   cell(ctx, S.berserker, (c) => orc(c, { bare: true, armor: '#4a3f37', skin: '#8a7462', weapon: (q) => { line(q, 2, 20, 58, 12, '#0a0a0b', 9); line(q, 16, 18, 58, 12, '#c0c4c8', 5.5); line(q, 2, 20, 16, 18, '#3a281a', 6); line(q, 14, 11, 18, 25, '#55565a', 4); } }));
   cell(ctx, S.warg, (c) => {
     ell(c, -44, 0, 12, 4, '#3b3129', '#0a0908', 2);
@@ -266,7 +264,7 @@ export function drawAtlas() {
   cell(ctx, S.corpseMan, (c) => { ell(c, 0, 0, 22, 11, '#6f6f4c'); line(c, -10, -6, -30, -14, '#6f6f4c', 7); line(c, 8, 6, 28, 18, '#6f6f4c', 7); line(c, 10, -6, 28, -14, '#66664a', 6); ell(c, -20, 4, 9, 9, '#585b3d'); ell(c, 2, 0, 12, 8, '#454833'); line(c, -4, 16, 26, 22, '#1e1f1b', 3.5); });
   cell(ctx, S.scorch, (c) => { for (let k = 0; k < 14; k++) { const a = rnd() * 6.28, r = rnd() * 22, rr = 18 + rnd() * 22; const x = Math.cos(a) * r, y = Math.sin(a) * r; const g = c.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, 'rgba(12,10,8,0.5)'); g.addColorStop(1, 'rgba(12,10,8,0)'); c.fillStyle = g; c.fillRect(-62, -62, 124, 124); } });
   cell(ctx, S.blood, (c) => { c.fillStyle = '#fff'; blob(c, 20, '#fff', 11, 0.45); for (let k = 0; k < 9; k++) { const a = rnd() * 6.28, r = 20 + rnd() * 28; ell(c, Math.cos(a) * r, Math.sin(a) * r, 2 + rnd() * 5, 2 + rnd() * 4, '#fff'); } });
-  cell(ctx, S.crater, (c) => { const g = c.createRadialGradient(0, 0, 4, 0, 0, 58); g.addColorStop(0, 'rgba(10,8,6,0.85)'); g.addColorStop(0.45, 'rgba(26,20,14,0.7)'); g.addColorStop(0.62, 'rgba(92,76,56,0.55)'); g.addColorStop(0.8, 'rgba(60,48,36,0.3)'); g.addColorStop(1, 'rgba(40,32,24,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 60, 0, 6.2832); c.fill(); for (let k = 0; k < 16; k++) { const a = rnd() * 6.28, r = 34 + rnd() * 22; ell(c, Math.cos(a) * r, Math.sin(a) * r, 2 + rnd() * 3, 2 + rnd() * 3, 'rgba(70,58,44,0.7)'); } });
+  cell(ctx, S.crater, (c) => { const g = c.createRadialGradient(0, 0, 4, 0, 0, 58); g.addColorStop(0, 'rgba(22,17,12,0.8)'); g.addColorStop(0.4, 'rgba(40,31,22,0.62)'); g.addColorStop(0.6, 'rgba(98,82,60,0.5)'); g.addColorStop(0.8, 'rgba(70,58,42,0.22)'); g.addColorStop(1, 'rgba(50,42,30,0)'); c.fillStyle = g; c.beginPath(); c.arc(0, 0, 60, 0, 6.2832); c.fill(); for (let k = 0; k < 16; k++) { const a = rnd() * 6.28, r = 34 + rnd() * 22; ell(c, Math.cos(a) * r, Math.sin(a) * r, 2 + rnd() * 3, 2 + rnd() * 3, 'rgba(70,58,44,0.7)'); } });
   cell(ctx, S.corpseTroll, (c) => { ell(c, 0, 0, 44, 28, '#3d4037'); line(c, -20, -16, -52, -30, '#3d4037', 16); line(c, 20, 14, 52, 28, '#3d4037', 16); ell(c, -40, 14, 14, 14, '#4a4d43'); rect(c, -22, -18, 44, 36, 'rgba(28,26,25,0.7)', null, 0, 8); });
   cell(ctx, S.wreck, (c) => { rect(c, -50, -24, 100, 48, '#1b1a17', '#070706', 3, 6); rect(c, -46, -30, 92, 8, '#0e0d0b', null, 0, 3); rect(c, -46, 22, 92, 8, '#0e0d0b', null, 0, 3); poly(c, [-16, -12, 10, -16, 20, 0, 10, 14, -16, 10], '#26241f', '#070706', 2); line(c, 12, -2, 50, -14, '#151412', 5); c.fillStyle = 'rgba(70,40,20,0.5)'; for (let k = 0; k < 8; k++) { c.beginPath(); c.ellipse((rnd() - 0.5) * 80, (rnd() - 0.5) * 36, 8, 5, rnd() * 3, 0, 6.28); c.fill(); } });
   cell(ctx, S.rubble, (c) => { for (let k = 0; k < 26; k++) { c.save(); c.translate((rnd() - 0.5) * 90, (rnd() - 0.5) * 90); c.rotate(rnd() * 6); const s = 4 + rnd() * 10; const v = 90 + (rnd() * 70) | 0; rect(c, -s, -s * 0.7, s * 2, s * 1.4, `rgb(${v},${v - 4},${v - 10})`, 'rgba(0,0,0,0.6)', 1.5); c.restore(); } });

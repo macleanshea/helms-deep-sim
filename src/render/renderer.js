@@ -60,18 +60,18 @@ void main(){
   grass = mix(grass, vec3(0.40,0.37,0.21), smoothstep(.5,.8,g2)*.55);
   grass *= 0.84+0.32*g3;
   vec3 dirt = mix(vec3(0.33,0.27,0.19), vec3(0.47,0.40,0.30), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
-  vec3 rk = mix(vec3(0.33,0.33,0.35), vec3(0.58,0.56,0.53), fbm(vec2(w.x/30., w.y/7.)+h0*0.12));
+  vec3 rk = mix(vec3(0.27,0.26,0.26), vec3(0.47,0.45,0.42), fbm(vec2(w.x/30., w.y/7.)+h0*0.12));
   rk = mix(rk, vec3(0.42,0.40,0.36), smoothstep(.45,.75,fbm(w/20.+9.))*.5);
   rk *= 0.75+0.5*fbm(w/3.5);
   float dm = clamp(m.b*(0.55+0.9*fbm(w/8.+3.)),0.,1.);
   vec3 c = mix(grass, dirt, dm);
   c = mix(c, rk, rock);
-  vec3 wat = vec3(0.17,0.26,0.31) + 0.22*pow(noise(vec2(w.x*.35, w.y*1.3)+3.), 4.);
+  vec3 wat = vec3(0.12,0.18,0.20) + 0.10*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);
   c = mix(c, vec3(0.30,0.27,0.2), smoothstep(0.02,0.35,m.a)*(1.-smoothstep(0.35,0.7,m.a))*0.7);
   c = mix(c, wat, smoothstep(0.35,0.75,m.a));
-  float light = (0.40 + 0.95*dif) * mix(0.55, 1., sh);
+  float light = (0.46 + 0.9*dif) * mix(0.7, 1., sh);
   c *= light;
-  c *= 1. - 0.25*smoothstep(0.2,0.9,m.g)*(1.-slope*2.);
+  c *= 1. - 0.12*smoothstep(0.2,0.9,m.g)*(1.-slope*2.);
   o = vec4(c,1.);
 }`;
 
@@ -85,7 +85,7 @@ uniform vec4 uCam; uniform float uZoom; uniform float uShadow; uniform float uLo
 out vec2 vUV; out vec2 vLocal; out vec4 vColor; out vec4 vDot; out float vLod; out float vR;
 void main(){
   float px = aPSR.z * uZoom;
-  float lod = max(uLodOff, clamp((px - 6.)/6., 0., 1.));
+  float lod = max(uLodOff, clamp((px - 6.)/11., 0., 1.));
   float size = aPSR.z;
   vR = 0.21;
   if (lod <= 0.) { size = max(px*0.4, 2.3)/uZoom; vR = 0.5; }
@@ -350,7 +350,7 @@ export class Renderer {
     };
     // masonry
     for (const s of segs) {
-      if (s.breached || !s.valid && s.kind === 'wall' && false) continue;
+      if (s.breached) continue;
       if (s.kind === 'wall') {
         wallPath(c, s, -6, 6); c.fillStyle = '#77736b'; c.fill();
         wallPath(c, s, -4.7, 4.3); c.fillStyle = '#9b978d'; c.fill();
@@ -465,7 +465,7 @@ export class Renderer {
     sc.filter = 'none';
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.globalCompositeOperation = 'destination-over';
-    c.globalAlpha = 0.5;
+    c.globalAlpha = 0.62;
     c.drawImage(this.shCanvas, 0, 0, W, Hh);
     c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
 
@@ -552,14 +552,14 @@ export class Renderer {
     if (fx) this._particles(C, z, fx, amb);
     if (sim) {
       const n = this._fillAir(sim, al, clock);
-      this._sprites(C, z, n, [1, 1, 1], false, 1);
+      this._sprites(C, z, n, [amb[0] * 0.45 + 0.55, amb[1] * 0.45 + 0.55, amb[2] * 0.45 + 0.55], false, 1);
     }
   }
 
   _fillUnits(cam, sim, al, vw, vh) {
     const hw = vw / cam.zoom / 2 + 8, hh = vh / cam.zoom / 2 + 8;
     const x0 = cam.x - hw, x1 = cam.x + hw, y0 = cam.y - hh, y1 = cam.y + hh;
-    const { alive, x, y, px, py, rot, trot, type, team, hitT, el, state } = sim;
+    const { alive, x, y, px, py, rot, trot, type, team, hitT, el, state, ammo } = sim;
     const f = this.instF, u = this.instU, time = sim.time;
     let k = 0; const turrets = [];
     for (let i = 0, n = sim.n; i < n && k < MAX_INST - 600; i++) {
@@ -577,7 +577,8 @@ export class Renderer {
       const flash = fl < 0.12 ? ((1 - fl / 0.12) * 200) | 0 : 0;
       f[o] = xi; f[o + 1] = yi; f[o + 2] = size; f[o + 3] = rot[i]; f[o + 4] = spr;
       u[o + 5] = rgba(v, v, v, 255);
-      u[o + 6] = team[i] === DEF ? rgba(110, 210, 255, flash) : rgba(150 + (h % 80), 42 + (h % 24), 30, flash);
+      // far-zoom dots: cyan = armed defender, amber = out of ammunition, red = attacker
+      u[o + 6] = team[i] === DEF ? (d.ammo && ammo[i] < 1 ? rgba(255, 168, 60, flash) : rgba(110, 210, 255, flash)) : rgba(150 + (h % 80), 42 + (h % 24), 30, flash);
       k++;
       if (d.turret) turrets.push(xi, yi, size, trot[i], d.turret, flash);
     }

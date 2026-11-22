@@ -84,9 +84,9 @@ export const UNITS = [
     desc: 'Fast armoured vehicle with a 30 mm autocannon.' },
   { key: 'tank', team: DEF, name: 'Main Battle Tank', cls: C.VEH, hp: 3600, speed: 8, rad: 2.8, size: 10.5, spr: 9, turret: 10, w: 'tankgun', ammo: 40, w2: 'coax', ammo2: 700, spacing: 12, supply: 6,
     desc: 'Heavy armour. Main gun kills trolls; almost immune to blades.' },
-  { key: 'cache', team: DEF, name: 'Ammo Cache', cls: C.CACHE, hp: 300, speed: 0, rad: 1.6, size: 5.5, spr: 11, pool: 400, spacing: 8,
-    desc: 'Re-arms nearby troops (45 m) until its stock runs out.' },
-  { key: 'crate', team: DEF, name: 'Supply Drop', cls: C.CACHE, hp: 200, speed: 0, rad: 1.2, size: 4, spr: 12, pool: 150, spacing: 6, hidden: true,
+  { key: 'cache', team: DEF, name: 'Ammo Cache', cls: C.CACHE, hp: 300, speed: 0, rad: 1.6, size: 5.5, spr: 11, pool: 150, spacing: 8,
+    desc: 'Re-arms troops within 60 m until its stock runs out.' },
+  { key: 'crate', team: DEF, name: 'Supply Drop', cls: C.CACHE, hp: 200, speed: 0, rad: 1.2, size: 4, spr: 12, pool: 60, spacing: 6, hidden: true,
     desc: 'Air-dropped ammunition.' },
   // ---- attackers -------------------------------------------------------
   { key: 'uruk', team: ORC, name: 'Uruk-hai', role: R.MELEE, hp: 130, speed: 4.8, rad: 0.5, size: 3.2, spr: 16, mdmg: 24, mreload: 1.0, reach: 1.3, spacing: 1.7, armor: A.FLESH,
@@ -122,7 +122,7 @@ export const SUPPORT = {
   air:       { name: 'Air Strike',     key: '1', cd: 40, def: 4, drag: true,  desc: 'Two jets drop a stick of bombs along a line. Click a point, or drag to set the attack heading. Danger close: hits friendlies too.' },
   gunship:   { name: 'Gunships',       key: '2', cd: 80, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
   arty:      { name: 'Artillery',      key: '3', cd: 30, def: 5, desc: 'Off-map battery saturates a 45 m circle. Danger close: hits friendlies too.' },
-  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 45 m re-arm.' },
+  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 60 m re-arm.' },
   reinforce: { name: 'Air Assault',    key: '5', cd: 90, def: 2, desc: 'A transport helicopter inserts a fresh platoon at the marker.' },
 };
 

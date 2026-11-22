@@ -194,7 +194,7 @@ export function buildMap() {
       if (wn) dirt = Math.max(dirt, sstep(26, 8, wn.d) * 0.6);
       const sd = Math.abs(y - streamY(x));
       if (cd < 0 && dk > KEEP.r + 8) {
-        water = sstep(6.5, 1.5, sd);
+        water = sstep(5.5, 1.2, sd);
         h -= sstep(9, 2, sd) * 1.6;
         dirt = Math.max(dirt, sstep(9, 4, sd) * 0.5 * (1 - water));
       }

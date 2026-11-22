@@ -215,7 +215,7 @@ export function buildUI(app, atlas) {
     let html = `<b>${fmt(sel.length)} selected</b>`;
     for (const [n, c] of [...by].sort((a, b) => b[1] - a[1]).slice(0, 5)) html += `<div class="line"><span>${n}</span><span>${fmt(c)}</span></div>`;
     html += `<div class="line"><span>Ammunition</span><span>${an ? Math.round(100 * am2 / an) + '%' : '—'}</span></div><div class="line"><span>Condition</span><span>${Math.round(100 * hp / sel.length)}%</span></div>`;
-    html += '<p class="tip"><b>Right-click</b> to move · <b>S</b> stop · <b>Esc</b> deselect</p>';
+    html += '<p class="tip"><b>Right-click</b> to move · <b>X</b> halt · <b>Esc</b> deselect</p>';
     selinfo.innerHTML = html; selinfo.hidden = false;
   };
 
@@ -236,9 +236,9 @@ export function buildUI(app, atlas) {
       <h4>Setting up</h4>
       <div class="keys"><div><kbd>Click</kbd></div><span>With a unit picked: drop a block of troops</span><div><kbd>Drag</kbd></div><span>Draw a firing line — along a wall top to man the battlements</span><div><kbd>Click formation</kbd></div><span>Select it; drag to move, <kbd>Q</kbd> <kbd>E</kbd> rotate, <kbd>Del</kbd> remove</span><div><kbd>Enter</kbd></div><span>Begin the battle</span></div>
       <h4>In battle</h4>
-      <div class="keys"><div><kbd>Space</kbd> <kbd>−</kbd> <kbd>+</kbd></div><span>Pause · slower · faster</span><div><kbd>1</kbd>–<kbd>5</kbd></div><span>Call support, then click the target (drag to aim an air strike)</span><div><kbd>F</kbd></div><span>Focus fire: drag a circle over the enemy you want dead</span><div><kbd>H</kbd></div><span>Hold / release mortars and howitzers</span><div><kbd>R</kbd></div><span>Fall back to the Hornburg</span><div><kbd>Drag</kbd> then <kbd>Right-click</kbd></div><span>Box-select defenders and order them to move</span></div>
+      <div class="keys"><div><kbd>Space</kbd> <kbd>−</kbd> <kbd>+</kbd></div><span>Pause · slower · faster</span><div><kbd>1</kbd>–<kbd>5</kbd></div><span>Call support, then click the target (drag to aim an air strike)</span><div><kbd>F</kbd></div><span>Focus fire: drag a circle over the enemy you want dead</span><div><kbd>H</kbd></div><span>Hold / release mortars and howitzers</span><div><kbd>R</kbd></div><span>Fall back to the Hornburg</span><div><kbd>Drag</kbd> then <kbd>Right-click</kbd></div><span>Box-select defenders and order them to move (<kbd>X</kbd> halts them)</span></div>
       <h4>What to watch for</h4>
-      <div class="keys"><div>Ammunition</div><span>Troops re-arm within 45 m of a cache or supply drop. Dry rifles mean bayonets.</span><div>Sappers</div><span>They run for the culvert with a blasting charge. Marksmen prioritise them.</span><div>Ladders &amp; rams</div><span>Ladders open the wall top; a ram on the causeway breaks the gate.</span><div>Trolls</div><span>Rifles barely scratch them. Rockets, tanks and artillery do.</span></div>
+      <div class="keys"><div>Ammunition</div><span>Troops re-arm within 60 m of a cache or supply drop. Dry rifles mean bayonets.</span><div>Sappers</div><span>They run for the culvert with a blasting charge. Marksmen prioritise them.</span><div>Ladders &amp; rams</div><span>Ladders open the wall top; a ram on the causeway breaks the gate.</span><div>Trolls</div><span>Rifles barely scratch them. Rockets, tanks and artillery do.</span></div>
       <div class="actions"><button class="primary" id="mClose">Got it</button></div></div>`;
     $('mClose').addEventListener('click', ui.hideModal);
   };

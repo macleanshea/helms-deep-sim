@@ -12,9 +12,11 @@ const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast 
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;    // coarse grid of defenders
 
+export const SUPPLY_R = 60; // re-arm radius of caches and supply drops (m)
 export const S_IDLE = 0, S_MOVE = 1, S_ACT = 2, S_DONE = 3, S_FLEE = 4, S_WAIT = 5;
 
 const NOFX = new Proxy({}, { get: () => () => {} });
+let sharedSolver = null;
 const W = WEAPONS;
 
 function mulberry(seed) {
@@ -63,7 +65,7 @@ export class Sim {
     this.structVersion = 1;
 
     // navigation
-    this.solver = new FlowSolver(GW, GH, CELL);
+    this.solver = sharedSolver || (sharedSolver = new FlowSolver(GW, GH, CELL)); // large scratch buffers: one per page
     this.orcCost = new Uint16Array(GW * GH); this.orcDir = new Uint8Array(GW * GH).fill(255);
     this.gateDir = new Uint8Array(GW * GH).fill(255);
     this.srcBuf = new Int32Array(8192); this.srcMark = new Uint8Array(GW * GH);
@@ -263,6 +265,9 @@ export class Sim {
     if ((k = d[c + 1]) !== 255) { const w = fx * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW]) !== 255) { const w = (1 - fx) * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW + 1]) !== 255) { const w = fx * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
+    // far from the fight the host marches up the valley in its ranks; close in, it follows the flow
+    const far = this.defBox[0] - 230 - x;
+    if (far > 0) { const w = far > 120 ? 2.2 : (far / 120) * 2.2; sx += w; }
     const l = Math.sqrt(sx * sx + sy * sy);
     if (l < 0.05) { this.fdx = 0; this.fdy = 0; return false; }
     this.fdx = sx / l; this.fdy = sy / l;
@@ -645,9 +650,10 @@ export class Sim {
     const x = this.x[i], y = this.y[i];
     this.kill(i, null, true);
     const s = this.segs[k];
+    const fresh = !s.breached;
     for (let j = k - 1; j <= k + 1; j++) { const q = this.segs[j]; if (q && q.group === s.group && q.kind !== 'tower') this.breachSeg(j, true); }
     this.explode(s.x, s.y, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
-    this.events.push({ type: 'banner', text: s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : 'The wall is breached!', cls: 'bad' });
+    if (fresh) this.events.push({ type: 'banner', text: s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : 'The wall is breached!', cls: 'bad' });
   }
 
   damageSeg(k, dmg) {
@@ -682,12 +688,14 @@ export class Sim {
     this.el[i] = el;
     if (this.state[i] === S_MOVE) {
       const dx = this.tx[i] - x, dy = this.ty[i] - y, d2 = dx * dx + dy * dy;
-      if (d2 < 0.6 || this.time > this.aux[i]) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; }
+      if (d2 < 1 || this.time > this.aux[i]) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; }
       else {
         let dirx, diry;
         const l = Math.sqrt(d2);
+        // follow the order's path field until inside its arrival zone, then walk straight to the assigned spot
         const f = this.ord[i] >= 0 ? this.orders[this.ord[i]] : null;
-        const k = f && d2 > 64 ? f.dir[c] : 255;
+        let k = 255;
+        if (f && d2 > 64) { const ex = f.x - x, ey = f.y - y; if (ex * ex + ey * ey > f.r * f.r) k = f.dir[c]; }
         if (k !== 255) { dirx = DXN[k]; diry = DYN[k]; } else { dirx = dx / l; diry = dy / l; }
         this._move(i, dirx, diry, Math.min(d.speed, l / DT), d.cls === C.INF ? 2 : 3);
       }
@@ -931,9 +939,9 @@ export class Sim {
   _supply() {
     for (const ci of this.caches) {
       if (!this.alive[ci] || this.ammo[ci] <= 0) continue;
-      const x = this.x[ci], y = this.y[ci], R2 = 45 * 45;
-      const x0 = Math.max(0, ((x - 45) / DCS) | 0), x1 = Math.min(DW - 1, ((x + 45) / DCS) | 0);
-      const y0 = Math.max(0, ((y - 45) / DCS) | 0), y1 = Math.min(DH - 1, ((y + 45) / DCS) | 0);
+      const x = this.x[ci], y = this.y[ci], R2 = SUPPLY_R * SUPPLY_R;
+      const x0 = Math.max(0, ((x - SUPPLY_R) / DCS) | 0), x1 = Math.min(DW - 1, ((x + SUPPLY_R) / DCS) | 0);
+      const y0 = Math.max(0, ((y - SUPPLY_R) / DCS) | 0), y1 = Math.min(DH - 1, ((y + SUPPLY_R) / DCS) | 0);
       let given = 0;
       for (let yy = y0; yy <= y1 && this.ammo[ci] > 0; yy++) for (let xx = x0; xx <= x1 && this.ammo[ci] > 0; xx++) {
         for (let j = this.dcHead[yy * DW + xx]; j >= 0; j = this.cnext[j]) {
@@ -950,7 +958,10 @@ export class Sim {
           if (this.ammo[ci] <= 0) break;
         }
       }
-      if (this.ammo[ci] <= 0) { this.kill(ci, null, true); this.events.push({ type: 'log', text: 'An ammo point has run dry', cls: 'warn' }); }
+      if (this.ammo[ci] <= 0) {
+        this.kill(ci, null, true);
+        if (this.time > (this._dryT || 0)) { this._dryT = this.time + 25; this.events.push({ type: 'log', text: 'Ammo points are running dry — call a resupply drop', cls: 'warn' }); }
+      }
     }
   }
 
@@ -1103,7 +1114,7 @@ export class Sim {
   }
   clearFocus() { this.focus = null; }
 
-  _orderField(x, y, veh) {
+  _orderField(x, y, veh, r = 14) {
     const cost = new Uint16Array(GW * GH), mt = this.mtype, ms = this.mseg;
     for (let c = 0; c < cost.length; c++) cost[c] = mt[c] === T.CLIFF || (veh && ms[c] >= 0 && !this.sBreached[ms[c]]) ? 0 : 10;
     const c = this.map.cellOf(x, y);
@@ -1112,7 +1123,7 @@ export class Sim {
     this.srcBuf[0] = c;
     this.solver.solve(cost, this.srcBuf, 1, dir, null);
     const idx = this.orderSeq++ % 12;
-    this.orders[idx] = { dir };
+    this.orders[idx] = { dir, x, y, r };
     for (let i = 0; i < this.n; i++) if (this.ord[i] === idx) this.ord[i] = -1;
     return idx;
   }
@@ -1129,17 +1140,18 @@ export class Sim {
     let any = false;
     for (const [list, isVeh] of [[inf, false], [veh, true]]) {
       if (!list.length) continue;
-      const fi = this._orderField(x, y, isVeh);
-      if (fi < 0) continue;
       const sp = isVeh ? 11 : 2.3;
       const cols = Math.ceil(Math.sqrt(list.length));
+      const fi = this._orderField(x, y, isVeh, cols * sp * 0.75 + 10);
+      if (fi < 0) continue;
       let k = 0;
       for (let s = 0; s < list.length * 6 && k < list.length; s++) {
         const cx = (s % cols) - (cols - 1) / 2, cy = Math.floor(s / cols) - (cols - 1) / 2;
         const px = x + cx * sp, py = y + cy * sp;
         if (px < 4 || py < 4 || px > WORLD_W - 4 || py > WORLD_H - 4 || !this.defCanEnter(this.map.cellOf(px, py), isVeh)) continue;
         const i = list[k++];
-        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.aux[i] = this.time + 400; this.target[i] = -1;
+        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1;
+        this.aux[i] = this.time + 20 + Math.hypot(px - this.x[i], py - this.y[i]) / UNITS[this.type[i]].speed * 3;
         any = true;
       }
     }
@@ -1160,7 +1172,7 @@ export class Sim {
     }
     if (!list.length) return 0;
     list.sort((a, b) => a[0] - b[0]);
-    const fi = this._orderField(KEEP.cx - 40, KEEP.cy, false);
+    const fi = this._orderField(KEEP.cx, KEEP.cy, false, KEEP.r + 4);
     const slots = this.map.keepSlots;
     // skip slots that already have someone standing on them
     let s = 0;
@@ -1174,7 +1186,8 @@ export class Sim {
         if (!occ) { slot = q; break; }
       }
       if (!slot) slot = { x: KEEP.cx + (this.rand() - 0.5) * 120, y: KEEP.cy + (this.rand() - 0.5) * 120 };
-      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.ord[i] = fi; this.aux[i] = this.time + 600; this.target[i] = -1;
+      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1;
+      this.aux[i] = this.time + 25 + Math.hypot(slot.x - this.x[i], slot.y - this.y[i]) / UNITS[this.type[i]].speed * 2.5;
     }
     this.retreated = true;
     this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn' });

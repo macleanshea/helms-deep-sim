@@ -1,17 +1,18 @@
-// Headless balance / performance run:  node tools/headless.js [preset] [maxSeconds] [policy]
+// Headless balance / performance run:  [HORDE=n] node tools/headless.js [preset] [maxSeconds] [none|auto]
 import { buildMap } from '../src/map.js';
-import { buildPreset } from '../src/scenarios.js';
+import { buildPreset, horde } from '../src/scenarios.js';
 import { Sim } from '../src/sim/sim.js';
 import { UNITS, DEF, ORC } from '../src/config.js';
 
 const preset = process.argv[2] || 'garrison';
 const maxT = +(process.argv[3] || 1500);
 const policy = process.argv[4] || 'none';
-if (process.env.HORDE) globalThis.HORDE = +process.env.HORDE;
 const t0 = performance.now();
 const map = buildMap();
 const tMap = performance.now() - t0;
 const setup = buildPreset(map, preset);
+// HORDE=25000 swaps in a horde of that size
+if (process.env.HORDE) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(+process.env.HORDE));
 const sim = new Sim(map, setup, null);
 console.log(`map ${tMap.toFixed(0)}ms  defenders ${sim.initial[0]}  orcs ${sim.initial[1]}`);
 let worst = 0, total = 0, next = 60;
@@ -25,7 +26,13 @@ while (!sim.result && sim.time < maxT) {
     let best = -1, bc = 40;
     for (let c = 0; c < sim.ocCount.length; c++) if (sim.ocCount[c] > bc && !sim.danger[c]) { bc = sim.ocCount[c]; best = c; }
     if (best >= 0) { const x = (best % 120) * 16 + 8, y = ((best / 120) | 0) * 16 + 8; for (const k of ['arty', 'air', 'gunship']) if (sim.callSupport(k, x, y)) break; }
-    if (sim.ammoLevel() < 0.45) sim.callSupport('supply', 1300, 450);
+    if (sim.ammoLevel() < 0.5) {
+      // drop ammo on the largest knot of dry defenders
+      const cnt = new Map();
+      for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === DEF && UNITS[sim.type[i]].ammo && sim.ammo[i] < 1) { const k = ((sim.y[i] / 60) | 0) * 100 + ((sim.x[i] / 60) | 0); cnt.set(k, (cnt.get(k) || 0) + 1); }
+      let bk = -1, bv = 8; for (const [k, v] of cnt) if (v > bv) { bv = v; bk = k; }
+      if (bk >= 0) sim.callSupport('supply', (bk % 100) * 60 + 30, ((bk / 100) | 0) * 60 + 30);
+    }
   }
   for (const e of sim.events) if (e.type === 'banner') console.log(`  [${sim.time.toFixed(0)}s] ${e.text}`);
   sim.events.length = 0;

@@ -17,7 +17,13 @@ const mm = $('mm'), mctx = mm.getContext('2d');
 
 const map = buildMap();
 const atlas = drawAtlas();
-const renderer = new Renderer(glCanvas, map, atlas);
+let renderer;
+try {
+  renderer = new Renderer(glCanvas, map, atlas);
+} catch (err) {
+  $('loading').innerHTML = '<span>This simulator needs WebGL2, which this browser or device did not provide.</span>';
+  throw err;
+}
 const audio = new Audio();
 const fx = new Fx(audio);
 
@@ -89,7 +95,7 @@ app.selectPlaceTool = (type) => {
   app.tool = type ? { kind: 'place', type } : null;
   app.selGroup = null;
   ui.refreshPalette(); ui.refreshInspector();
-  ui.hint(type ? `<b>${UNITS[U[type]].name}</b> — click to drop ${fmt(app.brushCount)}, drag to draw a line · right-click to finish` : null);
+  ui.hint(type ? `<b>${UNITS[U[type]].name}</b> — click to drop a block, drag to draw a line · right-click when done` : null);
 };
 app.setTypeCount = (type, n) => {
   const gs = app.setup.groups.filter((g) => g.type === type);
@@ -192,7 +198,7 @@ function fireTool(x0, y0, x1, y1) {
     if (k === 'air') { const L = Math.hypot(x1 - x0, y1 - y0); if (L < 20) marker(x0, y0, 20, 7, '240,179,74', 'AIR STRIKE', x0, y0 - 115); else marker((x0 + x1) / 2, (y0 + y1) / 2, 20, 7, '240,179,74', 'AIR STRIKE', x1, y1); }
     else if (k === 'arty') marker(x0, y0, 45, 14, '240,179,74', 'FIRE MISSION');
     else if (k === 'gunship') marker(x0, y0, 150, 48, '111,220,154', 'GUNSHIPS');
-    else if (k === 'supply') marker(x0, y0, 45, 12, '111,220,154', 'RESUPPLY');
+    else if (k === 'supply') marker(x0, y0, 60, 12, '111,220,154', 'RESUPPLY');
     else marker(x0, y0, 14, 22, '94,200,242', 'AIR ASSAULT');
   }
   app.tool = null; ui.hint(null);
@@ -405,7 +411,6 @@ function drawOverlay(dtReal) {
   // selection rings, bars, ammo warnings
   const selSet = app.selection.length ? new Set(app.selection) : null;
   if (selSet) {
-    app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);
     c.strokeStyle = 'rgba(120,225,255,0.95)'; c.lineWidth = 1.3;
     c.beginPath();
     let drawn = 0;
@@ -427,7 +432,7 @@ function drawOverlay(dtReal) {
     if (sx < -30 || sy < -30 || sx > vw + 30 || sy > vh + 30) continue;
     if (d.cls === C.CACHE) { if (z > 0.9) bar(sx, sy - d.size * 0.5 * z - 6, 26, sim.ammo[i] / d.pool, '#6fdc9a'); continue; }
     if (d.cls !== C.INF) { if (sim.hp[i] < d.hp || (selSet && selSet.has(i))) bar(sx, sy - d.size * 0.42 * z - 7, 30, sim.hp[i] / d.hp, sim.hp[i] / d.hp > 0.4 ? '#5ec8f2' : '#e8573d'); }
-    if (d.ammo && sim.ammo[i] < 1 && z > 1.6) { c.fillStyle = '#ff5a46'; c.beginPath(); c.arc(sx, sy - (d.rad + 1.1) * z - 3, Math.max(1.6, Math.min(3, z * 0.5)), 0, 6.2832); c.fill(); }
+    if (d.ammo && sim.ammo[i] < 1 && z > 5) { const r = Math.max(1.2, Math.min(2.2, z * 0.3)); c.fillStyle = '#ff6a4a'; c.fillRect(sx - r, sy - (d.rad + 1.3) * z - r * 2, r * 2, r * 2); }
   }
   // gates
   for (const k of [map.GATE, map.POSTERN]) {
@@ -454,7 +459,7 @@ function drawOverlay(dtReal) {
     if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
     else if (k === 'arty') circle(45, true);
     else if (k === 'gunship') { circle(150, true); c.beginPath(); c.arc(sx, sy, 85 * z, 0, 6.2832); c.stroke(); }
-    else if (k === 'supply') circle(45, true);
+    else if (k === 'supply') circle(60, true);
     else if (k === 'reinforce') circle(14, false);
     else if (k === 'air') {
       let dx = 0, dy = -1, L = 230, cx = ax, cy = ay;
@@ -465,6 +470,20 @@ function drawOverlay(dtReal) {
       c.restore();
     }
     c.beginPath(); c.moveTo(sx - 9, sy); c.lineTo(sx + 9, sy); c.moveTo(sx, sy - 9); c.lineTo(sx, sy + 9); c.stroke();
+  }
+  // night rain, thinning out as the sky lightens
+  const rainA = Math.max(0, Math.min(1, (0.93 - app.amb[0]) * 3));
+  if (rainA > 0.03) {
+    if (!app.paused) app.rainT = (app.rainT || 0) + dtReal;
+    const rt = app.rainT || 0;
+    c.strokeStyle = `rgba(196,210,232,${0.17 * rainA})`; c.lineWidth = 1;
+    c.beginPath();
+    for (let k = 0; k < 130; k++) {
+      const sp = 0.8 + ((k * 37) % 11) * 0.05, len = 12 + (k % 5) * 4;
+      const px = ((k * 131.7 + rt * 240 * sp) % (vw + 160)) - 80, py = ((k * 71.3 + rt * 1250 * sp) % (vh + 80)) - 40;
+      c.moveTo(px, py); c.lineTo(px - len * 0.2, py - len);
+    }
+    c.stroke();
   }
   if (app.paused && !sim.result) {
     c.font = '700 13px system-ui'; c.textAlign = 'center'; c.fillStyle = 'rgba(240,179,74,0.95)';
@@ -559,6 +578,7 @@ function frame(now) {
 
   const sh = fx.shake;
   const cam = { x: app.cam.x + (sh ? Math.sin(app.clock * 71) * sh * 2.2 / Math.max(0.6, app.cam.zoom * 0.5) : 0), y: app.cam.y + (sh ? Math.cos(app.clock * 83) * sh * 2.2 / Math.max(0.6, app.cam.zoom * 0.5) : 0), zoom: app.cam.zoom * dpr };
+  if (app.selection.length) app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);
   renderer.render(cam, sim, app.mode === 'battle' ? fx : null, alpha, app.amb, app.clock);
   drawOverlay(rdt);
 

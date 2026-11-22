@@ -87,7 +87,7 @@ function alongRing(type, count, a0, a1, r = KEEP.r) {
 export function horde(total, mix = {}) {
   const m = { uruk: 0.7, archer: 0.2, berserker: 0.06, warg: 0.03, ...mix };
   const waves = mix.waves ?? (total > 12000 ? 4 : total > 5000 ? 3 : total > 1500 ? 2 : 1);
-  const gap = mix.gap ?? 75;
+  const gap = mix.gap ?? 60;
   const g = [];
   const V = Math.PI / 2;
   const lanes = [205, 405, 600, 795, 995];
@@ -153,13 +153,12 @@ function garrison(map, scale = 1) {
   g.push(makeGroup('mg', s(4), KEEP.towerX - 14, KEEP.towerY, V, 12));
   // courtyard
   g.push(makeGroup('mortar', s(8), KEEP.cx - 20, KEEP.cy - 55, 0, 42));
-  g.push(makeGroup('cache', 1, KEEP.cx - 40, KEEP.cy + 30));
+  g.push(makeGroup('cache', 1, KEEP.cx - 72, KEEP.cy + 22));
   g.push(makeGroup('rifle', s(60), KEEP.cx - 62, KEEP.cy, V, 60));
   // the Deep, behind the wall
   g.push(makeGroup('mortar', s(16), 1400, 420, V, 130));
   g.push(makeGroup('howitzer', s(4), 1560, 560, V, 80));
-  g.push(makeGroup('cache', 1, 1330, 360));
-  g.push(makeGroup('cache', 1, 1340, 600));
+  for (const t of [0.2, 0.5, 0.8]) { const p = map.wallAt(t); g.push(makeGroup('cache', 1, p.x + 20, p.y)); }
   g.push(makeGroup('rifle', s(100), 1345, 480, V, 150));
   return g;
 }
@@ -167,23 +166,23 @@ function garrison(map, scale = 1) {
 export const PRESETS = [
   {
     key: 'garrison', name: 'The Hornburg Garrison',
-    blurb: 'A reinforced battalion mans the Deeping Wall against twelve thousand Uruk-hai.',
+    blurb: 'A reinforced battalion mans the Deeping Wall against eighteen thousand Uruk-hai.',
     build: (map) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1420, 500, Math.PI / 2, 40), makeGroup('ifv', 4, 1450, 640, Math.PI / 2, 60), ...horde(+(globalThis.HORDE || 12000))],
+      groups: [...garrison(map, 1), makeGroup('tank', 2, 1420, 500, Math.PI / 2, 40), makeGroup('ifv', 4, 1450, 640, Math.PI / 2, 60), ...horde(18000)],
       options: {},
     }),
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles',
-    blurb: 'A lone rifle company. Ten thousand at the gate. Your air support will decide this.',
+    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — air support will decide this.',
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
         ...alongRing('rifle', 70, -225, -135), ...alongRing('mg', 6, -210, -150), ...alongRing('at', 6, -200, -160),
         makeGroup('mortar', 6, 1400, 430, Math.PI / 2, 60), makeGroup('cache', 1, 1335, 480), makeGroup('rifle', 24, KEEP.cx - 60, KEEP.cy, Math.PI / 2, 30),
-        ...horde(10000),
+        ...horde(8000),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 } },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 720 },
     }),
   },
   {
