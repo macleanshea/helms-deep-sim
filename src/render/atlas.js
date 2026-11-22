@@ -204,6 +204,25 @@ export function drawAtlas() {
     for (const [x, y] of [[20, -38], [20, 38], [-14, 40]]) { c.save(); c.translate(x, y); c.scale(0.36, 0.36); orc(c, {}); c.restore(); }
   });
 
+  // ---- icons for units and works that are drawn as 3D meshes in the field
+  cell(ctx, 13, (c) => { soldier(c, { helm: '#4a5a3a', weapon: rifleW(38) }); line(c, -14, -6, -40, -30, '#111', 2.5); poly(c, [-40, -30, -22, -34, -26, -22], '#5ec8f2', '#0b2530', 1.5); });
+  cell(ctx, 14, (c) => {
+    c.strokeStyle = '#3a2a1c'; c.lineWidth = 6; for (const x of [-40, 40]) { c.beginPath(); c.moveTo(x - 12, -26); c.lineTo(x + 12, 26); c.moveTo(x + 12, -26); c.lineTo(x - 12, 26); c.stroke(); }
+    c.strokeStyle = '#b9bcc2'; c.lineWidth = 2.5; for (let k = -44; k < 44; k += 12) { c.beginPath(); c.ellipse(k + 6, 0, 9, 22, 0.3, 0, 6.2832); c.stroke(); }
+  });
+  cell(ctx, 15, (c) => { for (const a of [0.5, -0.5, 1.5708]) { c.save(); c.rotate(a); rect(c, -44, -6, 88, 12, '#4a4643', '#141312', 2.5); line(c, -40, -2, 40, -2, 'rgba(255,255,255,0.18)', 2); c.restore(); } });
+  cell(ctx, 26, (c) => { rect(c, -50, -34, 100, 68, '#4a3b2a', '#17110b', 3, 10); rect(c, -42, -24, 84, 48, '#14242c', null, 0, 8); c.strokeStyle = 'rgba(160,200,220,0.35)'; c.lineWidth = 2; for (let k = -1; k <= 1; k++) { c.beginPath(); c.moveTo(-30, k * 12); c.quadraticCurveTo(0, k * 12 - 6, 30, k * 12); c.stroke(); } });
+  cell(ctx, 27, (c) => { ell(c, 0, 0, 34, 34, '#3d4329', '#11130c', 3); ell(c, 0, 0, 22, 22, '#2b301e', '#11130c', 2); ell(c, 0, 0, 8, 8, '#111'); for (let k = 0; k < 3; k++) { const a = k * 2.094; line(c, Math.cos(a) * 12, Math.sin(a) * 12, Math.cos(a) * 20, Math.sin(a) * 20, '#11130c', 3); } });
+  cell(ctx, 28, (c) => { c.beginPath(); c.arc(-60, 0, 76, -0.42, 0.42); c.arc(-60, 0, 62, 0.42, -0.42, true); c.closePath(); c.fillStyle = '#4f5a34'; c.fill(); c.strokeStyle = '#11130c'; c.lineWidth = 3; c.stroke(); line(c, -4, -18, -22, -30, '#111', 3); line(c, -4, 18, -22, 30, '#111', 3); c.strokeStyle = 'rgba(240,179,74,0.75)'; c.lineWidth = 2; c.setLineDash([5, 5]); for (const a of [-0.45, 0, 0.45]) { c.beginPath(); c.moveTo(20, 0); c.lineTo(20 + Math.cos(a) * 38, Math.sin(a) * 38); c.stroke(); } c.setLineDash([]); });
+  cell(ctx, 29, (c) => { poly(c, [-18, -22, -44, -30, -44, 30, -18, 22], '#8e1f16', '#0b0a0a', 2.5); orc(c, { armor: '#5a4a48', shield: true, weapon: blade }); line(c, -6, -10, -6, -44, '#2a1c12', 4); poly(c, [-6, -44, 20, -40, 20, -22, -6, -24], '#a3271b', '#0b0a0a', 2); ell(c, 8, -32, 4, 5, '#e4e0d4'); });
+  cell(ctx, 30, (c) => {
+    for (const [x, y] of [[-30, -34], [-30, 34], [26, -34], [26, 34]]) rect(c, x - 10, y - 5, 20, 10, '#17120d', '#050403', 1.5, 3);
+    rect(c, -40, -30, 76, 60, '#4b3a29', '#0b0806', 3, 3); rect(c, -32, -22, 60, 44, '#6a5137', '#0b0806', 2);
+    c.strokeStyle = 'rgba(15,10,6,0.55)'; c.lineWidth = 2; for (let x = -26; x < 28; x += 9) { c.beginPath(); c.moveTo(x, -22); c.lineTo(x, 22); c.stroke(); }
+    rect(c, 36, -18, 18, 36, '#3a2c1e', '#0b0806', 2); line(c, 40, -14, 40, 14, 'rgba(255,255,255,0.15)', 2);
+    for (const [x, y] of [[-14, -8], [4, 8], [-12, 10], [8, -10]]) { c.save(); c.translate(x, y); c.scale(0.32, 0.32); orc(c, {}); c.restore(); }
+  });
+
   // ------------------------------------------------------------ aircraft
   cell(ctx, S.jet, (c) => {
     poly(c, [58, 0, 30, -6, 6, -9, -22, -46, -38, -46, -24, -9, -44, -8, -54, -22, -60, -22, -54, 0, -60, 22, -54, 22, -44, 8, -24, 9, -38, 46, -22, 46, 6, 9, 30, 6], '#7d858c', '#1c2024', 2.5);

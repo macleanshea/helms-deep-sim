@@ -1,16 +1,24 @@
-// Dijkstra flow-field solver on the nav grid.
+// Flow-field solver on the nav grid (Dial's bucketed Dijkstra over integer costs).
 // A field stores, per cell, the neighbour direction that leads toward the nearest source.
+//
+// Movement rules encoded here (and mirrored by Sim.canEnter):
+//  - ground to ground: only if the walking heights differ by at most `step`
+//  - along a wall walk: free within the same fortification group
+//  - ground <-> wall walk: only through a stair head or door (`portal` bits),
+//    or up a raised ladder / docked siege tower (`ladder` cells, attackers only)
+//  - with `virt`, a closed wall can still be "entered" at a huge cost so that a field
+//    leads attackers to press against the stretch of wall nearest the defenders.
 
 export const DX = [1, 1, 0, -1, -1, -1, 0, 1];
 export const DY = [0, 1, 1, 1, 0, -1, -1, -1];
 const S2 = Math.SQRT1_2;
 export const DXN = [1, S2, 0, -S2, -1, -S2, 0, S2];
 export const DYN = [0, S2, 1, S2, 0, -S2, -1, -S2];
-const B = 1024, MASK = B - 1; // bucket count must exceed the largest single step cost
+const B = 8192, MASK = B - 1; // bucket count must exceed the largest single step cost
 
 export class FlowSolver {
-  constructor(gw, gh, cell) {
-    this.gw = gw; this.gh = gh; this.cell = cell;
+  constructor(gw, gh) {
+    this.gw = gw; this.gh = gh;
     const n = gw * gh;
     this.dist = new Int32Array(n);
     this.bhead = new Int32Array(B);
@@ -18,14 +26,17 @@ export class FlowSolver {
   }
 
   /**
-   * Dial's algorithm (bucketed Dijkstra) over integer step costs.
    * @param cost    Uint16Array, 0 = impassable, otherwise cost of entering the cell
    * @param sources Int32Array of source cells
    * @param dirOut  Uint8Array receiving direction index 0..7 (255 = none)
-   * @param wall    optional {seg, open, group, gate, sx, sy, nx, ny} describing fortifications
+   * @param nav     { cz, elev, portal, step, ladder?, virt? }
+   *                cz Float32 walking height, elev Uint8 (0 ground, else wall group + 1),
+   *                portal Uint8 link bits, ladder Uint8 cells with a way up,
+   *                virt Uint16 per cell: cost of "pressing" into a closed wall (0 = never)
    */
-  solve(cost, sources, nsrc, dirOut, wall) {
-    const { gw, gh, dist, cell, bhead, enode, edist, enext } = this;
+  solve(cost, sources, nsrc, dirOut, nav) {
+    const { gw, gh, dist, bhead, enode, edist, enext } = this;
+    const { cz, elev, portal, step, ladder, virt } = nav;
     dist.fill(0x7fffffff);
     dirOut.fill(255);
     bhead.fill(-1);
@@ -34,8 +45,6 @@ export class FlowSolver {
       const s = sources[i];
       if (dist[s] !== 0) { dist[s] = 0; enode[ec] = s; edist[ec] = 0; enext[ec] = bhead[0]; bhead[0] = ec++; pending++; }
     }
-    const half = cell / 2;
-    const wseg = wall ? wall.seg : null;
     for (let cur = 0; pending > 0; cur++) {
       const b = cur & MASK;
       let e = bhead[b];
@@ -45,26 +54,25 @@ export class FlowSolver {
         pending--;
         const u = enode[e];
         if (edist[e] !== dist[u]) continue;
-        const d = cur;
         const ux = u % gw, uy = (u / gw) | 0;
-        const cu = cost[u], cd = Math.round(cu * 1.4142);
-        let su = -1, closed = false;
-        if (wseg) { su = wseg[u]; closed = su >= 0 && !wall.open[su]; }
+        const cu = cost[u], cd = Math.round(cu * 1.4142), eu = elev[u], zu = cz[u];
         for (let k = 0; k < 8; k++) {
           // a unit standing in n moves in direction k to reach u
           const nx = ux - DX[k], ny = uy - DY[k];
           if (nx < 0 || ny < 0 || nx >= gw || ny >= gh) continue;
           const n = ny * gw + nx;
           if (cost[n] === 0) continue;
-          let step = (k & 1) ? cd : cu;
-          if (closed) {
-            const sn = wseg[n];
-            if (!(sn >= 0 && wall.group[sn] === wall.group[su])) {
-              const inner = !wall.gate[su] && ((nx * cell + half - wall.sx[su]) * wall.nx[su] + (ny * cell + half - wall.sy[su]) * wall.ny[su] < 0);
-              step += inner ? 30 : 600;
-            }
+          let st = (k & 1) ? cd : cu;
+          const en = elev[n];
+          if (en === eu) {
+            if (!eu) { const dz = cz[n] - zu; if (dz > step || dz < -step) continue; }
+          } else if (!((portal[n] >> k) & 1)) {
+            if (en) continue;                            // no jumping off a wall
+            if (ladder && ladder[u]) st += 45;           // climb
+            else if (virt && virt[u]) st += virt[u];     // press against the masonry
+            else continue;
           }
-          const nd = d + step;
+          const nd = cur + st;
           if (nd < dist[n]) {
             dist[n] = nd; dirOut[n] = k;
             const nb = nd & MASK;

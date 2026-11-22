@@ -25,7 +25,7 @@ while (!sim.result && sim.time < maxT) {
     // crude autopilot: drop support on the densest attacker cell
     let best = -1, bc = 40;
     for (let c = 0; c < sim.ocCount.length; c++) if (sim.ocCount[c] > bc && !sim.danger[c]) { bc = sim.ocCount[c]; best = c; }
-    if (best >= 0) { const x = (best % 120) * 16 + 8, y = ((best / 120) | 0) * 16 + 8; for (const k of ['arty', 'air', 'gunship']) if (sim.callSupport(k, x, y)) break; }
+    if (best >= 0) { const x = (best % 90) * 16 + 8, y = ((best / 90) | 0) * 16 + 8; for (const k of ['arty', 'air', 'gunship']) if (sim.callSupport(k, x, y)) break; }
     if (sim.ammoLevel() < 0.5) {
       // drop ammo on the largest knot of dry defenders
       const cnt = new Map();
@@ -38,10 +38,10 @@ while (!sim.result && sim.time < maxT) {
   sim.events.length = 0;
   if (sim.time >= next) {
     next += 60;
-    console.log(`t=${sim.time.toFixed(0)}s def=${sim.defCombat} orc=${sim.count[ORC]} ammo=${(sim.ammoLevel() * 100).toFixed(0)}% avg=${(total / sim.tick).toFixed(2)}ms worst=${worst.toFixed(1)}ms`);
+    console.log(`t=${sim.time.toFixed(0)}s def=${sim.defCombat} orc=${sim.count[ORC]} fled=${sim.stats.fled} routs=${sim.stats.routs}/${sim.stats.routsDef || 0} ammo=${(sim.ammoLevel() * 100).toFixed(0)}% avg=${(total / sim.tick).toFixed(2)}ms worst=${worst.toFixed(1)}ms`);
   }
 }
 console.log('RESULT', sim.result, `ticks=${sim.tick} avg=${(total / sim.tick).toFixed(2)}ms worst=${worst.toFixed(1)}ms`);
 console.log('kills', sim.stats.kills);
 console.log('lostDef', sim.stats.lostDef, 'by', sim.stats.defLostBy);
-console.log('lostOrc', sim.stats.lostOrc);
+console.log('lostOrc', sim.stats.lostOrc, 'fled', sim.stats.fled, 'routs', sim.stats.routs, 'props', sim.props.length, 'breaches', sim.stats.breaches);
