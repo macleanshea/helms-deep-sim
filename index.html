@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Helm's Deep — Modern Defense Simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An RTS-style battle simulator: a modern military garrison holds Helm's Deep against the Uruk-hai.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2311161b'/%3E%3Cpath d='M6 24V12l4-3 2 3h8l2-3 4 3v12z' fill='%23f0b34a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" class="mode-setup">
+  <canvas id="gl"></canvas>
+  <canvas id="overlay"></canvas>
+  <div id="vignette"></div>
+
+  <header id="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg>
+      <div><b>HELM’S DEEP</b><small>Modern Defense Simulator</small></div>
+    </div>
+
+    <div class="tb-group setup-only">
+      <span class="lbl">Scenario</span>
+      <select id="preset" title="Load a ready-made order of battle"></select>
+    </div>
+
+    <div class="tb-group battle-only" id="speedCtl">
+      <button data-speed="0" class="seg" title="Pause (Space)"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg></button>
+      <button data-speed="1" class="seg">1×</button>
+      <button data-speed="2" class="seg">2×</button>
+      <button data-speed="4" class="seg">4×</button>
+      <button data-speed="8" class="seg">8×</button>
+    </div>
+    <div class="tb-group battle-only clock">
+      <b id="clock">00:00</b><small id="dawn"></small>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="force def"><small>Defenders</small><b id="defCount">0</b><div class="bar"><i id="defBar"></i></div></div>
+    <div class="force ammo battle-only"><small>Ammunition</small><b id="ammoPct">100%</b><div class="bar"><i id="ammoBar"></i></div></div>
+    <div class="force orc"><small>The Horde</small><b id="orcCount">0</b><div class="bar"><i id="orcBar"></i></div></div>
+
+    <div class="tb-group">
+      <button id="btnHelp" class="icon" title="Controls">?</button>
+      <button id="btnSound" class="icon" title="Sound on/off">
+        <svg viewBox="0 0 16 16" width="14" height="14"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path class="waves" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.6a6 6 0 0 1 0 8.8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+      </button>
+      <button id="btnBegin" class="primary setup-only">Begin Battle <kbd>↵</kbd></button>
+      <button id="btnBack" class="battle-only">End &amp; Edit</button>
+    </div>
+  </header>
+
+  <aside id="left" class="panel setup-only">
+    <div class="tabs" id="teamTabs">
+      <button data-team="0" class="tab def active">Defenders</button>
+      <button data-team="1" class="tab orc">Attackers</button>
+    </div>
+    <div id="palette" class="palette"></div>
+    <div class="brush">
+      <div class="row"><span class="lbl">Units per placement</span><input id="brushCount" type="number" min="1" max="5000" value="50"></div>
+      <div class="chips" id="brushChips"></div>
+      <p class="tip" id="brushTip">Pick a unit, then <b>click</b> the map to drop a block or <b>drag</b> to draw a line. Drag along a wall top to man it.</p>
+    </div>
+  </aside>
+
+  <aside id="right" class="panel setup-only">
+    <section id="inspector" hidden></section>
+    <section>
+      <h3>Order of Battle</h3>
+      <div id="roster"></div>
+    </section>
+    <section>
+      <h3>Battle Options</h3>
+      <div id="options"></div>
+    </section>
+  </aside>
+
+  <div id="cmdbar" class="battle-only"></div>
+  <div id="selinfo" class="panel battle-only" hidden></div>
+  <div id="minimap" class="panel"><canvas id="mm" width="264" height="176"></canvas></div>
+  <div id="feed"></div>
+  <div id="banner"></div>
+  <div id="hint"></div>
+  <div id="tooltip" hidden></div>
+  <div id="modal" hidden></div>
+  <div id="loading"><div class="spinner"></div><span>Surveying the Deeping-coomb…</span></div>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
