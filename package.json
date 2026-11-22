@@ -1,0 +1,11 @@
+{
+  "name": "helms-deep-sim",
+  "version": "1.0.0",
+  "description": "RTS-style simulator: a modern military defends Helm's Deep",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "sim": "node tools/headless.js"
+  }
+}
