@@ -190,7 +190,7 @@ export const PRESETS = [
     blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming.',
     build: (map) => ({
       groups: [
-        ...garrison(map, 1),
+        ...garrison(map, 1.12),
         makeGroup('tank', 4, 1150, 330, Math.PI / 2, 120), makeGroup('ifv', 6, 1170, 560, Math.PI / 2, 150),
         makeGroup('tank', 2, 1420, 500, Math.PI / 2, 40), makeGroup('howitzer', 4, 1620, 600, Math.PI / 2, 80),
         makeGroup('mortar', 12, 1440, 560, Math.PI / 2, 100), makeGroup('cache', 1, 1370, 520),
