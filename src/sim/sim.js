@@ -54,6 +54,8 @@ export class Sim {
     this.aux = new Float32Array(N); this.aux2 = new Int32Array(N).fill(-1);
     this.hitT = new Float32Array(N).fill(-10); this.fireT = new Float32Array(N).fill(-10);
     this.next = new Int32Array(N); this.cnext = new Int32Array(N);
+    this.gen = new Uint16Array(N);      // bumped each time a slot is reused, so a stored unit reference can be checked
+    this.holdR = new Float32Array(N);   // fire discipline: 0 fire at will, >0 hold until the enemy is this close (m), <0 hold fire
     this.n = 0; this.free = [];
 
     this.head = new Int32Array(FW * FH);
@@ -162,6 +164,7 @@ export class Sim {
     if (this.free.length) i = this.free.pop(); else if (this.n < MAX_UNITS) i = this.n++; else return -1;
     const d = UNITS[ti];
     this.alive[i] = 1; this.team[i] = d.team; this.type[i] = ti; this.state[i] = S_IDLE; this.ord[i] = -1;
+    this.gen[i]++; this.holdR[i] = 0;
     this.x[i] = this.px[i] = x; this.y[i] = this.py[i] = y; this.vx[i] = this.vy[i] = 0; this.sepx[i] = this.sepy[i] = 0;
     this.bx[i] = x; this.by[i] = y;
     this.rot[i] = rot; this.trot[i] = rot;
@@ -1044,6 +1047,9 @@ export class Sim {
   _fire(i, d, w, slot, eg, x, y, c) {
     const cdA = slot ? this.cd2 : this.cd, el = eg ? 1 : 0;
     const z0 = (eg ? this.segTop[this.mseg[c]] : this.map.groundZ(x, y)) + (d.cls === C.INF ? 1.4 : 2.2);
+    // fire discipline: a focus-fire order overrides it
+    const hold = this.focus ? 0 : this.holdR[i];
+    if (hold < 0) { cdA[i] = 0.4; return; }
     if (w.arc) {
       if (this.holdIndirect) { cdA[i] = 0.5; return; }
       if (!this._acquireIndirect(i, w, x, y)) { cdA[i] = 0.6 + this.rand() * 0.8; return; }
@@ -1059,13 +1065,15 @@ export class Sim {
     }
     const tA = slot ? this.target2 : this.target;
     const range = el ? w.range * (this.segTop[this.mseg[c]] > 15 ? 1.2 : 1.12) : w.range;
+    // holding fire to a set distance shortens the reach but not the accuracy curve: close shots hit far more often
+    const reach = hold > 0 && hold < range ? Math.max(hold, (w.min || 0) + 15) : range;
     let t = tA[i], dx = 0, dy = 0, d2 = 0, ok = false;
     if (t >= 0 && this.alive[t] && this.team[t] === ORC) {
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
-      ok = d2 <= range * range && d2 >= (w.min || 0) * (w.min || 0);
+      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0);
     }
     if (!ok) {
-      t = this._acquireDirect(i, w, range, eg, x, y);
+      t = this._acquireDirect(i, w, reach, eg, x, y);
       tA[i] = t;
       if (t < 0) { cdA[i] = 0.25 + this.rand() * 0.4; return; }
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
@@ -1331,9 +1339,18 @@ export class Sim {
     else { const c = this.map.cellOf(x, y); if (!cost[c]) return -1; this.srcBuf[0] = c; }
     const dir = new Uint8Array(GW * GH);
     this.solver.solve(cost, this.srcBuf, ns, dir, veh ? this.navVeh : this.navDef);
-    const idx = this.orderSeq++ % 12;
+    // take a path slot nobody is following; only when all are busy does the least-used order give its slot up
+    const MAXO = 32, use = new Int32Array(MAXO);
+    for (let i = 0; i < this.n; i++) if (this.alive[i] && this.team[i] === DEF && this.state[i] === S_MOVE && this.ord[i] >= 0) use[this.ord[i]]++;
+    // a slot just handed out stays reserved for a moment: its units are assigned right after this returns
+    const hold = this._orderHold || (this._orderHold = new Float32Array(MAXO).fill(-1));
+    for (let k = 0; k < MAXO; k++) if (hold[k] >= this.time) use[k] += 1e6;
+    let idx = 0;
+    for (let k = 1; k < MAXO; k++) if (use[k] < use[idx]) idx = k;
+    for (let k = 0; k < MAXO; k++) if (!use[k]) { idx = k; break; }
+    hold[idx] = this.time + 2.5;
     this.orders[idx] = { dir, x, y, r };
-    for (let i = 0; i < this.n; i++) if (this.ord[i] === idx) this.ord[i] = -1;
+    if (use[idx]) for (let i = 0; i < this.n; i++) if (this.ord[i] === idx) this.ord[i] = -1;
     return idx;
   }
 
@@ -1373,6 +1390,9 @@ export class Sim {
 
   stop(ids) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; } }
 
+  /** Fire discipline for the given defenders: 0 at will, a distance in metres to hold until, or -1 to hold fire. */
+  setStance(ids, v) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.holdR[i] = v; this.target[i] = -1; this.target2[i] = -1; } }
+
   /** Send the listed [distance, unit] pairs to free positions inside the Hornburg. */
   _toKeep(list) {
     if (!list.length) return 0;
@@ -1402,20 +1422,23 @@ export class Sim {
     return list.length;
   }
 
-  /** Fall back: every foot soldier outside the Hornburg runs for its walls. */
-  orderRetreat() {
+  /**
+   * Fall back to the Hornburg. With no list, every foot soldier outside it goes (the general
+   * retreat); with a list of unit ids, only those — a sector can be given up while the rest hold.
+   */
+  orderRetreat(ids) {
     const list = [];
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || this.team[i] !== DEF) continue;
+    const consider = (i) => {
+      if (!this.alive[i] || this.team[i] !== DEF) return;
       const d = UNITS[this.type[i]];
-      if (d.cls !== C.INF || !d.speed) continue;
+      if (d.cls !== C.INF || !d.speed) return;
       const dk = Math.hypot(this.x[i] - KEEP.cx, this.y[i] - KEEP.cy);
       if (dk > KEEP.r + 6) list.push([dk, i]);
-    }
+    };
+    if (ids) for (const i of ids) consider(i); else for (let i = 0; i < this.n; i++) consider(i);
     if (!list.length) return 0;
     this._toKeep(list);
-    this.retreated = true;
-    this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn', x: KEEP.cx, y: KEEP.cy });
+    if (!ids) { this.retreated = true; this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn', x: KEEP.cx, y: KEEP.cy }); }
     return list.length;
   }
 

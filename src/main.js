@@ -49,6 +49,7 @@ const app = {
   mouse: { sx: 0, sy: 0, wx: 0, wy: 0, wz: 0, inside: false },
   drag: null, keys: new Set(),
   alerts: [], alertIdx: 0, alertKeyT: -9,
+  groups: {}, lastClick: { t: -9, type: -1 }, groupTap: { k: '', t: -9 },
 };
 let ui;
 let dpr = 1, vw = 1, vh = 1;
@@ -179,7 +180,7 @@ app.startBattle = () => {
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
   app.tool = null; app.selGroup = null; app.selection = []; app.markers = []; app.drag = null; app.bolt = -1; app.nextBolt = 10;
-  app.alerts = []; app.alertIdx = 0;
+  app.alerts = []; app.alertIdx = 0; app.groups = {};
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
@@ -234,11 +235,51 @@ app.toggleHold = () => {
   ui.toast(app.sim.holdIndirect ? 'Mortars and howitzers: hold fire.' : 'Mortars and howitzers: fire at will.', app.sim.holdIndirect ? 'warn' : 'good');
   audio.play('click');
 };
-app.retreat = () => {
+/** Fall back to the keep: the whole garrison, or (selected = true) only the troops now selected. */
+app.retreat = (selected) => {
   if (app.mode !== 'battle' || app.sim.result) return;
+  if (selected && app.selection.length) {
+    const n = app.sim.orderRetreat(app.selection);
+    if (!n) { ui.toast('Those troops are already inside the Hornburg, or cannot move.'); return; }
+    audio.play('confirm'); ui.toast(`${fmt(n)} falling back to the keep. The rest hold.`, 'warn');
+    app.markers.push({ x: KEEP.cx, y: KEEP.cy, z: 12, r: KEEP.r + 8, t: 0, dur: 4, col: '94,200,242', label: 'FALL BACK' });
+    return;
+  }
   const n = app.sim.orderRetreat();
   if (!n) ui.toast('Everyone is already inside the Hornburg.');
   else { audio.horn(); app.markers.push({ x: KEEP.cx, y: KEEP.cy, z: 12, r: KEEP.r + 8, t: 0, dur: 6, col: '94,200,242', label: 'FALL BACK' }); }
+};
+// ---- fire discipline and control groups
+const STANCES = [[0, 'Fire at will'], [150, 'Hold fire to 150 m'], [75, 'Hold fire to 75 m'], [-1, 'Hold fire']];
+app.stanceName = (v) => (STANCES.find((q) => q[0] === v) || STANCES[0])[1];
+app.cycleStance = () => {
+  if (app.mode !== 'battle' || app.sim.result || !app.selection.length) return;
+  const cur = app.sim.holdR[app.selection[0]];
+  const nx = STANCES[(STANCES.findIndex((q) => q[0] === cur) + 1) % STANCES.length];
+  app.sim.setStance(app.selection, nx[0]);
+  audio.play('click'); ui.toast(`${fmt(app.selection.length)} selected: ${nx[1].toLowerCase()}.`, nx[0] ? 'warn' : 'good');
+  ui.updateHud();
+};
+const liveGroup = (key) => (app.groups[key] || []).filter((u) => app.sim.alive[u.i] && app.sim.gen[u.i] === u.g && app.sim.team[u.i] === DEF);
+app.groupCount = (key) => liveGroup(key).length;
+app.assignGroup = (key) => {
+  if (!app.selection.length) { delete app.groups[key]; ui.updateHud(); return; }
+  app.groups[key] = app.selection.map((i) => ({ i, g: app.sim.gen[i] }));
+  audio.play('click'); ui.toast(`Group ${key}: ${fmt(app.selection.length)} assigned.`);
+  ui.updateHud();
+};
+app.recallGroup = (key) => {
+  const live = liveGroup(key);
+  app.groups[key] = live;
+  if (!live.length) return;
+  app.selection = live.map((u) => u.i);
+  // a second tap looks at them
+  if (app.groupTap.k === key && app.clock - app.groupTap.t < 0.4) {
+    let x = 0, y = 0; for (const u of live) { x += app.sim.x[u.i]; y += app.sim.y[u.i]; }
+    app.jumpTo(x / live.length, y / live.length);
+  }
+  app.groupTap = { k: key, t: app.clock };
+  audio.play('click'); ui.updateHud();
 };
 
 // ---- alerts: anything the sim reports with a position can be pinged and jumped to
@@ -370,7 +411,18 @@ overlay.addEventListener('pointerup', (e) => {
       if (click) { const dd = (p[0] - m.sx) ** 2 + (p[1] - m.sy) ** 2; if (dd < bd) { bd = dd; best = i; } }
       else if (p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1) ids.push(i);
     }
-    if (click && best >= 0) ids.push(best);
+    if (click && best >= 0) {
+      const ty = sim.type[best];
+      if (app.clock - app.lastClick.t < 0.35 && app.lastClick.type === ty) {
+        // double-click: everyone of that kind in view
+        for (let i = 0; i < sim.n; i++) {
+          if (!sim.alive[i] || sim.team[i] !== DEF || sim.type[i] !== ty) continue;
+          const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 1);
+          if (p[0] >= 0 && p[1] >= 54 && p[0] <= vw && p[1] <= vh) ids.push(i);
+        }
+      } else ids.push(best);
+      app.lastClick = { t: app.clock, type: ty };
+    }
     app.selection = d.add ? [...new Set([...app.selection, ...ids])] : ids;
     if (ids.length) audio.play('click');
     ui.updateHud();
@@ -389,6 +441,8 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts alone (Ctrl+R must not sound the retreat)
   const k = e.key.toLowerCase();
   if (ui.modalOpen()) { if (k === 'escape') ui.hideModal(); return; }
+  // control groups live on 6-0 (1-5 call support): Shift+digit assigns, digit recalls, tap twice to look
+  if (app.mode === 'battle' && !app.sim.result && /^Digit[06-9]$/.test(e.code)) { const key = e.code.slice(5); if (e.shiftKey) app.assignGroup(key); else app.recallGroup(key); return; }
   app.keys.add(k);
   if (k === 'escape') {
     if (app.tool) { if (app.mode === 'setup') app.selectPlaceTool(null); else { app.tool = null; ui.hint(null); } }
@@ -412,7 +466,8 @@ window.addEventListener('keydown', (e) => {
   else if (k >= '1' && k <= '5') { const name = Object.keys(SUPPORT)[+k - 1]; if (name) app.armSupport(name); }
   else if (k === 'f') app.armFocus();
   else if (k === 'h') app.toggleHold();
-  else if (k === 'r') app.retreat();
+  else if (k === 'r') app.retreat(!e.shiftKey);
+  else if (k === 'v') app.cycleStance();
   else if (k === 'l') app.toggleLosses();
   else if (k === 'g') app.jumpAlert();
   else if (k === 'n') app.skipAhead();
@@ -426,6 +481,21 @@ window.addEventListener('resize', resize);
 // ----------------------------------------------------------------- overlay
 const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
 function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.max(2, r * app.cam.zoom), Math.max(1.4, r * app.cam.zoom * SIN_P), 0, 0, 6.2832); return p; }
+
+/** Reach of a unit's weapon from a spot: the outer ring, and the inner one it cannot fire inside. Walls add reach. */
+function rangeRings(c, def, x, y, alpha) {
+  const w = def.wdef || (def.ob === 'claymore' ? { range: 42 } : def.pool ? { range: 60, supply: true } : null);
+  if (!w || !w.range) return;
+  const k = def.team === DEF && def.cls === C.INF && map.seg[map.cellOf(x, y)] >= 0 ? (heightAt(x, y) > 15 ? 1.2 : 1.12) : 1;
+  const z0 = heightAt(x, y) + 0.3, col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
+  if (w.range * k < 1500) {
+    c.strokeStyle = `rgba(${col},${alpha})`; c.lineWidth = 1.4; c.setLineDash([9, 6]);
+    c.beginPath(); const p = ring(c, x, y, z0, w.range * k); c.stroke(); c.setLineDash([]);
+    c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`;
+    c.fillText(w.supply ? 're-arms 60 m' : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, p[0], p[1] - w.range * k * app.cam.zoom * SIN_P - 5);
+  }
+  if (w.min > 0) { c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); ring(c, x, y, z0, w.min); c.stroke(); }
+}
 
 function drawOverlay(dtReal) {
   const c = octx, z = app.cam.zoom, sim = app.sim, m = app.mouse;
@@ -459,6 +529,7 @@ function drawOverlay(dtReal) {
       c.strokeStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 1 : hov ? 0.9 : 0.16})`; c.lineWidth = sel ? 2 : 1;
       c.fillStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 0.14 : hov ? 0.1 : 0.015})`;
       c.fill(); c.stroke();
+      if (sel) rangeRings(c, UNITS[U[g.type]], g.x, g.y, 0.8);
       if (sel || hov) {
         const d = UNITS[U[g.type]];
         const txt = `${d.name} × ${fmt(g.count)}${g.delay ? ` · +${g.delay}s` : ''}`;
@@ -493,6 +564,7 @@ function drawOverlay(dtReal) {
       for (let k = 0; k < n; k += step) { const p = S(pos[k * 2], pos[k * 2 + 1], heightAt(pos[k * 2], pos[k * 2 + 1]) + 0.5); c.moveTo(p[0] + rr, p[1]); c.arc(p[0], p[1], rr, 0, 6.2832); }
       c.fill();
       if (line) { const a = S(d.x0, d.y0, heightAt(d.x0, d.y0)); c.strokeStyle = `rgba(${col},0.9)`; c.lineWidth = 1.5; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(m.sx, m.sy); c.stroke(); c.setLineDash([]); }
+      rangeRings(c, def, g.x, g.y, 0.85);
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       c.fillStyle = n ? '#fff' : '#ff8b73';
       const cost = def.cost && !app.setup.options.sandbox ? n * def.cost : 0;
@@ -621,13 +693,41 @@ function drawOverlay(dtReal) {
       if (++drawn > 1500) break;
     }
     c.stroke();
+    // a small selection shows its reach, and the distance it is holding its fire to
+    if (app.selection.length <= 30) {
+      const seen = new Set();
+      for (const i of app.selection) {
+        const dd = UNITS[sim.type[i]], w = dd.wdef;
+        if (!w || !w.range || w.range > 1500) continue;
+        const key = dd.id + ':' + ((sim.x[i] / 24) | 0) + ':' + ((sim.y[i] / 24) | 0);
+        if (seen.has(key)) continue; seen.add(key);
+        const k = sim.el[i] ? (sim.unitZ(i) > 15 ? 1.2 : 1.12) : 1, uz = sim.unitZ(i) + 0.2;
+        c.strokeStyle = 'rgba(140,220,255,0.38)'; c.lineWidth = 1; c.setLineDash([8, 7]);
+        c.beginPath(); ring(c, sim.x[i], sim.y[i], uz, w.range * k); c.stroke(); c.setLineDash([]);
+        const h = sim.holdR[i];
+        if (h > 0 && h < w.range * k) { c.strokeStyle = 'rgba(240,179,74,0.7)'; c.beginPath(); ring(c, sim.x[i], sim.y[i], uz, h); c.stroke(); }
+      }
+    }
   }
   const bar = (sx, sy, w, frac, col) => { c.fillStyle = 'rgba(0,0,0,0.65)'; c.fillRect(sx - w / 2 - 1, sy - 1, w + 2, 5); c.fillStyle = col; c.fillRect(sx - w / 2, sy, w * Math.max(0, Math.min(1, frac)), 3); };
+  let pips = 0;
   for (let i = 0; i < sim.n; i++) {
     if (!sim.alive[i]) continue;
     const d = UNITS[sim.type[i]];
     if (d.team === DEF) {
-      if (d.cls === C.INF) continue;
+      if (d.cls === C.INF) {
+        // foot soldiers: an amber pip when out of rounds; health and ammunition when selected and close enough to read
+        const dry = d.ammo && sim.ammo[i] < 1, sel = selSet && z > 1.5 && selSet.has(i);
+        if (!(dry && z > 1.1) && !sel) continue;
+        const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 2.6);
+        if (p[0] < -10 || p[1] < 50 || p[0] > vw + 10 || p[1] > vh + 10) continue;
+        if (sel && pips++ < 300) {
+          const px = p[0], py = p[1];
+          bar(px, py - 5, 14, sim.hp[i] / d.hp, sim.hp[i] / d.hp > 0.4 ? '#5ec8f2' : '#e8573d');
+          if (d.ammo) bar(px, py, 14, sim.ammo[i] / sim.maxAmmo(i), '#f0b34a');
+        } else if (dry) { c.fillStyle = '#f0b34a'; c.fillRect(p[0] - 1.5, p[1] - 1.5, 3, 3); }
+        continue;
+      }
       const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 4);
       if (p[0] < -30 || p[1] < -30 || p[0] > vw + 30 || p[1] > vh + 30) continue;
       if (d.cls === C.CACHE) { if (z > 0.9) bar(p[0], p[1], 26, sim.ammo[i] / d.pool, '#6fdc9a'); }

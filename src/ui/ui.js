@@ -215,14 +215,14 @@ export function buildUI(app, atlas) {
     cmds[id] = { b, uses: b.querySelector('.uses'), cool: b.querySelector('.cool') };
   };
   // the purse every support call is paid from
-  const cpBox = el('div', 'cpbox', '<small>Command pts</small><b id="cpVal">0</b><div class="bar"><i id="cpBar"></i></div><small id="cpRate"></small>');
+  const cpBox = el('div', 'cpbox', '<small>Command</small><b id="cpVal">0</b><div class="bar"><i id="cpBar"></i></div><small id="cpRate"></small>');
   bindTip(cpBox, 'Command Points', 'Every support call is paid for from this one pool. It refills slowly through the night, and killing captains, trolls and siege engines pays a bounty — so what you spend now you cannot spend later.');
   cmdbar.append(cpBox);
   for (const k in SUPPORT) addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, `${SUPPORT[k].desc} <i class="cost">Costs ${SUPPORT[k].cost} Command Points.</i>`, () => app.armSupport(k));
   cmdbar.append(el('div', 'sep'));
   addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map. Every weapon in range concentrates on targets inside it for 30 s. Press again to cancel.', () => app.armFocus());
   addCmd('hold', 'Hold Mortars', 'H', ICONS.hold, 'Hold Indirect Fire', 'Mortars and howitzers cease fire to save shells until you release them.', () => app.toggleHold());
-  addCmd('retreat', 'Fall Back', 'R', ICONS.retreat, 'Retreat to the Keep', 'All infantry outside the Hornburg leave their posts, cross the wall walk and man the keep.', () => app.retreat());
+  addCmd('retreat', 'Fall Back', 'R', ICONS.retreat, 'Retreat to the Keep', 'All infantry outside the Hornburg leave their posts, cross the wall walk and man the keep. With troops selected, <b>R</b> pulls back only those; <b>Shift+R</b> is always the general retreat.', () => app.retreat(false));
   cmdbar.append(el('div', 'sep'));
   addCmd('losses', 'Losses', 'L', ICONS.losses, 'Show Losses', 'Overlay where soldiers and attackers have fallen so far.', () => app.toggleLosses());
 
@@ -246,6 +246,8 @@ export function buildUI(app, atlas) {
   const defCount = $('defCount'), orcCount = $('orcCount'), defBar = $('defBar'), orcBar = $('orcBar');
   const ammoPct = $('ammoPct'), ammoBar = $('ammoBar'), clock = $('clock'), dawn = $('dawn'), selinfo = $('selinfo');
   const cpVal = $('cpVal'), cpBar = $('cpBar'), cpRate = $('cpRate');
+  const grpbar = $('grpbar'); let grpHtml = '';
+  grpbar.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) app.recallGroup(b.dataset.g); });
   const orcRes = $('orcRes'), orcRout = $('orcRout'), orcLbl = $('orcLbl'), orcForce = $('orcForce');
   const waveBox = $('waveBox'), wavePips = $('wavePips'), waveName = $('waveName'), waveNote = $('waveNote'), btnSkip = $('btnSkip');
   ui.updateHud = () => {
@@ -314,6 +316,10 @@ export function buildUI(app, atlas) {
     cmds.hold.b.classList.toggle('on', sim.holdIndirect);
     cmds.hold.b.querySelector('.name').textContent = sim.holdIndirect ? 'Mortars Held' : 'Hold Mortars';
     cmds.losses.b.classList.toggle('armed', !!app.showLosses);
+    // control groups
+    let gh = '';
+    for (const key of ['6', '7', '8', '9', '0']) { const n = app.groupCount(key); if (n) gh += `<button data-g="${key}"><kbd>${key}</kbd>${fmt(n)}</button>`; }
+    if (gh !== grpHtml) { grpHtml = gh; grpbar.innerHTML = gh; grpbar.hidden = !gh; }
     // selection summary
     const sel = app.selection;
     if (!sel.length) { selinfo.hidden = true; return; }
@@ -322,7 +328,9 @@ export function buildUI(app, atlas) {
     let html = `<b>${fmt(sel.length)} selected</b>`;
     for (const [n, c] of [...by].sort((a, b) => b[1] - a[1]).slice(0, 5)) html += `<div class="line"><span>${n}</span><span>${fmt(c)}</span></div>`;
     html += `<div class="line"><span>Ammunition</span><span>${an ? Math.round(100 * am2 / an) + '%' : '—'}</span></div><div class="line"><span>Condition</span><span>${Math.round(100 * hp / sel.length)}%</span></div><div class="line"><span>Morale</span><span>${Math.round(mo / sel.length)}%</span></div>`;
-    html += '<p class="tip"><b>Right-click</b> to move · <b>X</b> halt · <b>Esc</b> deselect</p>';
+    const st = sim.holdR[sel[0]], mixed = sel.some((i) => sim.holdR[i] !== st);
+    html += `<div class="line"><span>Fire</span><span class="${st && !mixed ? 'held' : ''}">${mixed ? 'mixed' : app.stanceName(st)}</span></div>`;
+    html += '<p class="tip"><b>Right-click</b> move · <b>V</b> fire discipline · <b>R</b> fall back to the keep · <b>X</b> halt · <b>Shift+6…0</b> make a group</p>';
     selinfo.innerHTML = html; selinfo.hidden = false;
   };
 
