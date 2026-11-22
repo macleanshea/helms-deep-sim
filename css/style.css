@@ -139,6 +139,10 @@ h3 { margin: 0 0 8px; }
 #feed { position: absolute; right: 14px; top: 66px; width: 300px; display: flex; flex-direction: column; gap: 5px; align-items: flex-end; pointer-events: none; z-index: 3; }
 .mode-setup #feed { right: 338px; }
 .toast { background: var(--bg); border: 1px solid var(--line); border-left: 3px solid var(--dim); border-radius: 7px; padding: 5px 10px; font-size: 12px; animation: toast 7s forwards; max-width: 100%; }
+.toast.loc { pointer-events: auto; cursor: pointer; padding-right: 26px; position: relative; }
+.toast.loc::after { content: "⌖"; position: absolute; right: 8px; top: 50%; transform: translateY(-52%); color: var(--dim); font-size: 13px; }
+.toast.loc:hover { border-color: var(--line-strong); background: rgba(30, 37, 44, 0.95); }
+.toast.loc:hover::after { color: var(--text); }
 .toast.good { border-left-color: var(--good); } .toast.warn { border-left-color: var(--accent); } .toast.bad { border-left-color: var(--orc); }
 @keyframes toast { 0% { opacity: 0; transform: translateX(14px); } 4% { opacity: 1; transform: none; } 88% { opacity: 1; } 100% { opacity: 0; } }
 

@@ -49,6 +49,7 @@ export function buildUI(app, atlas) {
   ui.setPreset = (k) => { preset.value = k; };
   $('btnBegin').addEventListener('click', () => app.startBattle());
   $('btnBack').addEventListener('click', () => app.backToSetup());
+  $('btnResult').addEventListener('click', () => { if (app.sim && app.sim.result) ui.showEnd(app.sim); });
   $('btnHelp').addEventListener('click', () => ui.showHelp());
   $('btnSound').addEventListener('click', () => { const m = app.toggleMute(); $('btnSound').classList.toggle('off', m); });
   for (const b of document.querySelectorAll('#speedCtl .seg')) b.addEventListener('click', () => { app.setSpeed(+b.dataset.speed); b.blur(); });
@@ -175,7 +176,16 @@ export function buildUI(app, atlas) {
 
   // ------------------------------------------------------ toasts & hints
   const feed = $('feed'), bannerEl = $('banner'), hintEl = $('hint');
-  ui.toast = (text, cls = '') => { const t = el('div', 'toast ' + cls, text); feed.append(t); while (feed.children.length > 6) feed.firstChild.remove(); setTimeout(() => t.remove(), 7000); };
+  // a toast that knows where it happened can be clicked to go there, and stays up a little longer
+  ui.toast = (text, cls = '', loc = null) => {
+    const life = loc ? 12 : 7;
+    const t = el('div', 'toast ' + cls + (loc ? ' loc' : ''), text);
+    t.style.animationDuration = life + 's';
+    if (loc) { t.title = 'Click to look there'; t.addEventListener('click', () => app.jumpTo(loc.x, loc.y)); }
+    feed.append(t);
+    while (feed.children.length > 7) feed.firstChild.remove();
+    setTimeout(() => t.remove(), life * 1000);
+  };
   ui.banner = (text, cls = '') => { bannerEl.innerHTML = ''; bannerEl.append(el('div', cls, text)); };
   ui.hint = (text) => { if (text) { hintEl.innerHTML = text; hintEl.classList.add('show'); } else hintEl.classList.remove('show'); };
   ui.clearFeed = () => { feed.innerHTML = ''; bannerEl.innerHTML = ''; };
@@ -199,6 +209,7 @@ export function buildUI(app, atlas) {
     ammoPct.textContent = sim.opt.ammoMult > 50 ? '∞' : Math.round(am * 100) + '%';
     ammoBar.style.width = (am * 100) + '%';
     ammoPct.parentElement.classList.toggle('low', am < 0.3 && sim.opt.ammoMult <= 50);
+    $('btnResult').hidden = !sim.result;
     clock.textContent = mmss(sim.time);
     dawn.textContent = sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }

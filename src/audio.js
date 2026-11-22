@@ -28,6 +28,8 @@ const DEFS = {
   jet:        { n: ['bandpass', 300, 2600, 0.9],  d: 3.6, g: 0.8, gap: 1, slow: true, swell: true },
   cargo:      { n: ['lowpass', 260, 180, 1],      t: ['sawtooth', 70, 62], d: 7, g: 0.4, gap: 2, swell: true },
   helo:       { n: ['lowpass', 320, 260, 1],      d: 6, g: 0.6, gap: 2, chop: 13, swell: true },
+  horn:       { t: ['sawtooth', 92, 98],          n: ['lowpass', 500, 300, 1], d: 1.8, g: 0.5, gap: 2, swell: true },
+  alert:      { t: ['triangle', 660, 990],        d: 0.22, g: 0.16, gap: 0.6 },
   click:      { t: ['sine', 880, 660],            d: 0.05, g: 0.12, gap: 0.02 },
   deny:       { t: ['square', 180, 140],          d: 0.12, g: 0.1, gap: 0.1 },
   confirm:    { t: ['sine', 520, 780],            d: 0.12, g: 0.14, gap: 0.05 },

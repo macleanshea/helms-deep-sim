@@ -237,6 +237,7 @@ export const PRESETS = [
 
 export function buildPreset(map, key) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
+  nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
   const s = p.build(map);
   return { groups: s.groups, options: { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } } };
 }

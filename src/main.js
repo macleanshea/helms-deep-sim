@@ -47,6 +47,7 @@ const app = {
   bolt: -1, nextBolt: 14,
   mouse: { sx: 0, sy: 0, wx: 0, wy: 0, wz: 0, inside: false },
   drag: null, keys: new Set(),
+  alerts: [], alertIdx: 0, alertKeyT: -9,
 };
 let ui;
 let dpr = 1, vw = 1, vh = 1;
@@ -156,6 +157,7 @@ app.startBattle = () => {
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
   app.tool = null; app.selGroup = null; app.selection = []; app.markers = []; app.drag = null; app.bolt = -1; app.nextBolt = 10;
+  app.alerts = []; app.alertIdx = 0;
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
@@ -185,7 +187,7 @@ app.armSupport = (k) => {
   ui.hint(`<b>${SUPPORT[k].name}</b> — ${k === 'air' ? 'click a target, or drag to set the attack heading' : 'click the target'} · right-click to cancel`);
 };
 app.armFocus = () => {
-  if (app.mode !== 'battle') return;
+  if (app.mode !== 'battle' || app.sim.result) return;
   if (app.sim.focus) { app.sim.clearFocus(); ui.toast('Focus fire lifted.'); return; }
   if (app.tool && app.tool.kind === 'focus') { app.tool = null; ui.hint(null); return; }
   app.tool = { kind: 'focus' };
@@ -193,7 +195,7 @@ app.armFocus = () => {
   ui.hint('<b>Focus Fire</b> — drag a circle over the enemy · right-click to cancel');
 };
 app.toggleHold = () => {
-  if (app.mode !== 'battle') return;
+  if (app.mode !== 'battle' || app.sim.result) return;
   app.sim.holdIndirect = !app.sim.holdIndirect;
   ui.toast(app.sim.holdIndirect ? 'Mortars and howitzers: hold fire.' : 'Mortars and howitzers: fire at will.', app.sim.holdIndirect ? 'warn' : 'good');
   audio.play('click');
@@ -203,6 +205,26 @@ app.retreat = () => {
   const n = app.sim.orderRetreat();
   if (!n) ui.toast('Everyone is already inside the Hornburg.');
   else { audio.horn(); app.markers.push({ x: KEEP.cx, y: KEEP.cy, z: 12, r: KEEP.r + 8, t: 0, dur: 6, col: '94,200,242', label: 'FALL BACK' }); }
+};
+
+// ---- alerts: anything the sim reports with a position can be pinged and jumped to
+app.jumpTo = (x, y) => { app.cam.x = x; app.cam.y = y; clampCam(); };
+function noteAlert(e) {
+  app.alerts.push({ x: e.x, y: e.y, t: app.clock, cls: e.cls || '', text: e.text });
+  if (app.alerts.length > 20) app.alerts.shift();
+  app.alertIdx = 0;
+  if (e.cls === 'bad' || e.cls === 'warn') { audio.play('alert', e.cls === 'bad' ? 1 : 0.55, 0); marker(e.x, e.y, 14, 5, e.cls === 'bad' ? '255,110,90' : '240,179,74'); }
+}
+/** Jump to the latest alert; pressing again soon after steps back through earlier ones. */
+app.jumpAlert = () => {
+  const n = app.alerts.length;
+  if (!n) { ui.toast('Nothing to report yet.'); return; }
+  app.alertIdx = app.clock - app.alertKeyT < 4 ? (app.alertIdx + 1) % n : 0;
+  app.alertKeyT = app.clock;
+  const a = app.alerts[n - 1 - app.alertIdx];
+  app.jumpTo(a.x, a.y);
+  ui.hint(`<b>${a.text}</b>${n > 1 ? ' · <b>G</b> again for the one before' : ''}`);
+  clearTimeout(app._alertHint); app._alertHint = setTimeout(() => { if (!app.tool) ui.hint(null); }, 2600);
 };
 
 function marker(x, y, r, dur, col, label, x2, y2) { app.markers.push({ x, y, z: heightAt(x, y), r, t: 0, dur, col, label, x2, y2 }); }
@@ -330,6 +352,7 @@ mm.addEventListener('pointerup', () => { mmDown = false; });
 
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts alone (Ctrl+R must not sound the retreat)
   const k = e.key.toLowerCase();
   if (ui.modalOpen()) { if (k === 'escape') ui.hideModal(); return; }
   app.keys.add(k);
@@ -341,6 +364,7 @@ window.addEventListener('keydown', (e) => {
   }
   if (k === '?' || (k === '/' && e.shiftKey)) { ui.showHelp(); return; }
   if (k === 'home') { app.cam.yaw = DEFAULT_YAW; fitCamera(); return; }
+  if (app.mode === 'battle' && app.sim.result) { if (k === 'enter') ui.showEnd(app.sim); return; }
   if (app.mode === 'setup') {
     if (k === 'enter') app.startBattle();
     else if ((k === 'delete' || k === 'backspace') && app.selGroup) app.removeGroup(app.selGroup);
@@ -356,6 +380,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'h') app.toggleHold();
   else if (k === 'r') app.retreat();
   else if (k === 'l') app.toggleLosses();
+  else if (k === 'g') app.jumpAlert();
   else if (k === 'x' && app.selection.length) app.sim.stop(app.selection);
   ui.updateHud();
 });
@@ -653,6 +678,18 @@ function drawMinimap() {
   mctx.closePath(); mctx.stroke();
   if (sim.focus) { mctx.strokeStyle = '#ff5a46'; mctx.beginPath(); mctx.arc(sim.focus.x * kx, sim.focus.y * ky, Math.max(3, sim.focus.r * kx), 0, 6.2832); mctx.stroke(); }
   for (const mk of app.markers) { if (!mk.label) continue; mctx.strokeStyle = `rgb(${mk.col})`; mctx.beginPath(); mctx.arc(mk.x * kx, mk.y * ky, 3.5, 0, 6.2832); mctx.stroke(); }
+  // alert pings: a ring that opens out from where it happened
+  mctx.lineWidth = 1.6;
+  for (const a of app.alerts) {
+    const age = app.clock - a.t;
+    if (age > 7) continue;
+    const col = a.cls === 'bad' ? '255,110,90' : a.cls === 'warn' ? '240,179,74' : a.cls === 'good' ? '111,220,154' : '230,233,236';
+    const u = (age % 1.75) / 1.75;
+    mctx.strokeStyle = `rgba(${col},${(1 - u) * Math.min(1, (7 - age) / 2)})`;
+    mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 2.5 + u * 13, 0, 6.2832); mctx.stroke();
+    mctx.fillStyle = `rgba(${col},${Math.min(1, (7 - age) / 2)})`; mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 2, 0, 6.2832); mctx.fill();
+  }
+  mctx.lineWidth = 1;
 }
 
 // -------------------------------------------------------------------- loop
@@ -691,12 +728,13 @@ function frame(now) {
   fx.view.rad = Math.hypot(vw / 2, vh / 2 / SIN_P) / cam.zoom + 40;
 
   let alpha = 1, simDt = 0;
+  const halted = app.paused || ui.modalOpen(); // the battle waits while a dialog is up
   if (app.mode === 'battle') {
     // a breath of slow motion when something momentous happens
     let scale = 1;
     if (app.slowT > 0) { app.slowT -= rdt; scale = app.slowT > 0.6 ? 0.2 : 0.2 + 0.8 * (1 - Math.max(0, app.slowT) / 0.6); }
     fx.frame(app.speed);
-    if (!app.paused && !sim.result) {
+    if (!halted && !sim.result) {
       app.acc += rdt * app.speed * scale;
       const t0 = performance.now();
       let ticks = 0;
@@ -709,8 +747,10 @@ function frame(now) {
       fx.update(Math.min(0.25, rdt * app.speed * scale));
     } else if (sim.result) fx.update(rdt * 0.6);
     for (const e of sim.events) {
-      if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls); if (e.big && app.speed <= 2) app.slowT = 2.2; }
-      else if (e.type === 'log') ui.toast(e.text, e.cls);
+      const loc = e.x != null ? { x: e.x, y: e.y } : null;
+      if (loc && (e.type === 'banner' || e.type === 'log')) noteAlert(e);
+      if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
+      else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
       else if (e.type === 'end') { audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null); }
     }
     sim.events.length = 0;
@@ -723,7 +763,7 @@ function frame(now) {
     if (p < 0.72) mood = MOOD.night;
     else if (p < 0.93) { const u = (p - 0.72) / 0.21; mood = [lerp3(MOOD.night[0], MOOD.dawn[0], u), lerp3(MOOD.night[1], MOOD.dawn[1], u), lerp3(MOOD.night[2], MOOD.dawn[2], u), 0.26 - 0.22 * u]; }
     else { const u = (p - 0.93) / 0.07; mood = [lerp3(MOOD.dawn[0], MOOD.day[0], u), lerp3(MOOD.dawn[1], MOOD.day[1], u), lerp3(MOOD.dawn[2], MOOD.day[2], u), 0.04]; }
-    if (mood === MOOD.night && !app.paused && !sim.result) {
+    if (mood === MOOD.night && !halted && !sim.result) {
       if ((app.nextBolt -= rdt) <= 0) { app.bolt = 0; app.nextBolt = 14 + Math.random() * 26; setTimeout(() => audio.play('boom', 0.35, 0), 700 + Math.random() * 900); }
     }
   }
@@ -747,7 +787,7 @@ function frame(now) {
   if (hudT > 0.12) {
     hudT = 0;
     ui.updateHud();
-    if (app.mode === 'battle') audio.setRoar(app.paused || sim.result ? 0 : Math.min(0.14, (sim.count[ORC] / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
+    if (app.mode === 'battle') audio.setRoar(halted || sim.result ? 0 : Math.min(0.14, (sim.count[ORC] / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
   }
   if (app.mode === 'battle' && (mmFrame++ & 3) === 0) drawMinimap();
 }

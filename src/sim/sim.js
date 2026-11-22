@@ -5,7 +5,7 @@
 import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
-import { KEEP } from '../map.js';
+import { KEEP, N_WALL } from '../map.js';
 import { supportMethods } from './support.js';
 import { moraleMethods } from './morale.js';
 
@@ -109,6 +109,13 @@ export class Sim {
     this._bx = NaN; this._by = 0; this._bp = 0;
     this._initMorale();
     this.miscGroup = [this.newGroup(DEF, true), this.newGroup(ORC, true)];
+    // the defence is reported on by sector: three stretches of the Deeping Wall and the Hornburg
+    this.sectors = ['the north wall', 'the centre wall', 'the south wall', 'the Hornburg'].map((name, k) => {
+      if (k === 3) return { name, x: KEEP.cx - KEEP.r, y: KEEP.cy };
+      const sg = this.segs[Math.floor(((k + 0.5) * N_WALL) / 3)];
+      return { name, x: sg.x, y: sg.y };
+    });
+    this._alertT = new Map();
 
     for (const g of setup.groups) {
       const pos = groupPositions(map, g);
@@ -153,6 +160,26 @@ export class Sim {
   }
 
   maxAmmo(i) { const d = UNITS[this.type[i]]; return d.pool ? d.pool : Math.ceil((d.ammo || 0) * Math.min(this.opt.ammoMult, 50)); }
+
+  /** Which sector a wall segment belongs to. */
+  segSector(k) { return k >= N_WALL ? 3 : Math.min(2, Math.floor((k * 3) / N_WALL)); }
+  /** Which sector a point on the defenders' side falls in. */
+  sectorAt(x, y) {
+    const dx = x - KEEP.cx, dy = y - KEEP.cy;
+    if (dx * dx + dy * dy < (KEEP.r + 14) * (KEEP.r + 14)) return 3;
+    const y0 = this.map.wallJoin.y, y1 = this.map.wallTop.y;
+    return Math.max(0, Math.min(2, Math.floor(((y - y0) / (y1 - y0)) * 3)));
+  }
+
+  /**
+   * Tell the player something, at most once every `gap` seconds per key. Alerts carry a map
+   * position so the UI can ping it and jump the camera there.
+   */
+  _alert(key, gap, text, cls, x, y, banner, big) {
+    if (key) { const t = this._alertT.get(key); if (t !== undefined && this.time < t) return false; this._alertT.set(key, this.time + gap); }
+    this.events.push({ type: banner ? 'banner' : 'log', text, cls, x, y, big: !!big });
+    return true;
+  }
 
   /** Height of a unit's feet above datum. */
   unitZ(i) {
@@ -517,6 +544,7 @@ export class Sim {
     if (this.aircraft.length) this._aircraft();
     if (this.drops.length) this._drops();
     if (this.tick % 10 === 3) this._supply();
+    if (this.tick % 20 === 7) this._ammoWatch();
     if (this.clays.length && this.tick % 3 === 0) this._claymores();
     if (this.tick % 5 === 2) this._morale();
     if (this.focus && this.time > this.focus.until) this.focus = null;
@@ -713,8 +741,10 @@ export class Sim {
             const cw = this.map.cellOf(this.tx[i], this.ty[i]);
             this.ladderAt[cw] = i; this.lad[cw] = 1; this.navDirty = true;
             this.fx.dust(this.x[i], this.y[i], this.map.groundZ(this.x[i], this.y[i]), tower ? 6 : 3); this.fx.sound('ladder', this.x[i], this.y[i], tower ? 1 : 0.6);
-            if (tower) this.events.push({ type: 'banner', text: 'A siege tower is against the wall!', cls: 'bad' });
-            else if (!this._ladderAnnounced) { this._ladderAnnounced = true; this.events.push({ type: 'banner', text: 'Ladders on the Deeping Wall', cls: 'warn' }); }
+            const where = this.sectors[this.segSector(k)].name;
+            if (tower) this._alert(null, 0, `A siege tower is against ${where}!`, 'bad', this.x[i], this.y[i], true);
+            else if (!this._ladderAnnounced) { this._ladderAnnounced = true; this._alert(null, 0, 'Ladders on the Deeping Wall', 'warn', this.x[i], this.y[i], true); }
+            else this._alert('ladUp' + this.segSector(k), 25, `Ladders are up on ${where}`, 'warn', this.x[i], this.y[i]);
           }
           return;
         }
@@ -723,6 +753,13 @@ export class Sim {
         const s = this.segs[k];
         const ax = s.ox + (tower ? s.nx * 2.2 : 0), ay = s.oy + (tower ? s.ny * 2.2 : 0);
         const dx = ax - x, dy = ay - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 130 && !this.ammo2[i]) {
+          // seen coming: one warning per engine while there is still time to do something about it
+          this.ammo2[i] = 1;
+          const where = this.sectors[this.segSector(k)].name;
+          if (tower) this._alert(null, 0, `A siege tower is closing on ${where}`, 'warn', x, y);
+          else this._alert('ladIn' + this.segSector(k), 30, `Ladder crews are making for ${where}`, 'warn', x, y);
+        }
         if (l < 2.5) { this.state[i] = S_ACT; this.aux[i] = this.time + (tower ? 3 : 4); this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-s.ny, -s.nx); return; }
         const bc = this._move(i, dx / l, dy / l, speed, d.sz, 0);
         if (tower) {
@@ -731,7 +768,7 @@ export class Sim {
           // a tower that cannot get forward lets its company out where it stands
           if (Math.abs(this.x[i] - this.bx[i]) + Math.abs(this.y[i] - this.by[i]) > 1.5) { this.bx[i] = this.x[i]; this.by[i] = this.y[i]; this.linkT[i] = this.time; }
           else if (this.time - this.linkT[i] > 9) {
-            this.events.push({ type: 'log', text: 'A siege tower is stuck — its company dismounts', cls: 'good' });
+            this._alert(null, 0, 'A siege tower is stuck — its company dismounts', 'good', x, y);
             this.fx.death(this.type[i], x, y, this.map.groundZ(x, y), this.rot[i], NaN, 0, 0);
             this.kill(i, null, true);
           }
@@ -747,6 +784,7 @@ export class Sim {
           return;
         }
         const dx = gseg.ox - x, dy = gseg.oy - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 140 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('ramIn', 20, 'A battering ram is on the causeway', 'bad', x, y); }
         if (l < 5.5) {
           this.linkT[i] = this.time;
           this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-gseg.ny, -gseg.nx);
@@ -776,6 +814,7 @@ export class Sim {
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, 0, 0); return; }
         const s = this.segs[k];
         const dx = s.ox - x, dy = s.oy - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
         if (l < 3) { this.state[i] = S_ACT; this.aux[i] = this.time + 1.6; this.vx[i] = this.vy[i] = 0; this.fx.sound('fuse', x, y, 0.8); return; }
         if ((this.tick + i) % 6 === 0) this.fx.spark(x, y, this.unitZ(i) + 1.5);
         this._move(i, dx / l, dy / l, speed, 0, 0);
@@ -867,18 +906,28 @@ export class Sim {
     const fresh = !s.breached;
     for (let j = k - 1; j <= k + 1; j++) { const q = this.segs[j]; if (q && q.kind === 'wall') this.breachSeg(j, j !== k); }
     this.explode(s.x, s.y, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
-    if (fresh) this.events.push({ type: 'banner', text: s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : 'The wall is breached!', cls: 'bad', big: true });
+    if (fresh) this._alert(null, 0, s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is breached!`, 'bad', s.x, s.y, true, true);
   }
 
   damageSeg(k, dmg) {
     const s = this.segs[k];
     if (s.breached || s.maxHp > 1e8) return;
+    const before = s.hp / s.maxHp;
     s.hp -= dmg;
     if (s.hp <= 0) {
       this.breachSeg(k);
-      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : 'A wall section has collapsed!';
-      this.events.push({ type: 'banner', text: txt, cls: 'bad', big: s.kind === 'gate' });
+      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
+      this._alert(null, 0, txt, 'bad', s.x, s.y, true, s.kind === 'gate');
+      return;
     }
+    // warn while there is still something to be done about it
+    const now = s.hp / s.maxHp;
+    if (s.kind === 'gate' || s.kind === 'postern') {
+      const what = s.kind === 'gate' ? 'The gate' : 'The postern door';
+      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, true);
+      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, true);
+      else if (before >= 1) this._alert(null, 0, `${what} is under attack`, 'warn', s.x, s.y);
+    } else if (before > 0.5 && now <= 0.5) this._alert('wallHp' + this.segSector(k), 30, `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is being battered down`, 'warn', s.x, s.y);
   }
 
   breachSeg(k, quiet) {
@@ -1338,7 +1387,7 @@ export class Sim {
     if (!list.length) return 0;
     this._toKeep(list);
     this.retreated = true;
-    this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn' });
+    this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn', x: KEEP.cx, y: KEEP.cy });
     return list.length;
   }
 
@@ -1362,6 +1411,15 @@ export class Sim {
   }
 
   // ------------------------------------------------------------- queries
+  /** Cheap fingerprint of the whole battle state, for checking that runs are reproducible. */
+  hash() {
+    let h = 0x811c9dc5;
+    const mix = (v) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
+    mix(this.tick); mix(this.count[0]); mix(this.count[1]); mix(this.defCombat);
+    for (let i = 0; i < this.n; i++) { if (!this.alive[i]) continue; mix(i); mix(this.x[i] * 16); mix(this.y[i] * 16); mix(this.hp[i]); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+
   defenderAt(x, y, r) {
     let best = -1, bd = r * r;
     for (let i = 0; i < this.n; i++) {

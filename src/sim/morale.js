@@ -69,7 +69,7 @@ export const moraleMethods = {
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
       } else if (st === G_ROUT && m >= 60 && this.time - this.gRoutT[g] > 20) {
         this.gState[g] = G_OK;
-        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 12; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: 'warn' }); }
+        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 12; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: 'warn', x: cx, y: cy }); }
       }
     }
   },
@@ -88,7 +88,7 @@ export const moraleMethods = {
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {
         this._moraleLogT[0] = this.time + 20;
-        this.events.push({ type: 'log', text: this._brokeN > 1 ? `${this._brokeN} Uruk companies have broken and run` : 'An Uruk company breaks and runs!', cls: 'good' });
+        this.events.push({ type: 'log', text: this._brokeN > 1 ? `${this._brokeN} Uruk companies have broken and run` : 'An Uruk company breaks and runs!', cls: 'good', x: this.gCx[g], y: this.gCy[g] });
         this._brokeN = 0;
       }
     } else {
@@ -103,7 +103,7 @@ export const moraleMethods = {
       }
       if (list.length) {
         this._toKeep(list);
-        this.events.push({ type: 'log', text: 'A platoon breaks under its losses and falls back to the keep', cls: 'bad' });
+        this.events.push({ type: 'log', text: `A platoon on ${this.sectors[this.sectorAt(this.gCx[g], this.gCy[g])].name} breaks under its losses and falls back to the keep`, cls: 'bad', x: this.gCx[g], y: this.gCy[g] });
       }
     }
   },
@@ -119,8 +119,8 @@ export const moraleMethods = {
       this.gMorale[g] = Math.max(0, this.gMorale[g] - (d < 120 ? 40 : 22) - (left ? 0 : 8));
       if (d < 240) this.gConf[g] = this.time + 4 + this.rand() * 4;
     }
-    if (team === ORC) this.events.push({ type: 'banner', text: left ? 'An Uruk captain is down — his companies waver' : 'The last Uruk captain has fallen — the horde is leaderless', cls: 'good' });
-    else this.events.push({ type: 'banner', text: left ? 'A command team is lost — the line is shaken' : 'The garrison has lost its commanders', cls: 'bad' });
+    if (team === ORC) this.events.push({ type: 'banner', text: left ? 'An Uruk captain is down — his companies waver' : 'The last Uruk captain has fallen — the horde is leaderless', cls: 'good', x, y });
+    else this.events.push({ type: 'banner', text: left ? 'A command team is lost — the line is shaken' : 'The garrison has lost its commanders', cls: 'bad', x, y });
     this.fx.sound('horn', x, y, 0.6);
   },
 };
