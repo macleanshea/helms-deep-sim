@@ -35,7 +35,7 @@ export const moraleMethods = {
 
   _startMorale() {
     this._buildAux();
-    this.hadCmd = [this.cmds[0].length > 0, this.cmds[1].length > 0];
+    this.hadCmd = [this.cmds[0].length > 0, this.cmds[1].length > 0 || !!(this.dir && this.dir.cmdReserve)];
     this._morale(true);
   },
 
@@ -69,7 +69,7 @@ export const moraleMethods = {
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
       } else if (st === G_ROUT && m >= 60 && this.time - this.gRoutT[g] > 20) {
         this.gState[g] = G_OK;
-        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 12; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: 'warn', x: cx, y: cy }); }
+        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 40; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
       }
     }
   },
@@ -109,7 +109,7 @@ export const moraleMethods = {
   },
 
   _cmdDown(i, team, x, y) {
-    let left = 0;
+    let left = team === ORC && this.dir ? this.dir.cmdReserve : 0; // captains still to come count
     for (const ci of this.cmds[team]) if (ci !== i && this.alive[ci]) left++;
     this.cmds[team] = this.cmds[team].filter((ci) => ci !== i);
     for (let g = 0; g < this.ng; g++) {

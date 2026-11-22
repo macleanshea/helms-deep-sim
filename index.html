@@ -35,12 +35,16 @@
     <div class="tb-group battle-only clock">
       <b id="clock">00:00</b><small id="dawn"></small>
     </div>
+    <div class="tb-group battle-only wave" id="waveBox" hidden>
+      <div><div class="pips" id="wavePips"></div><b id="waveName"></b><small id="waveNote"></small></div>
+      <button id="btnSkip" class="icon" title="Fast-forward to the next contact (N)" hidden><svg viewBox="0 0 16 16" width="14" height="14"><path d="M1.500 3l5.500 5-5.500 5zM7.500 3l5.500 5-5.500 5zM13.500 3h1.500v10h-1.500z" fill="currentColor"/></svg></button>
+    </div>
 
     <div class="spacer"></div>
 
     <div class="force def"><small>Defenders</small><b id="defCount">0</b><div class="bar"><i id="defBar"></i></div></div>
     <div class="force ammo battle-only"><small>Ammunition</small><b id="ammoPct">100%</b><div class="bar"><i id="ammoBar"></i></div></div>
-    <div class="force orc"><small>The Horde</small><b id="orcCount">0</b><div class="bar"><i id="orcBar"></i></div></div>
+    <div class="force orc" id="orcForce"><small id="orcLbl">The Horde</small><b id="orcCount">0</b><div class="bar"><i id="orcBar"></i><i id="orcRes" class="res"></i><u id="orcRout" hidden></u></div></div>
 
     <div class="tb-group">
       <button id="btnHelp" class="icon" title="Controls">?</button>

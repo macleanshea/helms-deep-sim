@@ -1,7 +1,7 @@
 // DOM user interface: setup panels, battle HUD, toasts and dialogs.
 
 import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C } from '../config.js';
-import { PRESETS } from '../scenarios.js';
+import { PRESETS, waveSummary } from '../scenarios.js';
 import { makeIcon } from '../render/atlas.js';
 
 const $ = (id) => document.getElementById(id);
@@ -53,6 +53,7 @@ export function buildUI(app, atlas) {
   $('btnHelp').addEventListener('click', () => ui.showHelp());
   $('btnSound').addEventListener('click', () => { const m = app.toggleMute(); $('btnSound').classList.toggle('off', m); });
   for (const b of document.querySelectorAll('#speedCtl .seg')) b.addEventListener('click', () => { app.setSpeed(+b.dataset.speed); b.blur(); });
+  $('btnSkip').addEventListener('click', () => { app.skipAhead(); $('btnSkip').blur(); });
 
   // ---------------------------------------------------- palette & brush
   const palette = $('palette');
@@ -107,6 +108,15 @@ export function buildUI(app, atlas) {
         const x = el('button', 'x', '✕'); x.title = 'Remove all'; x.addEventListener('click', () => app.setTypeCount(d.key, 0));
         row.append(ic, el('div', null, d.name), inp, x);
         roster.append(row);
+      }
+      if (team === ORC) {
+        // the order of attack: what comes when
+        const ws = waveSummary(app.setup.groups).filter((w) => w.size > 0);
+        if (ws.length > 1) {
+          const box = el('div', 'waves', '<h3>Order of attack</h3>');
+          for (const w of ws) box.append(el('div', 'wrow', `<i>${w.k + 1}</i><div>${w.name}${w.k === 0 ? ' — on the field' : ''}<span>${w.note || 'infantry'}</span></div><b>${fmt(w.size)}</b>`));
+          roster.append(box);
+        }
       }
     }
   };
@@ -193,18 +203,43 @@ export function buildUI(app, atlas) {
   // ----------------------------------------------------------------- HUD
   const defCount = $('defCount'), orcCount = $('orcCount'), defBar = $('defBar'), orcBar = $('orcBar');
   const ammoPct = $('ammoPct'), ammoBar = $('ammoBar'), clock = $('clock'), dawn = $('dawn'), selinfo = $('selinfo');
+  const orcRes = $('orcRes'), orcRout = $('orcRout'), orcLbl = $('orcLbl'), orcForce = $('orcForce');
+  const waveBox = $('waveBox'), wavePips = $('wavePips'), waveName = $('waveName'), waveNote = $('waveNote'), btnSkip = $('btnSkip');
   ui.updateHud = () => {
     const sim = app.sim;
     if (!sim) return;
     if (app.mode === 'setup') {
       defCount.textContent = fmt(sim.defCombat); orcCount.textContent = fmt(sim.count[ORC]);
-      defBar.style.width = orcBar.style.width = '100%';
+      defBar.style.width = orcBar.style.width = '100%'; orcRes.style.width = '0'; orcRout.hidden = true; orcLbl.textContent = 'The Horde';
       return;
     }
     defCount.textContent = `${fmt(sim.defCombat)} / ${fmt(sim.initial[0])}`;
     orcCount.textContent = `${fmt(sim.count[ORC])} / ${fmt(sim.initial[1])}`;
     defBar.style.width = (100 * sim.defCombat / Math.max(1, sim.initial[0])) + '%';
-    orcBar.style.width = (100 * sim.count[ORC] / Math.max(1, sim.initial[1])) + '%';
+    // the horde bar shows what is on the field, what is still to come, and the point at which it breaks
+    const o0 = Math.max(1, sim.initial[1]), wi = sim.waveInfo(), res = wi ? wi.reserve : 0;
+    orcBar.style.width = (100 * (sim.count[ORC] - res) / o0) + '%';
+    orcRes.style.width = (100 * res / o0) + '%';
+    orcRout.hidden = !(sim.opt.rout > 0); orcRout.style.left = (100 * sim.opt.rout) + '%';
+    orcLbl.textContent = res > 0 ? `Horde · ${fmt(res)} to come` : 'The Horde';
+    orcForce.title = sim.opt.rout > 0 ? `The horde breaks and runs when ${Math.round(sim.opt.rout * 100)}% of it is left (the white mark).` : '';
+    waveBox.hidden = !wi;
+    if (wi) {
+      if (wavePips.children.length !== wi.W) { wavePips.innerHTML = ''; for (let k = 0; k < wi.W; k++) wavePips.append(el('i')); }
+      for (let k = 0; k < wi.W; k++) wavePips.children[k].className = k < wi.k ? 'done' : k === wi.k ? 'now' : k === wi.k + 1 && wi.next && wi.next.forming ? 'soon' : '';
+      const nx = wi.next;
+      waveName.textContent = `Wave ${wi.k + 1} of ${wi.W} · ${wi.name}`;
+      let note;
+      if (wi.phase === 'approach') note = `contact in about ${mmss(wi.eta)}`;
+      else if (nx && nx.forming) note = `${nx.name} steps off in ${mmss(nx.in)}`;
+      else if (wi.phase === 'lull') note = `lull — ${nx.name} within ${mmss(nx.in)}`;
+      else if (nx) note = `engaged · next: ${nx.name} in ${mmss(nx.in)}`;
+      else note = sim.opt.dawn > 0 ? 'the last of them — hold until dawn' : 'the last of them';
+      waveNote.textContent = sim.result ? '' : note;
+      waveBox.classList.toggle('lull', wi.phase === 'lull' && !(nx && nx.forming));
+      waveBox.classList.toggle('hot', wi.phase === 'engaged');
+      btnSkip.hidden = !!sim.result || !(wi.phase === 'lull' || wi.phase === 'approach') || !!app.skip;
+    }
     const am = sim.ammoLevel();
     ammoPct.textContent = sim.opt.ammoMult > 50 ? '∞' : Math.round(am * 100) + '%';
     ammoBar.style.width = (am * 100) + '%';

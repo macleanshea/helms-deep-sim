@@ -8,6 +8,7 @@ import { groupPositions } from '../scenarios.js';
 import { KEEP, N_WALL } from '../map.js';
 import { supportMethods } from './support.js';
 import { moraleMethods } from './morale.js';
+import { directorMethods } from './director.js';
 
 export { SUPPLY_R } from './support.js';
 export const MAX_UNITS = 1 << 16;
@@ -117,22 +118,32 @@ export class Sim {
     });
     this._alertT = new Map();
 
-    for (const g of setup.groups) {
-      const pos = groupPositions(map, g);
-      const ti = U[g.type], d = UNITS[ti];
-      const n = Math.min(g.count, pos.length / 2);
-      if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); continue; }
-      const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
-      const face = d.team === DEF ? Math.PI : 0;
-      for (let k = 0; k < n; k++) {
-        const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (this.rand() - 0.5) * 0.3, gid);
-        if (i < 0) break;
-        if (d.team === ORC) { this.state[i] = g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = g.delay || 0; }
-      }
-    }
-    this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
+    // later waves of the horde wait beyond the valley mouth until the director brings them on
+    const reserve = [];
+    for (const g of setup.groups) { if (g.team === ORC && g.phase > 0) reserve.push(g); else this._spawnGroup(g); }
     for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
+    this._initDirector(setup.groups, reserve);
+    this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
     this._startMorale();
+  }
+
+  /** Put a formation on the field. `atX` overrides where (late arrivals); returns how many found room. */
+  _spawnGroup(g, atX, marching) {
+    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX });
+    const ti = U[g.type], d = UNITS[ti];
+    const n = Math.min(g.count, pos.length / 2);
+    if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
+    if (!n) return 0;
+    const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
+    const face = d.team === DEF ? Math.PI : 0;
+    let made = 0;
+    for (let k = 0; k < n; k++) {
+      const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
+      if (i < 0) break;
+      made++;
+      if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; }
+    }
+    return made;
   }
 
   // ---------------------------------------------------------------- units
@@ -547,6 +558,7 @@ export class Sim {
     if (this.tick % 20 === 7) this._ammoWatch();
     if (this.clays.length && this.tick % 3 === 0) this._claymores();
     if (this.tick % 5 === 2) this._morale();
+    if (this.dir && this.tick % 5 === 4) this._director();
     if (this.focus && this.time > this.focus.until) this.focus = null;
     if (this.tick % 5 === 0) this._checkEnd();
   }
@@ -1398,6 +1410,7 @@ export class Sim {
     if (this.routing) { if (this.time > this.routT + 14) this._finish(true, 'The horde has broken and fled the valley.'); return; }
     if (this.opt.rout > 0 && this.count[ORC] <= this.initial[ORC] * this.opt.rout) {
       this.routing = true; this.routT = this.time;
+      this._dropReserves();
       for (let i = 0; i < this.n; i++) if (this.alive[i] && this.team[i] === ORC && this.state[i] !== S_DONE && this.state[i] !== S_CLIMB) this.state[i] = S_FLEE;
       this.events.push({ type: 'banner', text: 'The horde breaks — they are running!', cls: 'good' });
       return;
@@ -1432,4 +1445,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods);

@@ -138,6 +138,7 @@ app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
   for (const g of app.setup.groups) {
+    if (g.phase > 0) continue; // later waves are beyond the valley mouth: nothing to grab
     const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
     const dx = wx - g.x, dy = wy - g.y;
     const a = dx * ux + dy * uy, p = -dx * uy + dy * ux;
@@ -161,7 +162,9 @@ app.startBattle = () => {
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
-  ui.toast('The horde advances in waves. Space pauses; number keys call support.');
+  const wi0 = app.sim.waveInfo();
+  ui.toast(wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
+  app.skip = null;
   audio.horn();
   mmBase = null;
   ui.updateHud();
@@ -173,7 +176,17 @@ app.backToSetup = () => {
   rebuildPreview(); fitCamera();
   ui.refreshRoster(); ui.refreshPalette(); ui.refreshInspector();
 };
-app.setSpeed = (s) => { if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
+app.setSpeed = (s) => { app.skip = null; if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
+/** Run at full speed through a quiet spell, back to the old pace when the next wave makes contact. */
+app.skipAhead = () => {
+  if (app.mode !== 'battle' || app.sim.result) return;
+  if (app.skip) { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); return; }
+  const wi = app.sim.waveInfo();
+  if (!wi || (wi.phase !== 'lull' && wi.phase !== 'approach')) { ui.toast('Nothing to skip: the enemy is at the wall.', 'warn'); return; }
+  app.skip = { speed: app.speed, alerts: app.alerts.length }; app.speed = 8; app.paused = false;
+  ui.toast('Fast-forwarding to the next contact — any key or alarm stops it.');
+  ui.updateHud();
+};
 app.toggleMute = () => { audio.unlock(); audio.setMuted(!audio.muted); return audio.muted; };
 app.toggleLosses = () => { app.showLosses = !app.showLosses; ui.updateHud(); };
 app.armSupport = (k) => {
@@ -381,6 +394,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'r') app.retreat();
   else if (k === 'l') app.toggleLosses();
   else if (k === 'g') app.jumpAlert();
+  else if (k === 'n') app.skipAhead();
   else if (k === 'x' && app.selection.length) app.sim.stop(app.selection);
   ui.updateHud();
 });
@@ -410,7 +424,7 @@ function drawOverlay(dtReal) {
     // formation outlines
     for (const g of app.setup.groups) {
       const sel = g === app.selGroup, hov = g === app.hoverGroup && !app.tool;
-      if (!sel && !hov && z < 0.75) continue;
+      if (g.phase > 0 || (!sel && !hov && z < 0.75)) continue;
       const b = groupBounds(g), col = g.team === DEF ? '94,200,242' : '232,87,61';
       const ux = Math.cos(g.ang), uy = Math.sin(g.ang), gz = heightAt(g.x, g.y) + 0.3;
       c.beginPath();
@@ -432,6 +446,15 @@ function drawOverlay(dtReal) {
         c.fillStyle = 'rgba(10,13,16,0.9)'; c.beginPath(); c.roundRect(cxs - tw / 2, ty - 10, tw, 20, 5); c.fill();
         c.fillStyle = sel ? '#f0b34a' : '#e6e9ec'; c.fillText(txt, cxs, ty + 1);
       }
+    }
+    // what is still to come
+    const wi = sim.waveInfo();
+    if (wi && wi.reserve > 0) {
+      const p = S(26, 480, heightAt(26, 480) + 2), txt = `◀  ${wi.W - 1} more wave${wi.W > 2 ? 's' : ''} beyond the valley mouth · ${fmt(wi.reserve)}`;
+      c.font = `600 12px ${FONT}`; c.textAlign = 'left';
+      const tw = c.measureText(txt).width + 16, bx = Math.max(insets().l + 8, p[0] - 8);
+      c.fillStyle = 'rgba(10,13,16,0.85)'; c.beginPath(); c.roundRect(bx, p[1] - 11, tw, 22, 6); c.fill();
+      c.fillStyle = '#ff9c86'; c.fillText(txt, bx + 8, p[1] + 1);
     }
     // placement ghost
     if (app.tool && m.inside) {
@@ -678,6 +701,13 @@ function drawMinimap() {
   mctx.closePath(); mctx.stroke();
   if (sim.focus) { mctx.strokeStyle = '#ff5a46'; mctx.beginPath(); mctx.arc(sim.focus.x * kx, sim.focus.y * ky, Math.max(3, sim.focus.r * kx), 0, 6.2832); mctx.stroke(); }
   for (const mk of app.markers) { if (!mk.label) continue; mctx.strokeStyle = `rgb(${mk.col})`; mctx.beginPath(); mctx.arc(mk.x * kx, mk.y * ky, 3.5, 0, 6.2832); mctx.stroke(); }
+  // a wave forming or marching on: chevrons at the valley mouth
+  const wv = sim.waveInfo();
+  if (wv && !sim.result && ((wv.next && wv.next.forming) || wv.phase === 'approach')) {
+    const hot = wv.phase === 'approach', a = 0.45 + 0.45 * Math.sin(app.clock * 5);
+    mctx.strokeStyle = hot ? `rgba(255,110,90,${a})` : `rgba(240,179,74,${a})`; mctx.lineWidth = 2;
+    for (let k = 0; k < 3; k++) { const x = 5 + k * 7; mctx.beginPath(); mctx.moveTo(x, H * 0.5 - 9); mctx.lineTo(x + 6, H * 0.5); mctx.lineTo(x, H * 0.5 + 9); mctx.stroke(); }
+  }
   // alert pings: a ring that opens out from where it happened
   mctx.lineWidth = 1.6;
   for (const a of app.alerts) {
@@ -749,11 +779,16 @@ function frame(now) {
     for (const e of sim.events) {
       const loc = e.x != null ? { x: e.x, y: e.y } : null;
       if (loc && (e.type === 'banner' || e.type === 'log')) noteAlert(e);
+      if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
       else if (e.type === 'end') { audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null); }
     }
     sim.events.length = 0;
+    if (app.skip) {
+      const wi = sim.waveInfo();
+      if (sim.result || !wi || wi.phase === 'engaged' || wi.phase === 'last') { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); }
+    }
   }
 
   // light: a stormy night that greys toward dawn, with the odd flash of lightning
@@ -787,7 +822,7 @@ function frame(now) {
   if (hudT > 0.12) {
     hudT = 0;
     ui.updateHud();
-    if (app.mode === 'battle') audio.setRoar(halted || sim.result ? 0 : Math.min(0.14, (sim.count[ORC] / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
+    if (app.mode === 'battle') audio.setRoar(halted || sim.result ? 0 : Math.min(0.14, (sim.onField() / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
   }
   if (app.mode === 'battle' && (mmFrame++ & 3) === 0) drawMinimap();
 }
