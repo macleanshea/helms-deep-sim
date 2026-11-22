@@ -277,9 +277,22 @@ export const PRESETS = [
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
 ];
 
+/** Requisition cost of the defending side of a setup. */
+export function forceCost(groups) {
+  let c = 0;
+  for (const g of groups) if (g.team === DEF) c += (UNITS[U[g.type]].cost || 0) * g.count;
+  return c;
+}
+
+/**
+ * A preset as a setup: { groups, options, budget }. The budget is the cost of the garrison as
+ * issued plus a tenth, so the stock layout always fits and there is something left to spend.
+ */
 export function buildPreset(map, key) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
   nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
   const s = p.build(map);
-  return { groups: s.groups, options: { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } } };
+  const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
+  if (!s.groups.length) options.sandbox = true; // nothing to hold a blank map against
+  return { groups: s.groups, options, budget: Math.ceil((forceCost(s.groups) * 1.1) / 100) * 100 };
 }

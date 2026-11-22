@@ -175,7 +175,7 @@ export const supportMethods = {
             const n = a.tries = (a.tries || 0) + 1;
             const ang = n * 2.4, rr = 3 + Math.sqrt(n) * 2.4;
             const ux = a.cx + Math.cos(ang) * rr, uy = a.cy + Math.sin(ang) * rr;
-            if (canPlace(this.map, d, ux, uy, null)) { const j = this.spawn(ti, ux, uy, Math.PI, a.grp); if (j >= 0) { this.fx.dust(ux, uy, this.unitZ(j), 1.5); a.dropped++; } }
+            if (canPlace(this.map, d, ux, uy, null)) { const j = this.spawn(ti, ux, uy, Math.PI, a.grp); if (j >= 0) { this.fx.dust(ux, uy, this.unitZ(j), 1.5); a.dropped++; this.stats.reinforced = (this.stats.reinforced || 0) + 1; } }
           }
           if (a.kind === 'helo' ? this.time >= a.until : a.dropped >= 30 || a.tries >= 90) a.st = 2;
         } else {

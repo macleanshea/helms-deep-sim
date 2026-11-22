@@ -3,7 +3,8 @@
 
 import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT } from './config.js';
 import { buildMap, KEEP } from './map.js';
-import { buildPreset, makeGroup, groupPositions, groupBounds, PRESETS } from './scenarios.js';
+import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, PRESETS } from './scenarios.js';
+import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { drawAtlas } from './render/atlas.js';
 import { Renderer } from './render/renderer.js';
@@ -111,6 +112,22 @@ app.loadPreset = (key) => {
   const p = PRESETS.find((q) => q.key === key);
   if (p) ui.toast(p.blurb);
 };
+/** Challenge <-> sandbox. Going back to a challenge restores the scenario's enemy and options; the garrison is kept. */
+app.setSandbox = (on) => {
+  if (on) app.setup.options.sandbox = true;
+  else {
+    const fresh = buildPreset(map, app.presetKey);
+    if (fresh.options.sandbox) { ui.toast('A blank map has no scenario to be challenged on.', 'warn'); return; }
+    app.setup = { groups: [...app.setup.groups.filter((g) => g.team === DEF), ...fresh.groups.filter((g) => g.team === ORC)], options: fresh.options, budget: fresh.budget };
+  }
+  app.selGroup = null; app.tool = null;
+  ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
+  rebuildPreview();
+  ui.toast(on ? 'Sandbox: build both sides freely. Battles are not scored.' : 'Challenge: the scenario\'s enemy and options are restored.');
+};
+app.optionsChanged = () => { app.previewDirty = true; };
+const BEST_KEY = 'hd-best-v1';
+const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch { return {}; } };
 app.selectPlaceTool = (type) => {
   app.tool = type ? { kind: 'place', type } : null;
   app.selGroup = null;
@@ -137,8 +154,9 @@ app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !
 
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
+  const lockOrc = !app.setup.options.sandbox;
   for (const g of app.setup.groups) {
-    if (g.phase > 0) continue; // later waves are beyond the valley mouth: nothing to grab
+    if (g.phase > 0 || (lockOrc && g.team === ORC)) continue; // later waves are beyond the valley mouth; a challenge's enemy is fixed
     const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
     const dx = wx - g.x, dy = wy - g.y;
     const a = dx * ux + dy * uy, p = -dx * uy + dy * ux;
@@ -153,6 +171,9 @@ app.startBattle = () => {
   audio.unlock();
   const real = (g, team) => g.team === team && UNITS[U[g.type]].cls !== C.OBST;
   if (!app.setup.groups.some((g) => real(g, DEF)) || !app.setup.groups.some((g) => real(g, ORC))) { ui.toast('Place at least one defender and one attacker first.', 'warn'); audio.play('deny'); return; }
+  const spent = forceCost(app.setup.groups);
+  if (!app.setup.options.sandbox && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} over its requisition budget. Remove something, or switch to Sandbox.`, 'warn'); audio.play('deny'); return; }
+  app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
   app.sim = new Sim(map, app.setup, fx);
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
@@ -474,7 +495,10 @@ function drawOverlay(dtReal) {
       if (line) { const a = S(d.x0, d.y0, heightAt(d.x0, d.y0)); c.strokeStyle = `rgba(${col},0.9)`; c.lineWidth = 1.5; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(m.sx, m.sy); c.stroke(); c.setLineDash([]); }
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       c.fillStyle = n ? '#fff' : '#ff8b73';
-      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}` : 'Not here', m.sx + 16, m.sy - 12);
+      const cost = def.cost && !app.setup.options.sandbox ? n * def.cost : 0;
+      const over = cost && forceCost(app.setup.groups) + cost > app.setup.budget;
+      if (over) c.fillStyle = '#ff8b73';
+      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${cost ? `  ·  ${fmt(cost)} req${over ? ' — over budget' : ''}` : ''}` : 'Not here', m.sx + 16, m.sy - 12);
     }
     return;
   }
@@ -783,7 +807,17 @@ function frame(now) {
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
       else if (e.type === 'cp' && e.amt >= 0.15) marker(e.x, e.y, 4, 3.5, '240,179,74', `+${e.amt.toFixed(1)} CP`);
-      else if (e.type === 'end') { audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null); }
+      else if (e.type === 'end') {
+        // score a challenge and remember the best result on each scenario
+        const sc = sim.opt.sandbox ? null : scoreBattle(sim, { budget: app.setup.budget, spent: app.battleSpent });
+        if (sc) {
+          const best = loadBest(), old = best[app.presetKey];
+          sc.best = old ? old.score : null;
+          if (!old || sc.total > old.score) { sc.newBest = true; best[app.presetKey] = { score: sc.total, medal: sc.medal ? sc.medal.key : null }; try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch { /* private mode */ } ui.refreshPresets(best); }
+        }
+        app.lastScore = sc;
+        audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null);
+      }
     }
     sim.events.length = 0;
     if (app.skip) {
@@ -831,6 +865,7 @@ function frame(now) {
 // -------------------------------------------------------------------- boot
 if (params.has('q')) renderer.setQuality(params.get('q') === 'low' ? 'low' : 'high');
 ui = buildUI(app, atlas);
+ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('garrison');
 fitCamera();

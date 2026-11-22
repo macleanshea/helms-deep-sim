@@ -1,7 +1,7 @@
 // DOM user interface: setup panels, battle HUD, toasts and dialogs.
 
 import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C } from '../config.js';
-import { PRESETS, waveSummary } from '../scenarios.js';
+import { PRESETS, waveSummary, forceCost } from '../scenarios.js';
 import { makeIcon } from '../render/atlas.js';
 
 const $ = (id) => document.getElementById(id);
@@ -45,6 +45,8 @@ export function buildUI(app, atlas) {
   // ------------------------------------------------------------- top bar
   const preset = $('preset');
   for (const p of PRESETS) { const o = el('option', null, p.name); o.value = p.key; preset.append(o); }
+  /** Show the best medal and score won on each scenario next to its name. */
+  ui.refreshPresets = (best) => { for (const o of preset.options) { const p = PRESETS.find((q) => q.key === o.value), b = best[o.value]; o.textContent = p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''); } };
   preset.addEventListener('change', () => { app.loadPreset(preset.value); preset.blur(); });
   ui.setPreset = (k) => { preset.value = k; };
   $('btnBegin').addEventListener('click', () => app.startBattle());
@@ -59,10 +61,18 @@ export function buildUI(app, atlas) {
   const palette = $('palette');
   function renderPalette() {
     palette.innerHTML = '';
+    const sandbox = !app.setup || !!app.setup.options.sandbox;
+    if (tab === ORC && !sandbox) {
+      // in a challenge the enemy is what it is
+      const box = el('div', 'locked', '<b>The enemy is fixed in a challenge.</b><span>The horde\'s order of battle and the battle options are part of the scenario. Switch to Sandbox to build both armies freely — sandbox battles are not scored.</span>');
+      const b = el('button', null, 'Switch to Sandbox'); b.addEventListener('click', () => app.setSandbox(true));
+      box.append(b); palette.append(box);
+      return;
+    }
     const card = (d) => {
       const b = el('button', 'card ' + (d.team === DEF ? 'def' : 'orc') + (app.tool && app.tool.kind === 'place' && app.tool.type === d.key ? ' active' : ''));
       const ic = el('div', 'ico'); ic.append(icon(d, 44));
-      b.append(ic, el('div', null, `<b>${d.name}</b><span>${d.desc}</span>`));
+      b.append(ic, el('div', null, `<b>${d.name}${d.cost && !sandbox ? `<em title="Requisition cost each">${d.cost}</em>` : ''}</b><span>${d.desc}</span>`));
       b.addEventListener('click', () => { app.selectPlaceTool(app.tool && app.tool.type === d.key ? null : d.key); b.blur(); });
       palette.append(b);
     };
@@ -94,10 +104,17 @@ export function buildUI(app, atlas) {
       const byType = new Map();
       for (const g of app.setup.groups) if (g.team === team) byType.set(g.type, (byType.get(g.type) || 0) + g.count);
       let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * (1 + (UNITS[U[k]].carry || 0));
+      const sandbox = !!app.setup.options.sandbox, locked = team === ORC && !sandbox;
       const head = el('div', 'side-head ' + (team === DEF ? 'def' : 'orc'), `<div>${team === DEF ? 'DEFENDERS' : 'ATTACKERS'} <span>· ${fmt(total)}</span></div>`);
       const clr = el('button', null, 'Clear'); clr.addEventListener('click', () => app.clearTeam(team));
-      if (byType.size) head.append(clr);
+      if (byType.size && !locked) head.append(clr);
       roster.append(head);
+      if (team === DEF && !sandbox) {
+        // what the garrison has cost against what the scenario allows
+        const spent = forceCost(app.setup.groups), budget = app.setup.budget, over = spent > budget;
+        const req = el('div', 'req' + (over ? ' over' : ''), `<div><span>Requisition</span><b>${fmt(spent)} / ${fmt(budget)}</b></div><div class="bar"><i style="width:${Math.min(100, (100 * spent) / Math.max(1, budget))}%"></i></div>${over ? `<small>Over by ${fmt(spent - budget)} — remove something before the battle.</small>` : `<small>${fmt(budget - spent)} left to spend</small>`}`);
+        roster.append(req);
+      }
       if (!byType.size) roster.append(el('div', 'empty', team === DEF ? 'No defenders placed yet.' : 'No attackers placed yet.'));
       for (const d of UNITS) {
         if (!byType.has(d.key)) continue;
@@ -106,6 +123,7 @@ export function buildUI(app, atlas) {
         const inp = el('input'); inp.type = 'number'; inp.min = 0; inp.max = 60000; inp.value = byType.get(d.key);
         inp.addEventListener('change', () => app.setTypeCount(d.key, Math.max(0, +inp.value | 0)));
         const x = el('button', 'x', '✕'); x.title = 'Remove all'; x.addEventListener('click', () => app.setTypeCount(d.key, 0));
+        if (locked) { inp.disabled = true; x.style.visibility = 'hidden'; }
         row.append(ic, el('div', null, d.name), inp, x);
         roster.append(row);
       }
@@ -130,6 +148,7 @@ export function buildUI(app, atlas) {
     insp.innerHTML = `<h3>Selected formation</h3><div style="font-weight:700;margin-bottom:6px">${d.name}</div>`;
     const addNum = (label, val, min, max, fn) => { const r = el('div', 'opt'); const i = el('input'); i.type = 'number'; i.min = min; i.max = max; i.value = val; i.addEventListener('change', () => fn(Math.max(min, Math.min(max, +i.value || 0)))); r.append(el('span', null, label), i); insp.append(r); };
     addNum(d.cls === C.OBST ? 'Pieces' : 'Units', g.count, 1, 20000, (v) => app.editGroup(g, { count: v | 0 }));
+    if (d.cost && !app.setup.options.sandbox) insp.append(el('div', 'opt', `<span>Requisition</span><b>${fmt(d.cost * g.count)}</b>`));
     if (g.team === ORC) addNum('Advance after (s)', g.delay || 0, 0, 3600, (v) => app.editGroup(g, { delay: v }));
     const btns = el('div', 'btns');
     const mk = (t, fn, cls) => { const b = el('button', cls, t); b.addEventListener('click', fn); btns.append(b); };
@@ -142,28 +161,47 @@ export function buildUI(app, atlas) {
   // ------------------------------------------------------------- options
   const options = $('options');
   ui.refreshOptions = () => {
-    const o = app.setup.options;
+    const o = app.setup.options, sb = !!o.sandbox;
     options.innerHTML = '';
+    // challenge or sandbox
+    const mode = el('div', 'modesw');
+    for (const [v, t, tipText] of [[0, 'Challenge', 'Scored. The enemy and the battle options are fixed by the scenario; you choose and place the garrison within its requisition budget and pay for support with Command Points.'], [1, 'Sandbox', 'Free build. Place anything on either side, change every option, call support by a fixed number of uses. Not scored.']]) {
+      const b = el('button', (sb ? 1 : 0) === v ? 'active' : '', t);
+      b.addEventListener('click', () => { if ((sb ? 1 : 0) !== v) app.setSandbox(!!v); b.blur(); });
+      bindTip(b, t, tipText);
+      mode.append(b);
+    }
+    options.append(mode);
     const sel = (label, cur, list, fn, tipText) => {
       const r = el('div', 'opt'), s = el('select');
       for (const [v, t] of list) { const op = el('option', null, t); op.value = v; s.append(op); }
       if (!list.some(([v]) => v === cur)) { const op = el('option', null, String(cur)); op.value = cur; s.append(op); }
-      s.value = cur; s.addEventListener('change', () => { fn(+s.value); s.blur(); });
+      s.value = cur; s.disabled = !sb; s.addEventListener('change', () => { fn(+s.value); s.blur(); app.optionsChanged(); });
       r.append(el('span', null, label), s); options.append(r);
       if (tipText) bindTip(r, label, tipText);
     };
+    const num = (label, val, min, max, fn, tipText) => {
+      const r = el('div', 'opt'), i = el('input');
+      i.type = 'number'; i.min = min; i.max = max; i.value = val;
+      i.addEventListener('change', () => { const v = Math.max(min, Math.min(max, +i.value | 0)); i.value = v; fn(v); app.optionsChanged(); });
+      r.append(el('span', null, label), i); options.append(r);
+      if (tipText) bindTip(r, label, tipText);
+    };
     sel('Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. When it runs dry they fight hand to hand.');
-    sel('Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; }, 'Hold out this long and the relief column arrives: you win.');
+    sel('Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; }, 'Hold out this long and the relief column arrives: you win. The horde paces its waves so the last and heaviest lands shortly before dawn.');
     sel('Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses in a short time breaks and runs; commanders steady the troops around them, and losing one shakes them.');
     sel('Horde gives up at', o.rout, [[0, 'Never — to the last'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The whole host routs when this little of it is left.');
-    const sh = el('h3', null, 'Support on call'); sh.style.marginTop = '12px'; options.append(sh);
-    for (const k in SUPPORT) {
-      const r = el('div', 'opt'), i = el('input');
-      i.type = 'number'; i.min = 0; i.max = 99; i.value = o.support[k];
-      i.addEventListener('change', () => { o.support[k] = Math.max(0, Math.min(99, +i.value | 0)); i.value = o.support[k]; });
-      r.append(el('span', null, SUPPORT[k].name), i); options.append(r);
-      bindTip(r, SUPPORT[k].name, SUPPORT[k].desc);
+    if (!sb) {
+      const sh = el('h3', null, 'Support'); sh.style.marginTop = '12px'; options.append(sh);
+      const r = el('div', 'opt', `<span>Command Points</span><b>${o.cpStart} to start · +${(o.cpRate * 60).toFixed(1)} / min</b>`);
+      options.append(r);
+      bindTip(r, 'Command Points', 'One pool pays for every support call. It refills slowly, and killing captains, trolls and siege engines pays a bounty.');
+      options.append(el('p', 'tip', Object.values(SUPPORT).map((q) => `${q.name} <b>${q.cost}</b>`).join(' · ')));
+      return;
     }
+    const sh = el('h3', null, 'Support on call'); sh.style.marginTop = '12px'; options.append(sh);
+    for (const k in SUPPORT) num(SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
+    num('Random seed', o.seed, 1, 9999, (v) => { o.seed = v; }, 'The same setup with the same seed and the same orders plays out the same way. Change it for a different roll of the dice.');
   };
 
   // --------------------------------------------------------- command bar
@@ -322,10 +360,15 @@ export function buildUI(app, atlas) {
     const totalL = lost.reduce((a, b) => a + b[1], 0);
     const maxL = Math.max(1, ...lost.map((k) => k[1]));
     const wname = (k) => (WEAPONS[k] ? WEAPONS[k].name : k);
+    const sc = app.lastScore;
+    const scoreHtml = !sc ? (sim.opt.sandbox ? '<p class="unscored">Sandbox battles are not scored.</p>' : '') : `<div class="scorebox${sc.medal ? ' ' + sc.medal.key : ''}">
+        <div class="total"><small>Score</small><b>${fmt(sc.total)}</b>${sc.medal ? `<span class="medal">★ ${sc.medal.name}</span>` : ''}<em>${sc.newBest ? 'New best' : sc.best != null ? `Best ${fmt(sc.best)}` : ''}</em></div>
+        <div class="lines">${sc.lines.map(([l, p, dt]) => `<div class="${p ? '' : 'zero'}"><span>${l}${dt ? ` <i>${dt}</i>` : ''}</span><b>${p ? '+' + fmt(p) : '—'}</b></div>`).join('')}</div></div>`;
     modal.hidden = false;
     modal.innerHTML = `<div class="dialog">
       <h1 class="${r.win ? 'win' : 'lose'}">${r.win ? 'Victory' : 'The Deep has fallen'}</h1>
       <p class="sub">${r.reason}</p>
+      ${scoreHtml}
       <div class="stats">
         <div class="stat"><small>Duration</small><b>${mmss(r.time)}</b></div>
         <div class="stat"><small>Enemy killed</small><b>${fmt(totalK)}</b></div>

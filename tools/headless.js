@@ -8,7 +8,8 @@
 // --verify (run twice and compare state hashes). HORDE=n in the environment still works.
 import { pathToFileURL } from 'node:url';
 import { buildMap } from '../src/map.js';
-import { buildPreset, horde } from '../src/scenarios.js';
+import { buildPreset, horde, forceCost } from '../src/scenarios.js';
+import { scoreBattle } from '../src/score.js';
 import { Sim } from '../src/sim/sim.js';
 import { DEF, ORC } from '../src/config.js';
 import { autopilot } from './autopilot.js';
@@ -46,6 +47,7 @@ export function runBattle(cfg = {}) {
     }
   }
   const r = sim.result || { win: null, reason: 'time limit', time: sim.time };
+  const sc = sim.result && !sim.opt.sandbox ? scoreBattle(sim, { budget: setup.budget, spent: forceCost(setup.groups) }) : null;
   const round = (v, p = 2) => +v.toFixed(p);
   return {
     preset, seed, policy, win: r.win, reason: r.reason, t: round(r.time, 1), dawn: sim.opt.dawn,
@@ -54,6 +56,7 @@ export function runBattle(cfg = {}) {
     calls: pilot ? pilot.calls : {},
     cp: sim.opt.sandbox ? null : { earned: round(sim.cpStats.earned, 1), bounty: round(sim.cpStats.bounty, 1), spent: sim.cpStats.spent, left: round(sim.cp, 1) },
     lullS: sim.dir ? sim.dir.lullS : 0,
+    score: sc ? sc.total : null, medal: sc && sc.medal ? sc.medal.key : null,
     tickAvg: round(total / Math.max(1, sim.tick)), tickMax: round(worst, 1), hash: sim.hash(),
     stats: sim.stats,
   };
