@@ -1,7 +1,9 @@
 // WebGL2 renderer: a pitched orthographic ("isometric") 3D view.
 //  - terrain: a height-field mesh textured from a baked procedural albedo
 //  - fortress: one static mesh, rebuilt when a section is breached, casting a shadow map
-//  - units, vehicles, props, ordnance: instanced low-poly meshes with shader animation
+//  - units, vehicles, props, ordnance: instanced meshes with shader animation, drawn at one of
+//    four levels of detail chosen from the zoom (dots, boxes, blocky stand-ins, full models)
+//  - surfaces are textured from two generated material arrays (see materials.js)
 //  - particles: billboards / streaks / ground quads, depth-tested against the scene
 //  - corpses, craters and scorch marks are stamped into a persistent decal texture
 //  - optional post-processing: MSAA resolve, bloom, vignette
@@ -9,7 +11,8 @@
 import { WORLD_W, WORLD_H, UNITS, DEF, U, C, R } from '../config.js';
 import { HM_W, HM_H, MARGIN, GZ_W, HM_RES } from '../map.js';
 import { COLS, SPR } from './atlas.js';
-import { buildMeshes } from './mesh.js';
+import { buildModels } from './models/index.js';
+import { buildMaterials } from './materials.js';
 import { buildStructures } from './structures.js';
 import { viewMatrix, SIN_P, COS_P } from './camera.js';
 import { S_DONE, S_CLIMB, LADDER_TIME, TOWER_TIME } from '../sim/sim.js';
@@ -22,10 +25,17 @@ const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v
 // region covered by the shadow map: the fortress and its approaches
 const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
-// simulation unit type -> mesh name and drawing scale
-const MESH_OF = { rifle: ['rifle', 1.3], mg: ['mg', 1.3], marksman: ['marksman', 1.3], grenadier: ['grenadier', 1.3], at: ['at', 1.3], cmd: ['cmd', 1.4], mortar: ['mortar', 1.3], howitzer: ['howitzer', 1.15],
-  ifv: ['ifv', 1], tank: ['tank', 1], cache: ['cache', 1], crate: ['crate', 1], uruk: ['uruk', 1.3], archer: ['archer', 1.3], berserker: ['berserker', 1.4], sapper: ['sapper', 1.35], chief: ['chief', 1.6],
-  warg: ['warg', 1.35], troll: ['troll', 1.25], ladder: ['ladder', 1], ram: ['ram', 1.15], catapult: ['catapult', 1.15], tower: ['tower', 1] };
+// zoom (CSS px per metre) from which each level of detail applies, and where full models take over
+const DOT_ZOOM = 2.0, BOX_ZOOM = 3.4;
+const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
+// how linear light is scaled from the display-space mood colours in main.js
+const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
+
+// simulation unit type -> model names (one is picked per unit, for variety), drawing scale, and
+// whether individuals vary a little in height
+const MESH_OF = { rifle: [['rifle'], 1.3, 1], mg: [['mg'], 1.3, 1], marksman: [['marksman'], 1.3, 1], grenadier: [['grenadier'], 1.3, 1], at: [['at'], 1.3, 1], cmd: [['cmd'], 1.4, 0], mortar: [['mortar'], 1.3, 0], howitzer: [['howitzer'], 1.15, 0],
+  ifv: [['ifv'], 1, 0], tank: [['tank'], 1, 0], cache: [['cache'], 1, 0], crate: [['crate'], 1, 0], uruk: [['uruk', 'urukB', 'urukC'], 1.3, 1], archer: [['archer', 'archerB'], 1.3, 1], berserker: [['berserker', 'berserkerB'], 1.4, 1], sapper: [['sapper'], 1.35, 0], chief: [['chief'], 1.6, 0],
+  warg: [['warg'], 1.35, 1], troll: [['troll'], 1.25, 1], ladder: [['ladder'], 1, 0], ram: [['ram'], 1.15, 0], catapult: [['catapult'], 1.15, 0], tower: [['tower'], 1, 0] };
 const PROP_MESH = { wire: 'wire', av: 'hedgehog', moat: 'moat', mine: 'mine', claymore: 'claymore' };
 
 function compile(gl, vs, fs) {
@@ -58,6 +68,7 @@ export class Renderer {
     this.pPart = compile(gl, SH.VS_PART, SH.FS_PART);
     this.pStamp = compile(gl, SH.VS_STAMP, SH.FS_STAMP);
     this.pBake = compile(gl, SH.VS_FULL, SH.FS_BAKE);
+    this.timerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2');
     this.pBright = compile(gl, SH.VS_FULL, SH.FS_BRIGHT);
     this.pBlur = compile(gl, SH.VS_FULL, SH.FS_BLUR);
     this.pComp = compile(gl, SH.VS_FULL, SH.FS_COMPOSITE);
@@ -112,6 +123,7 @@ export class Renderer {
 
     const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
     this.texScale = maxTex >= 4096 ? 2 : 1;
+    this.mats = buildMaterials(gl, compile, SH.VS_FULL, this.vaoFull, 512);
     this._bakeTerrain();
     this._buildTerrainMesh();
 
@@ -125,17 +137,23 @@ export class Renderer {
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    // meshes
-    this.meshes = buildMeshes();
-    for (const name in this.meshes) this._initMesh(this.meshes[name]);
-    this.unitMesh = UNITS.map((d) => { const m = MESH_OF[d.key]; return m ? { mesh: this.meshes[m[0]], scale: m[1], turret: d.key === 'tank' ? this.meshes.tankTurret : d.key === 'ifv' ? this.meshes.ifvTurret : null } : null; });
+    // models
+    this.meshes = buildModels();
+    for (const name in this.meshes) this._initModel(this.meshes[name]);
+    this.unitMesh = UNITS.map((d) => {
+      const m = MESH_OF[d.key];
+      if (!m) return null;
+      // a variant that has not been modelled falls back to the first
+      const variants = m[0].map((n) => this.meshes[n]).filter(Boolean);
+      return { variants, scale: m[1], jitter: m[2], turret: d.key === 'tank' ? this.meshes.tankTurret : d.key === 'ifv' ? this.meshes.ifvTurret : null };
+    });
     this.struct = { vbo: gl.createBuffer(), vao: gl.createVertexArray(), vaoDepth: gl.createVertexArray(), count: 0 };
     this._meshAttribs(this.struct.vao, this.struct.vbo);
     gl.bindVertexArray(this.struct.vaoDepth);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.struct.vbo);
     gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
     gl.bindVertexArray(null);
-    this.structVersion = -1; this.propVersion = -1; this.propSim = null;
+    this.structVersion = -1; this.propVersion = -1; this.propSim = null; this.structCache = new Map();
 
     // shadow map
     this.shadowSize = Math.min(2048, maxTex);
@@ -150,12 +168,13 @@ export class Renderer {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowTex, 0);
     gl.drawBuffers([gl.NONE]); gl.readBuffer(gl.NONE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    this.shadowVP = this._lightMatrix();
+    this.shadowVP = this._lightMatrix(); this.shadowTexel = 1 / this.shadowSize;
 
     this.quality = 'high'; this.post = null;
     this.vp = new Float32Array(16);
     this.lpos = new Float32Array(24); this.lcol = new Float32Array(18);
-    this.stats = { units: 0, parts: 0 };
+    this.stats = { units: 0, parts: 0, dots: 0, tier: 0, draws: 0, tris: { terrain: 0, fort: 0, units: 0, shadows: 0, fx: 0 }, cpu: 0, gpu: {}, gpuOk: !!this.timerExt };
+    this.perfOn = false; this._queries = []; this._query = null; this.view = new Float32Array(3);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
@@ -187,17 +206,25 @@ export class Renderer {
     for (const [loc, n, type, norm, off] of at) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, n, type, norm, ISTRIDE, off); gl.vertexAttribDivisor(loc, 1); }
   }
 
-  _initMesh(m) {
+  /** GPU buffers for a model: one instance list shared by its levels of detail (plus one for static props). */
+  _initModel(m) {
     const gl = this.gl;
     m.cap = 256; m.n = 0;
     m.idata = new ArrayBuffer(m.cap * ISTRIDE); m.f = new Float32Array(m.idata); m.u8 = new Uint8Array(m.idata);
     m.ibuf = gl.createBuffer(); m.pbuf = gl.createBuffer(); m.pn = 0;
-    for (const [geo, key, pkey] of [[m, 'vao', 'pvao'], [m.lod, 'vaoLod', 'pvaoLod']]) {
+    for (const geo of [m.full, m.mid, m.lod]) {
+      if (!geo) continue;
       const vbo = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
       gl.bufferData(gl.ARRAY_BUFFER, geo.data, gl.STATIC_DRAW);
-      m[key] = gl.createVertexArray(); this._meshAttribs(m[key], vbo); this._instAttribs(m.ibuf);
-      m[pkey] = gl.createVertexArray(); this._meshAttribs(m[pkey], vbo); this._instAttribs(m.pbuf);
+      let ibo = null;
+      if (geo.index) { ibo = gl.createBuffer(); geo.itype = geo.index instanceof Uint32Array ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT; geo.n = geo.index.length; } else geo.n = geo.count;
+      for (const [key, ibuf] of [['vao', m.ibuf], ['pvao', m.pbuf]]) {
+        geo[key] = gl.createVertexArray(); this._meshAttribs(geo[key], vbo); this._instAttribs(ibuf);
+        if (ibo) gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+      }
+      if (ibo) gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, geo.index, gl.STATIC_DRAW);
+      geo.data = null; // the GPU has it now
     }
     gl.bindVertexArray(null);
   }
@@ -286,7 +313,7 @@ export class Renderer {
 
   _updateStructures(sim) {
     const gl = this.gl;
-    const mesh = buildStructures(this.map, sim.segs);
+    const mesh = buildStructures(this.map, sim.segs, this.structCache);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.struct.vbo);
     gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.DYNAMIC_DRAW);
     this.struct.count = mesh.count;
@@ -362,16 +389,16 @@ export class Renderer {
 
   setQuality(q) { this.quality = q; }
 
-  _ensurePost(w, h) {
+  _ensurePost(w, h, want) {
     const gl = this.gl;
-    if (this.post && this.post.w === w && this.post.h === h) return this.post;
+    if (this.post && this.post.w === w && this.post.h === h && this.post.want === want) return this.post;
     if (this.post) {
       const p = this.post;
       gl.deleteFramebuffer(p.msFbo); gl.deleteRenderbuffer(p.msColor); gl.deleteRenderbuffer(p.msDepth); gl.deleteFramebuffer(p.resFbo); gl.deleteTexture(p.resTex);
       for (const b of p.bloom) { gl.deleteFramebuffer(b.fbo); gl.deleteTexture(b.tex); }
     }
-    const samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES));
-    const p = { w, h };
+    const samples = Math.min(want, gl.getParameter(gl.MAX_SAMPLES));
+    const p = { w, h, want };
     p.msFbo = gl.createFramebuffer(); p.msColor = gl.createRenderbuffer(); p.msDepth = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, p.msColor); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.RGBA8, w, h);
     gl.bindRenderbuffer(gl.RENDERBUFFER, p.msDepth); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.DEPTH_COMPONENT24, w, h);
@@ -409,21 +436,30 @@ export class Renderer {
     const gl = this.gl;
     gl.uniformMatrix4fv(u.uVP, false, this.vp);
     if (u.uSun) gl.uniform3fv(u.uSun, SUN);
-    if (u.uSunCol) gl.uniform3fv(u.uSunCol, env.sun);
-    if (u.uAmb) gl.uniform3fv(u.uAmb, env.amb);
+    // mood colours are authored in display space; the shaders light in linear space
+    if (u.uSunCol) gl.uniform3f(u.uSunCol, env.sun[0] * env.sun[0] * SUN_GAIN, env.sun[1] * env.sun[1] * SUN_GAIN, env.sun[2] * env.sun[2] * SUN_GAIN);
+    if (u.uAmb) gl.uniform3f(u.uAmb, env.amb[0] * env.amb[0] * AMB_GAIN, env.amb[1] * env.amb[1] * AMB_GAIN, env.amb[2] * env.amb[2] * AMB_GAIN);
+    if (u.uView) gl.uniform3fv(u.uView, this.view);
+    if (u.uWet) gl.uniform1f(u.uWet, env.wet || 0);
+    if (u.uExposure) gl.uniform1f(u.uExposure, EXPOSURE);
     if (u.uFog) gl.uniform3fv(u.uFog, env.fog);
     if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 60, 330);
-    if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
+    if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.uniform1f(u.uShadowTexel, this.shadowTexel); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
     if (u.uLPos) { gl.uniform4fv(u.uLPos, this.lpos); gl.uniform3fv(u.uLCol, this.lcol); }
     if (u.uDecal) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.decalTex); gl.uniform1i(u.uDecal, 1); }
+    if (u.uMatA) {
+      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.mats.a); gl.uniform1i(u.uMatA, 4);
+      gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.mats.b); gl.uniform1i(u.uMatB, 5);
+      gl.uniform1fv(u.uMatScale, this.mats.scale); gl.uniform3fv(u.uMatMean, this.mats.mean);
+    }
   }
 
-  _scene(env, detail) {
+  _scene(env) {
     const gl = this.gl;
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
     let p = this.pTerrain;
     gl.useProgram(p.p); this._common(p.u, env);
-    gl.uniform4fv(p.u.uAlbRect, this.albRect); gl.uniform1f(p.u.uDetail, detail); gl.uniform1f(p.u.uTime, this.clock || 0);
+    gl.uniform4fv(p.u.uAlbRect, this.albRect); gl.uniform1f(p.u.uTime, this.clock || 0);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.albedo); gl.uniform1i(p.u.uAlbedo, 0);
     gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.hmTex); gl.uniform1i(p.u.uHM, 3);
     gl.bindVertexArray(this.terrain.vao);
@@ -432,27 +468,61 @@ export class Renderer {
     gl.useProgram(p.p); this._common(p.u, env);
     gl.bindVertexArray(this.struct.vao);
     gl.drawArrays(gl.TRIANGLES, 0, this.struct.count);
+    const st = this.stats; st.tris.terrain = this.terrain.count / 3; st.tris.fort = this.struct.count / 3; st.draws += 2;
   }
 
-  _drawMeshes(env, clock, lod, shadowPass, props) {
-    const gl = this.gl, p = this.pUnit;
+  /** Which geometry a model is drawn with at a level of detail (0 full, 1 stand-in, 2 box, 3 far). */
+  _geo(m, tier, shadow, props) {
+    if (props) return tier === 0 ? m.full : m.mid || m.full;
+    if (tier === 0) return shadow ? m.mid || m.full : m.full;
+    if (tier === 1 || m.big) return m.mid || m.full;
+    return m.lod;
+  }
+
+  _drawMeshes(env, clock, tier, shadowPass, props) {
+    const gl = this.gl, p = this.pUnit, st = this.stats;
     gl.useProgram(p.p); this._common(p.u, env);
     gl.uniform1f(p.u.uTime, clock); gl.uniform1f(p.u.uShadowPass, shadowPass ? 1 : 0); gl.uniform1f(p.u.uLift, env.lift);
     for (const name in this.meshes) {
       const m = this.meshes[name], n = props ? m.pn : m.n;
       if (!n) continue;
-      const big = m.bbox[4] > 3.2 || m.bbox[1] - m.bbox[0] > 4;
-      const useLod = lod && !big && !props;
       if (shadowPass && (name === 'moat' || name === 'mine' || name === 'cube')) continue;
-      const a = m.anim;
-      gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]);
-      gl.bindVertexArray(props ? (useLod ? m.pvaoLod : m.pvao) : useLod ? m.vaoLod : m.vao);
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, useLod ? m.lod.count : m.count, n);
+      const geo = this._geo(m, tier, shadowPass, props), a = m.anim;
+      gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]); gl.uniform1f(p.u.uLegX, a[9]);
+      gl.uniform1f(p.u.uMatOn, geo === m.full ? 1 : 0);   // stand-ins are too small on screen for texture to show
+      gl.bindVertexArray(props ? geo.pvao : geo.vao);
+      if (geo.itype) gl.drawElementsInstanced(gl.TRIANGLES, geo.n, geo.itype, 0, n); else gl.drawArraysInstanced(gl.TRIANGLES, 0, geo.n, n);
+      st.draws++; if (shadowPass) st.tris.shadows += (geo.n / 3) * n; else st.tris.units += (geo.n / 3) * n;
     }
+  }
+
+  // ------------------------------------------------------------ GPU timing
+  /** Start timing a named stretch of the frame on the GPU (only while the performance overlay is up). */
+  _time(name) {
+    const gl = this.gl, ext = this.timerExt;
+    if (!ext || !this.perfOn) return;
+    if (this._query) { gl.endQuery(ext.TIME_ELAPSED_EXT); this._query = null; }
+    if (!name) return;
+    const q = gl.createQuery();
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+    this._query = q; this._queries.push({ name, q });
+  }
+  _collectTimes() {
+    const gl = this.gl, ext = this.timerExt;
+    if (!ext) return;
+    const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT), g = this.stats.gpu;
+    while (this._queries.length && this._queries[0].q !== this._query) {
+      const { name, q } = this._queries[0];
+      if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
+      if (!disjoint) { const ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; g[name] = g[name] == null ? ms : g[name] * 0.9 + ms * 0.1; }
+      gl.deleteQuery(q); this._queries.shift();
+    }
+    if (!this.perfOn && !this._queries.length) for (const k in g) delete g[k];
   }
 
   _drawParticles(n, minPx, tint, zoom, vw, vh) {
     if (!n) return;
+    this.stats.draws++; this.stats.tris.fx += n * 2;
     const gl = this.gl, p = this.pPart;
     gl.useProgram(p.p);
     gl.uniformMatrix4fv(p.u.uVP, false, this.vp);
@@ -470,12 +540,16 @@ export class Renderer {
    * @param env  {amb, sun, fog: [r,g,b], lift, flash, shadows}
    */
   render(cam, sim, fx, al, env, clock) {
-    const gl = this.gl, vw = this.canvas.width, vh = this.canvas.height;
+    const gl = this.gl, vw = this.canvas.width, vh = this.canvas.height, st = this.stats, t0 = performance.now();
     this.clock = clock;
+    st.draws = 0; st.tris.units = st.tris.shadows = st.tris.fx = 0;
+    this._collectTimes();
     if (sim && sim.structVersion !== this.structVersion) { this.structVersion = sim.structVersion; this._updateStructures(sim); }
     if (sim && (sim !== this.propSim || sim.propVersion !== this.propVersion)) { this.propSim = sim; this.propVersion = sim.propVersion; this._updateProps(sim); }
     if (fx) this._flushDecals(fx);
     viewMatrix(cam, vw, vh, SIN_P, COS_P, this.vp);
+    // direction from the scene toward the (orthographic) camera
+    this.view[0] = -Math.sin(cam.yaw) * COS_P; this.view[1] = Math.cos(cam.yaw) * COS_P; this.view[2] = SIN_P;
 
     // brightest few flashes become real lights
     this.lpos.fill(0); this.lcol.fill(0);
@@ -484,45 +558,50 @@ export class Renderer {
       for (let i = ls.length - 1; i >= 0 && k < 6; i--) {
         const l = ls[i], f = Math.max(0, l.life / l.max);
         this.lpos[k * 4] = l.x; this.lpos[k * 4 + 1] = l.y; this.lpos[k * 4 + 2] = l.z; this.lpos[k * 4 + 3] = l.rad;
-        this.lcol[k * 3] = l.r * f; this.lcol[k * 3 + 1] = l.g * f; this.lcol[k * 3 + 2] = l.b * f; k++;
+        this.lcol[k * 3] = l.r * l.r * f; this.lcol[k * 3 + 1] = l.g * l.g * f; this.lcol[k * 3 + 2] = l.b * l.b * f; k++;
       }
     }
 
-    const hq = this.quality === 'high';
-    const post = hq ? this._ensurePost(vw, vh) : null;
+    const q = this.quality;
+    const post = q === 'low' ? null : this._ensurePost(vw, vh, q === 'high' ? 4 : 2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, post ? post.msFbo : null);
     gl.viewport(0, 0, vw, vh);
     gl.depthMask(true);
     gl.clearColor(env.fog[0], env.fog[1], env.fog[2], 1); gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const zc = cam.zoom / (cam.dpr || 1);
-    this._scene(env, Math.min(0.4, Math.max(0, (zc - 2) * 0.06)));
+    this._time('scene');
+    this._scene(env);
 
     let dots = 0;
+    this._time('units');
     if (sim) {
       for (const name in this.meshes) this.meshes[name].n = 0;
-      const lod = zc < 2.0 ? 2 : zc < 3.4 ? 1 : 0;
-      dots = this._fillUnits(cam, sim, al, vw, vh, lod, clock, env.lift > 0.12);
+      const tier = zc < DOT_ZOOM ? 3 : zc < BOX_ZOOM ? 2 : zc < HERO_ZOOM[q] ? 1 : 0;
+      st.tier = tier;
+      dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
       this._fillDynamic(sim, fx, al, clock);
       for (const name in this.meshes) { const m = this.meshes[name]; if (m.n) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf); gl.bufferData(gl.ARRAY_BUFFER, m.u8.subarray(0, m.n * ISTRIDE), gl.DYNAMIC_DRAW); } }
       gl.disable(gl.BLEND);
-      this._drawMeshes(env, clock, lod > 0, false, true);
-      if (env.shadows && lod < 2) {
+      this._drawMeshes(env, clock, tier, false, true);
+      if (env.shadows && tier < 3) {
         gl.enable(gl.BLEND); gl.depthMask(false);
-        this._drawMeshes(env, clock, lod > 0, true, false);
+        this._drawMeshes(env, clock, tier, true, false);
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
-      this._drawMeshes(env, clock, lod > 0, false, false);
+      this._drawMeshes(env, clock, tier, false, false);
     }
+    this._time('effects');
     gl.enable(gl.BLEND); gl.depthMask(false);
     if (dots) this._drawParticles(dots, 2.6, [1, 1, 1], cam.zoom, vw, vh);
     if (fx) {
       const n = fx.fill(this.partF, this.partU, this.partMax, sim);
-      this.stats.parts = n;
+      st.parts = n;
       this._drawParticles(n, 1.6, [env.amb[0] * 0.6 + 0.4, env.amb[1] * 0.6 + 0.4, env.amb[2] * 0.6 + 0.4], cam.zoom, vw, vh);
     }
     gl.depthMask(true); gl.disable(gl.BLEND);
 
+    this._time('post');
     if (post) {
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, post.msFbo); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, post.resFbo);
       gl.blitFramebuffer(0, 0, vw, vh, 0, 0, vw, vh, gl.COLOR_BUFFER_BIT, gl.NEAREST);
@@ -535,11 +614,14 @@ export class Renderer {
       this._pass(this.pBlur, b.tex, a, (u) => gl.uniform2f(u.uDir, 0, 2 / a.h));
       this._pass(this.pComp, post.resTex, null, (u) => { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, a.tex); gl.uniform1i(u.uBloom, 1); gl.uniform1f(u.uBloomK, 0.85); gl.uniform1f(u.uFlash, env.flash || 0); });
       gl.enable(gl.DEPTH_TEST);
+      st.draws += 6;
     }
+    this._time(null);
+    st.cpu = st.cpu * 0.9 + (performance.now() - t0) * 0.1;
   }
 
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
-  _fillUnits(cam, sim, al, vw, vh, lod, clock, torches) {
+  _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
     const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, tx, ty, target2 } = sim;
     const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
     const hw = vw / 2 + 60, hh = vh / 2 + 120;
@@ -580,7 +662,7 @@ export class Renderer {
           PFv[o + 8] = 1; PFv[o + 9] = 2; PFv[o + 10] = 0; PFv[o + 11] = 0; PFv[o + 12] = 0;
         }
       }
-      if (lod === 2 && d.size < 7) {
+      if (tier === 3 && d.size < 7) {
         // far view: a coloured dot. cyan = armed defender, amber = out of ammunition, red = attacker
         const o = dots * PF;
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + 1; PFv[o + 3] = d.size * 0.42; PFv[o + 4] = d.size * 0.42; PFv[o + 5] = 0; PFv[o + 6] = SPR.dot;
@@ -592,7 +674,10 @@ export class Renderer {
         dots++;
         continue;
       }
-      const m = d.role === R.LADDER && st === S_DONE ? this.meshes.ladderUp : um_i.mesh;
+      const vs = um_i.variants, h2 = Math.imul(i, 2246822519) >>> 20;
+      const m = d.role === R.LADDER && st === S_DONE ? this.meshes.ladderUp : vs.length > 1 ? vs[h2 % vs.length] : vs[0];
+      // no two soldiers stand quite the same height or wear quite the same shade
+      const sc = um_i.jitter ? um_i.scale * (0.95 + ((h2 >> 4) & 31) * 0.0034) : um_i.scale;
       const v = 200 + (h % 56);
       const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
       const walk = st === S_CLIMB ? 200 : sp > 0.3 ? Math.min(255, sp * 80) | 0 : 0;
@@ -602,8 +687,8 @@ export class Renderer {
       if (d.role === R.TOWER) atk = st === S_DONE ? 255 : 0;
       else { const ft = time - fireT[i], dur = d.team === DEF ? 0.16 : d.role === R.CATAPULT ? 1.2 : d.role === R.RAM ? 0.7 : 0.38; if (ft < dur) atk = ((1 - ft / dur) * 255) | 0; }
       // mid-distance stand-ins are tinted by side so the two armies still read at a glance
-      if (lod === 1 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, um_i.scale, phase, 120, 200, 235, flash, walk, atk, 0); else this._put(m, xi, yi, zi, yaw, um_i.scale, phase, v, 92, 74, flash, walk, atk, 0); }
-      else this._put(m, xi, yi, zi, yaw, um_i.scale, phase, v, v, v, flash, walk, atk, 0);
+      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
+      else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0);
       if (um_i.turret) this._put(um_i.turret, xi, yi, zi, trot[i], um_i.scale, 0, v, v, v, flash, 0, atk, 0);
     }
     this.stats.units = drawn; this.stats.dots = dots;
@@ -656,7 +741,8 @@ export class Renderer {
     viewMatrix({ x: WORLD_W / 2, y: WORLD_H / 2, zoom: w / WORLD_W, yaw: 0 }, w, h, 1, 0, this.vp);
     this.vp[1] = -this.vp[1]; this.vp[5] = -this.vp[5]; this.vp[9] = -this.vp[9]; this.vp[13] = -this.vp[13];
     this.lpos.fill(0); this.lcol.fill(0);
-    this._scene({ amb: [0.75, 0.75, 0.75], sun: [0.5, 0.5, 0.48], fog: [0.1, 0.1, 0.1], shadows: true, lift: 0 }, 0);
+    this.view[0] = 0; this.view[1] = 0; this.view[2] = 1;
+    this._scene({ amb: [0.75, 0.75, 0.75], sun: [0.5, 0.5, 0.48], fog: [0.1, 0.1, 0.1], shadows: true, lift: 0, wet: 0 });
     const px = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);

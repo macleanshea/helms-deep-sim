@@ -8,6 +8,7 @@ import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { drawAtlas } from './render/atlas.js';
 import { Renderer } from './render/renderer.js';
+import { Perf } from './render/perf.js';
 import { toScreen, toGround, pick, SIN_P, DEFAULT_YAW } from './render/camera.js';
 import { Fx } from './render/fx.js';
 import { Audio } from './audio.js';
@@ -76,7 +77,7 @@ function fitCamera() {
 }
 function clampCam() {
   const c = app.cam;
-  c.zoom = Math.max(fitZoom() * 0.8, Math.min(18, c.zoom));
+  c.zoom = Math.max(fitZoom() * 0.8, Math.min(36, c.zoom));
   c.x = Math.max(-120, Math.min(WORLD_W + 120, c.x)); c.y = Math.max(-120, Math.min(WORLD_H + 120, c.y));
 }
 function zoomAt(sx, sy, f) {
@@ -87,7 +88,7 @@ function zoomAt(sx, sy, f) {
   clampCam();
 }
 function resize() {
-  dpr = Math.min(renderer.quality === 'high' ? 2 : 1.25, window.devicePixelRatio || 1);
+  dpr = Math.min(renderer.quality === 'high' ? 2 : renderer.quality === 'medium' ? 1.5 : 1.25, window.devicePixelRatio || 1);
   vw = window.innerWidth; vh = window.innerHeight;
   renderer.resize(Math.round(vw * dpr), Math.round(vh * dpr));
   overlay.width = Math.round(vw * dpr); overlay.height = Math.round(vh * dpr);
@@ -494,6 +495,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (k === '?' || (k === '/' && e.shiftKey)) { ui.showHelp(); return; }
+  if (k === 'f2' || k === '`') { e.preventDefault(); perf.toggle(); return; }
   if (k === 'home') { app.cam.yaw = DEFAULT_YAW; fitCamera(); return; }
   if (app.mode === 'battle' && app.sim.result) { if (k === 'enter') ui.showEnd(app.sim); return; }
   if (app.mode === 'setup') {
@@ -1057,10 +1059,13 @@ function frame(now) {
   last = now;
   app.clock += rdt;
 
-  // step down to the cheaper render path if this machine cannot hold 30 fps with the full one
-  if (!params.has('q') && renderer.quality === 'high') {
+  // step down a quality level whenever this machine cannot hold 30 fps at the current one
+  if (!params.has('q') && !params.has('bench') && renderer.quality !== 'low') {
     if (rdt > 0.036) slowFrames++; else fastFrames++;
-    if (slowFrames + fastFrames >= 90) { if (slowFrames > 55) { renderer.setQuality('low'); resize(); ui.toast('Switched to performance rendering to keep the frame rate up.'); } slowFrames = fastFrames = 0; }
+    if (slowFrames + fastFrames >= 90) {
+      if (slowFrames > 55) { renderer.setQuality(renderer.quality === 'high' ? 'medium' : 'low'); resize(); ui.toast(renderer.quality === 'medium' ? 'Switched to balanced rendering to keep the frame rate up.' : 'Switched to performance rendering to keep the frame rate up.'); }
+      slowFrames = fastFrames = 0;
+    }
   }
 
   // keyboard pan and rotate
@@ -1083,7 +1088,7 @@ function frame(now) {
   fx.view.x = cam.x; fx.view.y = cam.y; fx.view.zoom = cam.zoom; fx.view.cy = Math.cos(cam.yaw); fx.view.sy = Math.sin(cam.yaw);
   fx.view.rad = Math.hypot(vw / 2, vh / 2 / SIN_P) / cam.zoom + 40;
 
-  let alpha = 1, simDt = 0;
+  let alpha = 1, simDt = 0, simMs = 0;
   const halted = app.paused || ui.modalOpen(); // the battle waits while a dialog is up
   if (app.mode === 'battle') {
     // a breath of slow motion when something momentous happens
@@ -1098,6 +1103,7 @@ function frame(now) {
         sim.step(); app.acc -= DT; ticks++; simDt += DT;
         if (performance.now() - t0 > 15) break;
       }
+      simMs = performance.now() - t0;
       if (app.acc > DT * 2) app.acc = DT; // can't keep up: drop the backlog rather than spiral
       alpha = Math.min(1, app.acc / DT);
       fx.update(Math.min(0.25, rdt * app.speed * scale));
@@ -1148,12 +1154,14 @@ function frame(now) {
   if (app.bolt >= 0) { app.bolt += rdt; const b = app.bolt; bolt = b < 0.07 ? 1 : b < 0.15 ? 0.15 : b < 0.24 ? 0.7 : Math.max(0, 0.7 - (b - 0.24) * 2.4); if (b > 0.6) app.bolt = -1; }
   for (let q = 0; q < 3; q++) { env.amb[q] = base.amb[q] + bolt * [0.5, 0.55, 0.75][q]; env.sun[q] = base.sun[q] + bolt * [0.7, 0.75, 0.95][q]; env.fog[q] = base.fog[q] + bolt * 0.08; }
   env.flash = bolt * 0.07;
+  env.wet = app.mode === 'battle' ? Math.max(0, Math.min(1, (0.44 - base.amb[0]) * 6)) : 0;   // it rains through the night
 
   const sh = fx.shake, shk = sh ? (sh * 2.2) / Math.max(0.6, cam.zoom * 0.5) : 0;
   const rcam = { x: cam.x + Math.sin(app.clock * 71) * shk, y: cam.y + Math.cos(app.clock * 83) * shk, zoom: cam.zoom * dpr, yaw: cam.yaw, dpr };
   renderer.render(rcam, sim, app.mode === 'battle' ? fx : null, alpha, env, app.clock);
   if (app.selection.length) app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);
   drawOverlay(rdt);
+  perf.frame(rdt, simMs);
 
   hudT += rdt;
   if (hudT > 0.12) {
@@ -1165,7 +1173,10 @@ function frame(now) {
 }
 
 // -------------------------------------------------------------------- boot
-if (params.has('q')) renderer.setQuality(params.get('q') === 'low' ? 'low' : 'high');
+if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
+const perf = new Perf(app, renderer);
+app.keepCentre = [KEEP.cx, KEEP.cy];
+app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 ui = buildUI(app, atlas);
 ui.refreshPresets(loadBest());
 resize();
@@ -1176,4 +1187,6 @@ if (!localStorage.getItem('hd-seen-help-3')) { localStorage.setItem('hd-seen-hel
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };
-window.__app = app; window.__renderer = renderer; window.__fx = fx;
+window.__app = app; window.__renderer = renderer; window.__fx = fx; window.__perf = perf;
+if (params.has('perf')) perf.toggle(true);
+if (params.has('bench')) setTimeout(() => perf.bench(), 500);
