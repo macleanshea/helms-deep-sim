@@ -3,7 +3,8 @@
 
 import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS } from './config.js';
 import { buildMap, KEEP } from './map.js';
-import { buildPreset, makeGroup, groupPositions, groupBounds, PRESETS } from './scenarios.js';
+import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
+import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { drawAtlas } from './render/atlas.js';
 import { Renderer } from './render/renderer.js';
@@ -49,6 +50,8 @@ const app = {
   bolt: -1, nextBolt: 14,
   mouse: { sx: 0, sy: 0, wx: 0, wy: 0, wz: 0, inside: false },
   drag: null, keys: new Set(),
+  alerts: [], alertIdx: 0, alertKeyT: -9,
+  groups: {}, lastClick: { t: -9, type: -1 }, groupTap: { k: '', t: -9 },
 };
 let ui;
 let dpr = 1, vw = 1, vh = 1;
@@ -112,6 +115,30 @@ app.loadPreset = (key) => {
   const p = PRESETS.find((q) => q.key === key);
   if (p) ui.toast(p.blurb);
 };
+/** Challenge <-> sandbox. Going back to a challenge restores the scenario's enemy and options; the garrison is kept. */
+app.setSandbox = (on) => {
+  if (on) app.setup.options.sandbox = true;
+  else {
+    const fresh = buildPreset(map, app.presetKey);
+    if (fresh.options.sandbox) { ui.toast('A blank map has no scenario to be challenged on.', 'warn'); return; }
+    app.setup = { groups: [...app.setup.groups.filter((g) => g.team === DEF), ...fresh.groups.filter((g) => g.team === ORC)], options: fresh.options, budget: fresh.budget };
+  }
+  app.selGroup = null; app.tool = null;
+  ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
+  rebuildPreview();
+  ui.toast(on ? 'Sandbox: build both sides freely. Battles are not scored.' : 'Challenge: the scenario\'s enemy and options are restored.');
+};
+app.optionsChanged = () => { app.previewDirty = true; };
+/** Sandbox: replace the generated horde with a fresh one of n, in waves. Hand-placed attackers stay. */
+app.raiseHorde = (n) => {
+  app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n));
+  app.selGroup = null;
+  groupsChanged(); ui.refreshPalette();
+  const w = new Set(app.setup.groups.filter((g) => g.phase != null).map((g) => g.phase)).size;
+  ui.toast(`A horde of ${fmt(n)} in ${w} waves: the vanguard is on the field, the rest wait beyond the valley mouth.`);
+};
+const BEST_KEY = 'hd-best-v1';
+const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch { return {}; } };
 app.selectPlaceTool = (type) => {
   app.tool = type ? { kind: 'place', type } : null;
   app.selGroup = null;
@@ -138,7 +165,9 @@ app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !
 
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
+  const lockOrc = !app.setup.options.sandbox;
   for (const g of app.setup.groups) {
+    if (g.phase > 0 || (lockOrc && g.team === ORC)) continue; // later waves are beyond the valley mouth; a challenge's enemy is fixed
     const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
     const dx = wx - g.x, dy = wy - g.y;
     const a = dx * ux + dy * uy, p = -dx * uy + dy * ux;
@@ -153,16 +182,22 @@ app.startBattle = () => {
   audio.unlock();
   const real = (g, team) => g.team === team && UNITS[U[g.type]].cls !== C.OBST;
   if (!app.setup.groups.some((g) => real(g, DEF)) || !app.setup.groups.some((g) => real(g, ORC))) { ui.toast('Place at least one defender and one attacker first.', 'warn'); audio.play('deny'); return; }
+  const spent = forceCost(app.setup.groups);
+  if (!app.setup.options.sandbox && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} over its requisition budget. Remove something, or switch to Sandbox.`, 'warn'); audio.play('deny'); return; }
+  app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
   app.sim = new Sim(map, app.setup, fx);
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
   app.overlay.zones = false; app.overlay.ranges = false; app.artyPanel = false; rangeCache.t = -1; ui.setOverlayKey(null);
   app.tool = null; app.selGroup = null; app.selection = []; app.markers = []; app.drag = null; app.bolt = -1; app.nextBolt = 10;
+  app.alerts = []; app.alertIdx = 0; app.groups = {};
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
-  ui.toast('The horde advances in waves. Space pauses; number keys call support.');
+  const wi0 = app.sim.waveInfo();
+  ui.toast(wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
+  app.skip = null;
   audio.horn();
   mmBase = null;
   ui.updateHud();
@@ -175,21 +210,31 @@ app.backToSetup = () => {
   rebuildPreview(); fitCamera();
   ui.refreshRoster(); ui.refreshPalette(); ui.refreshInspector();
 };
-app.setSpeed = (s) => { if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
+app.setSpeed = (s) => { app.skip = null; if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
+/** Run at full speed through a quiet spell, back to the old pace when the next wave makes contact. */
+app.skipAhead = () => {
+  if (app.mode !== 'battle' || app.sim.result) return;
+  if (app.skip) { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); return; }
+  const wi = app.sim.waveInfo();
+  if (!wi || (wi.phase !== 'lull' && wi.phase !== 'approach')) { ui.toast('Nothing to skip: the enemy is at the wall.', 'warn'); return; }
+  app.skip = { speed: app.speed, alerts: app.alerts.length }; app.speed = 8; app.paused = false;
+  ui.toast('Fast-forwarding to the next contact — any key or alarm stops it.');
+  ui.updateHud();
+};
 app.toggleMute = () => { audio.unlock(); audio.setMuted(!audio.muted); return audio.muted; };
 app.toggleLosses = () => { app.showLosses = !app.showLosses; ui.updateHud(); };
 app.armSupport = (k) => {
   if (app.mode !== 'battle' || app.sim.result) return;
   const s = app.sim.support[k];
   if (app.tool && app.tool.kind === 'support' && app.tool.name === k) { app.tool = null; ui.hint(null); return; }
-  if (s.left <= 0) { ui.toast(`No ${SUPPORT[k].name.toLowerCase()} left.`, 'warn'); audio.play('deny'); return; }
+  if (!app.sim.affordSupport(k)) { ui.toast(app.sim.opt.sandbox ? `No ${SUPPORT[k].name.toLowerCase()} left.` : `${SUPPORT[k].name} costs ${s.cost} Command Points — you have ${Math.floor(app.sim.cp)}.`, 'warn'); audio.play('deny'); return; }
   if (app.sim.time < s.ready) { ui.toast(`${SUPPORT[k].name} ready in ${Math.ceil(s.ready - app.sim.time)} s.`, 'warn'); audio.play('deny'); return; }
   app.tool = { kind: 'support', name: k };
   audio.play('click');
   ui.hint(`<b>${SUPPORT[k].name}</b> — ${k === 'air' ? 'click a target, or drag to set the attack heading' : 'click the target'} · right-click to cancel`);
 };
 app.armFocus = () => {
-  if (app.mode !== 'battle') return;
+  if (app.mode !== 'battle' || app.sim.result) return;
   if (app.sim.focus) { app.sim.clearFocus(); ui.toast('Focus fire lifted.'); return; }
   if (app.tool && app.tool.kind === 'focus') { app.tool = null; ui.hint(null); return; }
   app.tool = { kind: 'focus' };
@@ -227,11 +272,71 @@ app.artyOrder = (groups, mode) => {
   audio.play('click'); ui.updateHud();
 };
 app.toggleOverlay = (k) => { app.overlay[k] = !app.overlay[k]; rangeCache.t = -1; audio.play('click'); ui.updateHud(); };
-app.retreat = () => {
+/** Fall back to the keep: the whole garrison, or (selected = true) only the troops now selected. */
+app.retreat = (selected) => {
   if (app.mode !== 'battle' || app.sim.result) return;
+  if (selected && app.selection.length) {
+    const n = app.sim.orderRetreat(app.selection);
+    if (!n) { ui.toast('Those troops are already inside the Hornburg, or cannot move.'); return; }
+    audio.play('confirm'); ui.toast(`${fmt(n)} falling back to the keep. The rest hold.`, 'warn');
+    app.markers.push({ x: KEEP.cx, y: KEEP.cy, z: 12, r: KEEP.r + 8, t: 0, dur: 4, col: '94,200,242', label: 'FALL BACK' });
+    return;
+  }
   const n = app.sim.orderRetreat();
   if (!n) ui.toast('Everyone is already inside the Hornburg.');
   else { audio.horn(); app.markers.push({ x: KEEP.cx, y: KEEP.cy, z: 12, r: KEEP.r + 8, t: 0, dur: 6, col: '94,200,242', label: 'FALL BACK' }); }
+};
+// ---- fire discipline and control groups
+const STANCES = [[0, 'Fire at will'], [150, 'Hold fire to 150 m'], [75, 'Hold fire to 75 m'], [-1, 'Hold fire']];
+app.stanceName = (v) => (STANCES.find((q) => q[0] === v) || STANCES[0])[1];
+app.cycleStance = () => {
+  if (app.mode !== 'battle' || app.sim.result || !app.selection.length) return;
+  const cur = app.sim.holdR[app.selection[0]];
+  const nx = STANCES[(STANCES.findIndex((q) => q[0] === cur) + 1) % STANCES.length];
+  app.sim.setStance(app.selection, nx[0]);
+  audio.play('click'); ui.toast(`${fmt(app.selection.length)} selected: ${nx[1].toLowerCase()}.`, nx[0] ? 'warn' : 'good');
+  ui.updateHud();
+};
+const liveGroup = (key) => (app.groups[key] || []).filter((u) => app.sim.alive[u.i] && app.sim.gen[u.i] === u.g && app.sim.team[u.i] === DEF);
+app.groupCount = (key) => liveGroup(key).length;
+app.assignGroup = (key) => {
+  if (!app.selection.length) { delete app.groups[key]; ui.updateHud(); return; }
+  app.groups[key] = app.selection.map((i) => ({ i, g: app.sim.gen[i] }));
+  audio.play('click'); ui.toast(`Group ${key}: ${fmt(app.selection.length)} assigned.`);
+  ui.updateHud();
+};
+app.recallGroup = (key) => {
+  const live = liveGroup(key);
+  app.groups[key] = live;
+  if (!live.length) return;
+  app.selection = live.map((u) => u.i);
+  // a second tap looks at them
+  if (app.groupTap.k === key && app.clock - app.groupTap.t < 0.4) {
+    let x = 0, y = 0; for (const u of live) { x += app.sim.x[u.i]; y += app.sim.y[u.i]; }
+    app.jumpTo(x / live.length, y / live.length);
+  }
+  app.groupTap = { k: key, t: app.clock };
+  audio.play('click'); ui.updateHud();
+};
+
+// ---- alerts: anything the sim reports with a position can be pinged and jumped to
+app.jumpTo = (x, y) => { app.cam.x = x; app.cam.y = y; clampCam(); };
+function noteAlert(e) {
+  app.alerts.push({ x: e.x, y: e.y, t: app.clock, cls: e.cls || '', text: e.text });
+  if (app.alerts.length > 20) app.alerts.shift();
+  app.alertIdx = 0;
+  if (e.cls === 'bad' || e.cls === 'warn') { audio.play('alert', e.cls === 'bad' ? 1 : 0.55, 0); marker(e.x, e.y, 14, 5, e.cls === 'bad' ? '255,110,90' : '240,179,74'); }
+}
+/** Jump to the latest alert; pressing again soon after steps back through earlier ones. */
+app.jumpAlert = () => {
+  const n = app.alerts.length;
+  if (!n) { ui.toast('Nothing to report yet.'); return; }
+  app.alertIdx = app.clock - app.alertKeyT < 4 ? (app.alertIdx + 1) % n : 0;
+  app.alertKeyT = app.clock;
+  const a = app.alerts[n - 1 - app.alertIdx];
+  app.jumpTo(a.x, a.y);
+  ui.hint(`<b>${a.text}</b>${n > 1 ? ' · <b>G</b> again for the one before' : ''}`);
+  clearTimeout(app._alertHint); app._alertHint = setTimeout(() => { if (!app.tool) ui.hint(null); }, 2600);
 };
 
 function marker(x, y, r, dur, col, label, x2, y2) { app.markers.push({ x, y, z: heightAt(x, y), r, t: 0, dur, col, label, x2, y2 }); }
@@ -350,7 +455,18 @@ overlay.addEventListener('pointerup', (e) => {
       if (click) { const dd = (p[0] - m.sx) ** 2 + (p[1] - m.sy) ** 2; if (dd < bd) { bd = dd; best = i; } }
       else if (p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1) ids.push(i);
     }
-    if (click && best >= 0) ids.push(best);
+    if (click && best >= 0) {
+      const ty = sim.type[best];
+      if (app.clock - app.lastClick.t < 0.35 && app.lastClick.type === ty) {
+        // double-click: everyone of that kind in view
+        for (let i = 0; i < sim.n; i++) {
+          if (!sim.alive[i] || sim.team[i] !== DEF || sim.type[i] !== ty) continue;
+          const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 1);
+          if (p[0] >= 0 && p[1] >= 54 && p[0] <= vw && p[1] <= vh) ids.push(i);
+        }
+      } else ids.push(best);
+      app.lastClick = { t: app.clock, type: ty };
+    }
     app.selection = d.add ? [...new Set([...app.selection, ...ids])] : ids;
     if (ids.length) audio.play('click');
     ui.updateHud();
@@ -366,8 +482,11 @@ mm.addEventListener('pointerup', () => { mmDown = false; });
 
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts alone (Ctrl+R must not sound the retreat)
   const k = e.key.toLowerCase();
   if (ui.modalOpen()) { if (k === 'escape') ui.hideModal(); return; }
+  // control groups live on 6-0 (1-5 call support): Shift+digit assigns, digit recalls, tap twice to look
+  if (app.mode === 'battle' && !app.sim.result && /^Digit[06-9]$/.test(e.code)) { const key = e.code.slice(5); if (e.shiftKey) app.assignGroup(key); else app.recallGroup(key); return; }
   app.keys.add(k);
   if (k === 'escape') {
     if (app.tool) { if (app.mode === 'setup') app.selectPlaceTool(null); else { app.tool = null; ui.hint(null); } }
@@ -378,6 +497,7 @@ window.addEventListener('keydown', (e) => {
   if (k === '?' || (k === '/' && e.shiftKey)) { ui.showHelp(); return; }
   if (k === 'f2' || k === '`') { e.preventDefault(); perf.toggle(); return; }
   if (k === 'home') { app.cam.yaw = DEFAULT_YAW; fitCamera(); return; }
+  if (app.mode === 'battle' && app.sim.result) { if (k === 'enter') ui.showEnd(app.sim); return; }
   if (app.mode === 'setup') {
     if (k === 'enter') app.startBattle();
     else if ((k === 'delete' || k === 'backspace') && app.selGroup) app.removeGroup(app.selGroup);
@@ -393,8 +513,11 @@ window.addEventListener('keydown', (e) => {
   else if (k === 't') app.toggleFireMission();
   else if (k === 'z') app.toggleOverlay('zones');
   else if (k === 'v') app.toggleOverlay('ranges');
-  else if (k === 'r') app.retreat();
+  else if (k === 'h') app.cycleStance();
+  else if (k === 'r') app.retreat(!e.shiftKey);
   else if (k === 'l') app.toggleLosses();
+  else if (k === 'g') app.jumpAlert();
+  else if (k === 'n') app.skipAhead();
   else if (k === 'x' && app.selection.length) app.sim.stop(app.selection);
   ui.updateHud();
 });
@@ -406,6 +529,20 @@ window.addEventListener('resize', resize);
 const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
 function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.max(2, r * app.cam.zoom), Math.max(1.4, r * app.cam.zoom * SIN_P), 0, 0, 6.2832); return p; }
 
+/** Reach of a unit's weapon from a spot: the outer ring, and the inner one it cannot fire inside. Walls add reach. */
+function rangeRings(c, def, x, y, alpha) {
+  const w = def.wdef || (def.ob === 'claymore' ? { range: 42 } : def.pool ? { range: 60, supply: true } : null);
+  if (!w || !w.range) return;
+  const k = def.team === DEF && def.cls === C.INF && map.seg[map.cellOf(x, y)] >= 0 ? (heightAt(x, y) > 15 ? 1.2 : 1.12) : 1;
+  const z0 = heightAt(x, y) + 0.3, col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
+  if (w.range * k < 1500) {
+    c.strokeStyle = `rgba(${col},${alpha})`; c.lineWidth = 1.4; c.setLineDash([9, 6]);
+    c.beginPath(); const p = ring(c, x, y, z0, w.range * k); c.stroke(); c.setLineDash([]);
+    c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`;
+    c.fillText(w.supply ? 're-arms 60 m' : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, p[0], p[1] - w.range * k * app.cam.zoom * SIN_P - 5);
+  }
+  if (w.min > 0) { c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); ring(c, x, y, z0, w.min); c.stroke(); }
+}
 // ---- range overlays: unions of many circles, drawn through an offscreen layer so overlaps don't stack up
 const rl = document.createElement('canvas'), rctx = rl.getContext('2d');
 const rangeCache = { t: -1, zones: [], ranges: [], key: [] };
@@ -569,7 +706,7 @@ function drawOverlay(dtReal) {
     // formation outlines
     for (const g of app.setup.groups) {
       const sel = g === app.selGroup, hov = g === app.hoverGroup && !app.tool;
-      if (!sel && !hov && z < 0.75) continue;
+      if (g.phase > 0 || (!sel && !hov && z < 0.75)) continue;
       const b = groupBounds(g), col = g.team === DEF ? '94,200,242' : '232,87,61';
       const ux = Math.cos(g.ang), uy = Math.sin(g.ang), gz = heightAt(g.x, g.y) + 0.3;
       c.beginPath();
@@ -583,6 +720,7 @@ function drawOverlay(dtReal) {
       c.strokeStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 1 : hov ? 0.9 : 0.16})`; c.lineWidth = sel ? 2 : 1;
       c.fillStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 0.14 : hov ? 0.1 : 0.015})`;
       c.fill(); c.stroke();
+      if (sel) rangeRings(c, UNITS[U[g.type]], g.x, g.y, 0.8);
       if (sel || hov) {
         const d = UNITS[U[g.type]];
         const txt = `${d.name} × ${fmt(g.count)}${g.delay ? ` · +${g.delay}s` : ''}`;
@@ -591,6 +729,15 @@ function drawOverlay(dtReal) {
         c.fillStyle = 'rgba(10,13,16,0.9)'; c.beginPath(); c.roundRect(cxs - tw / 2, ty - 10, tw, 20, 5); c.fill();
         c.fillStyle = sel ? '#f0b34a' : '#e6e9ec'; c.fillText(txt, cxs, ty + 1);
       }
+    }
+    // what is still to come
+    const wi = sim.waveInfo();
+    if (wi && wi.reserve > 0) {
+      const p = S(26, 480, heightAt(26, 480) + 2), txt = `◀  ${wi.W - 1} more wave${wi.W > 2 ? 's' : ''} beyond the valley mouth · ${fmt(wi.reserve)}`;
+      c.font = `600 12px ${FONT}`; c.textAlign = 'left';
+      const tw = c.measureText(txt).width + 16, bx = Math.max(insets().l + 8, p[0] - 8);
+      c.fillStyle = 'rgba(10,13,16,0.85)'; c.beginPath(); c.roundRect(bx, p[1] - 11, tw, 22, 6); c.fill();
+      c.fillStyle = '#ff9c86'; c.fillText(txt, bx + 8, p[1] + 1);
     }
     // placement ghost
     if (app.tool && m.inside) {
@@ -608,9 +755,13 @@ function drawOverlay(dtReal) {
       for (let k = 0; k < n; k += step) { const p = S(pos[k * 2], pos[k * 2 + 1], heightAt(pos[k * 2], pos[k * 2 + 1]) + 0.5); c.moveTo(p[0] + rr, p[1]); c.arc(p[0], p[1], rr, 0, 6.2832); }
       c.fill();
       if (line) { const a = S(d.x0, d.y0, heightAt(d.x0, d.y0)); c.strokeStyle = `rgba(${col},0.9)`; c.lineWidth = 1.5; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(m.sx, m.sy); c.stroke(); c.setLineDash([]); }
+      rangeRings(c, def, g.x, g.y, 0.85);
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       c.fillStyle = n ? '#fff' : '#ff8b73';
-      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}` : 'Not here', m.sx + 16, m.sy - 12);
+      const cost = def.cost && !app.setup.options.sandbox ? n * def.cost : 0;
+      const over = cost && forceCost(app.setup.groups) + cost > app.setup.budget;
+      if (over) c.fillStyle = '#ff8b73';
+      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${cost ? `  ·  ${fmt(cost)} req${over ? ' — over budget' : ''}` : ''}` : 'Not here', m.sx + 16, m.sy - 12);
     }
     return;
   }
@@ -696,13 +847,13 @@ function drawOverlay(dtReal) {
   c.font = `700 12px ${FONT}`; c.textAlign = 'center';
   let nLab = 0;
   for (let g = 0; g < sim.ng; g++) {
-    const st = sim.gState[g], conf = sim.gConf[g] > sim.time;
-    if ((!st && !conf) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
+    const st = sim.gState[g], conf = sim.gConf[g] > sim.time, pin = sim.gPin[g] === 2;
+    if ((!st && !conf && !pin) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
     const gx = sim.gCx[g], gy = sim.gCy[g];
     const p = S(gx, gy, heightAt(gx, gy) + 5);
     if (p[0] < 0 || p[1] < 60 || p[0] > vw || p[1] > vh) continue;
     const orc = sim.gTeam[g] === ORC;
-    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : '! wavering';
+    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : st ? '! wavering' : '▼ pinned';
     // keep the field legible: never stack labels on top of one another
     let clash = false;
     for (let k = 0; k < nLab; k += 2) if (Math.abs(labXY[k] - p[0]) < 96 && Math.abs(labXY[k + 1] - p[1]) < 24) { clash = true; break; }
@@ -710,7 +861,7 @@ function drawOverlay(dtReal) {
     labXY[nLab++] = p[0]; labXY[nLab++] = p[1];
     const tw = c.measureText(txt).width + 10;
     c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 18, 4); c.fill();
-    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : orc ? '#f0b34a' : '#ffb86a';
+    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : !st && !conf ? '#8fd8ff' : orc ? '#f0b34a' : '#ffb86a';
     c.fillText(txt, p[0], p[1] + 0.5); // middle baseline: vertically centred in the tag
   }
   // commanders: a star over each so they can be found (and hunted)
@@ -737,13 +888,38 @@ function drawOverlay(dtReal) {
       if (++drawn > 1500) break;
     }
     c.stroke();
+    // the distance a small selection is holding its fire to (V shows its full reach)
+    if (app.selection.length <= 30) {
+      const seen = new Set();
+      for (const i of app.selection) {
+        const h = sim.holdR[i], w = UNITS[sim.type[i]].wdef;
+        if (!(h > 0) || !w || !w.range || h >= w.range * 1.2) continue;
+        const key = ((sim.x[i] / 24) | 0) + ':' + ((sim.y[i] / 24) | 0);
+        if (seen.has(key)) continue; seen.add(key);
+        c.strokeStyle = 'rgba(240,179,74,0.7)'; c.lineWidth = 1; c.setLineDash([8, 7]);
+        c.beginPath(); ring(c, sim.x[i], sim.y[i], sim.unitZ(i) + 0.2, h); c.stroke(); c.setLineDash([]);
+      }
+    }
   }
   const bar = (sx, sy, w, frac, col) => { c.fillStyle = 'rgba(0,0,0,0.65)'; c.fillRect(sx - w / 2 - 1, sy - 1, w + 2, 5); c.fillStyle = col; c.fillRect(sx - w / 2, sy, w * Math.max(0, Math.min(1, frac)), 3); };
+  let pips = 0;
   for (let i = 0; i < sim.n; i++) {
     if (!sim.alive[i]) continue;
     const d = UNITS[sim.type[i]];
     if (d.team === DEF) {
-      if (d.cls === C.INF) continue;
+      if (d.cls === C.INF) {
+        // foot soldiers: an amber pip when out of rounds; health and ammunition when selected and close enough to read
+        const dry = d.ammo && sim.ammo[i] < 1, sel = selSet && z > 1.5 && selSet.has(i);
+        if (!(dry && z > 1.1) && !sel) continue;
+        const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 2.6);
+        if (p[0] < -10 || p[1] < 50 || p[0] > vw + 10 || p[1] > vh + 10) continue;
+        if (sel && pips++ < 300) {
+          const px = p[0], py = p[1];
+          bar(px, py - 5, 14, sim.hp[i] / d.hp, sim.hp[i] / d.hp > 0.4 ? '#5ec8f2' : '#e8573d');
+          if (d.ammo) bar(px, py, 14, sim.ammo[i] / sim.maxAmmo(i), '#f0b34a');
+        } else if (dry) { c.fillStyle = '#f0b34a'; c.fillRect(p[0] - 1.5, p[1] - 1.5, 3, 3); }
+        continue;
+      }
       const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 4);
       if (p[0] < -30 || p[1] < -30 || p[0] > vw + 30 || p[1] > vh + 30) continue;
       if (d.cls === C.CACHE) { if (z > 0.9) bar(p[0], p[1], 26, sim.ammo[i] / d.pool, '#6fdc9a'); }
@@ -850,6 +1026,28 @@ function drawMinimap() {
   if (sim.focus) { mctx.strokeStyle = '#ff5a46'; mctx.beginPath(); mctx.arc(sim.focus.x * kx, sim.focus.y * ky, Math.max(3, sim.focus.r * kx), 0, 6.2832); mctx.stroke(); }
   for (const a of sim.arty) if (a.n && a.mode === 'target') { mctx.strokeStyle = '#f0b34a'; mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 3, 0, 6.2832); mctx.moveTo(a.x * kx - 5, a.y * ky); mctx.lineTo(a.x * kx + 5, a.y * ky); mctx.moveTo(a.x * kx, a.y * ky - 5); mctx.lineTo(a.x * kx, a.y * ky + 5); mctx.stroke(); }
   for (const mk of app.markers) { if (!mk.label) continue; mctx.strokeStyle = `rgb(${mk.col})`; mctx.beginPath(); mctx.arc(mk.x * kx, mk.y * ky, 3.5, 0, 6.2832); mctx.stroke(); }
+  // a wave forming or marching on: chevrons at the valley mouth
+  const wv = sim.waveInfo();
+  if (wv && !sim.result && ((wv.next && wv.next.forming) || wv.phase === 'approach')) {
+    const hot = wv.phase === 'approach', a = 0.45 + 0.45 * Math.sin(app.clock * 5);
+    mctx.strokeStyle = hot ? `rgba(255,110,90,${a})` : `rgba(240,179,74,${a})`; mctx.lineWidth = 2;
+    // pointing at the stretch of wall it has been aimed at, when it has one
+    const sec = hot ? wv.sector : wv.next.sector, yy = sec ? sec.y * ky : H * 0.5;
+    for (let k = 0; k < 3; k++) { const x = 5 + k * 7; mctx.beginPath(); mctx.moveTo(x, yy - 9); mctx.lineTo(x + 6, yy); mctx.lineTo(x, yy + 9); mctx.stroke(); }
+    if (sec) { mctx.setLineDash([4, 4]); mctx.lineWidth = 1.2; mctx.beginPath(); mctx.moveTo(30, yy); mctx.lineTo(sec.x * kx - 8, yy); mctx.stroke(); mctx.setLineDash([]); }
+  }
+  // alert pings: a ring that opens out from where it happened
+  mctx.lineWidth = 1.6;
+  for (const a of app.alerts) {
+    const age = app.clock - a.t;
+    if (age > 7) continue;
+    const col = a.cls === 'bad' ? '255,110,90' : a.cls === 'warn' ? '240,179,74' : a.cls === 'good' ? '111,220,154' : '230,233,236';
+    const u = (age % 1.75) / 1.75;
+    mctx.strokeStyle = `rgba(${col},${(1 - u) * Math.min(1, (7 - age) / 2)})`;
+    mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 2.5 + u * 13, 0, 6.2832); mctx.stroke();
+    mctx.fillStyle = `rgba(${col},${Math.min(1, (7 - age) / 2)})`; mctx.beginPath(); mctx.arc(a.x * kx, a.y * ky, 2, 0, 6.2832); mctx.fill();
+  }
+  mctx.lineWidth = 1;
 }
 
 // -------------------------------------------------------------------- loop
@@ -891,12 +1089,13 @@ function frame(now) {
   fx.view.rad = Math.hypot(vw / 2, vh / 2 / SIN_P) / cam.zoom + 40;
 
   let alpha = 1, simDt = 0, simMs = 0;
+  const halted = app.paused || ui.modalOpen(); // the battle waits while a dialog is up
   if (app.mode === 'battle') {
     // a breath of slow motion when something momentous happens
     let scale = 1;
     if (app.slowT > 0) { app.slowT -= rdt; scale = app.slowT > 0.6 ? 0.2 : 0.2 + 0.8 * (1 - Math.max(0, app.slowT) / 0.6); }
     fx.frame(app.speed);
-    if (!app.paused && !sim.result) {
+    if (!halted && !sim.result) {
       app.acc += rdt * app.speed * scale;
       const t0 = performance.now();
       let ticks = 0;
@@ -910,11 +1109,29 @@ function frame(now) {
       fx.update(Math.min(0.25, rdt * app.speed * scale));
     } else if (sim.result) fx.update(rdt * 0.6);
     for (const e of sim.events) {
-      if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls); if (e.big && app.speed <= 2) app.slowT = 2.2; }
-      else if (e.type === 'log') ui.toast(e.text, e.cls);
-      else if (e.type === 'end') { audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null); }
+      const loc = e.x != null ? { x: e.x, y: e.y } : null;
+      if (loc && (e.cls === 'bad' || e.cls === 'warn') && (e.type === 'banner' || e.type === 'log')) noteAlert(e); // good news does not need a ping
+      if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
+      if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
+      else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
+      else if (e.type === 'cp' && e.amt >= 0.15) marker(e.x, e.y, 4, 3.5, '240,179,74', `+${e.amt.toFixed(1)} CP`);
+      else if (e.type === 'end') {
+        // score a challenge and remember the best result on each scenario
+        const sc = sim.opt.sandbox ? null : scoreBattle(sim, { budget: app.setup.budget, spent: app.battleSpent });
+        if (sc) {
+          const best = loadBest(), old = best[app.presetKey];
+          sc.best = old ? old.score : null;
+          if (!old || sc.total > old.score) { sc.newBest = true; best[app.presetKey] = { score: sc.total, medal: sc.medal ? sc.medal.key : null }; try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch { /* private mode */ } ui.refreshPresets(best); }
+        }
+        app.lastScore = sc;
+        audio.horn(); setTimeout(() => { if (app.sim === sim && app.mode === 'battle') ui.showEnd(sim); }, 2600); ui.banner(e.win ? 'Victory' : 'The Deep has fallen', e.win ? 'good' : 'bad'); app.tool = null; ui.hint(null);
+      }
     }
     sim.events.length = 0;
+    if (app.skip) {
+      const wi = sim.waveInfo();
+      if (sim.result || !wi || wi.phase === 'engaged' || wi.phase === 'last') { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); }
+    }
   }
 
   // light: a stormy night that greys toward dawn, with the odd flash of lightning
@@ -924,7 +1141,7 @@ function frame(now) {
     if (p < 0.72) mood = MOOD.night;
     else if (p < 0.93) { const u = (p - 0.72) / 0.21; mood = [lerp3(MOOD.night[0], MOOD.dawn[0], u), lerp3(MOOD.night[1], MOOD.dawn[1], u), lerp3(MOOD.night[2], MOOD.dawn[2], u), 0.26 - 0.22 * u]; }
     else { const u = (p - 0.93) / 0.07; mood = [lerp3(MOOD.dawn[0], MOOD.day[0], u), lerp3(MOOD.dawn[1], MOOD.day[1], u), lerp3(MOOD.dawn[2], MOOD.day[2], u), 0.04]; }
-    if (mood === MOOD.night && !app.paused && !sim.result) {
+    if (mood === MOOD.night && !halted && !sim.result) {
       if ((app.nextBolt -= rdt) <= 0) { app.bolt = 0; app.nextBolt = 14 + Math.random() * 26; setTimeout(() => audio.play('boom', 0.35, 0), 700 + Math.random() * 900); }
     }
   }
@@ -950,7 +1167,7 @@ function frame(now) {
   if (hudT > 0.12) {
     hudT = 0;
     ui.updateHud();
-    if (app.mode === 'battle') audio.setRoar(app.paused || sim.result ? 0 : Math.min(0.14, (sim.count[ORC] / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
+    if (app.mode === 'battle') audio.setRoar(halted || sim.result ? 0 : Math.min(0.14, (sim.onField() / 9000) * 0.1 * Math.min(1, 0.4 + cam.zoom / 4)));
   }
   if (app.mode === 'battle' && (mmFrame++ & 3) === 0) drawMinimap();
 }
@@ -961,11 +1178,12 @@ const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 ui = buildUI(app, atlas);
+ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('garrison');
 fitCamera();
 requestAnimationFrame((t) => { last = t; frame(t); $('loading').classList.add('done'); });
-if (!localStorage.getItem('hd-seen-help-2')) { localStorage.setItem('hd-seen-help-2', '1'); ui.showHelp(); }
+if (!localStorage.getItem('hd-seen-help-3')) { localStorage.setItem('hd-seen-help-3', '1'); ui.showHelp(); }
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };

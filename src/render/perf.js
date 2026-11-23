@@ -1,12 +1,15 @@
 // Performance overlay and benchmark.
 //   ?perf   (or F2 / `)  shows frame time, CPU and GPU time per stage, triangles and draw calls
-//   ?bench              runs the 30,000-attacker preset through a fixed set of views and reports each
+//   ?bench              fast-forwards the largest scenario to its final assault, then steps through a
+//                       fixed set of views and reports each
 // GPU times need the EXT_disjoint_timer_query_webgl2 extension (desktop Chrome and Edge have it).
 
 const fmtK = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k' : String(Math.round(n)));
 const TIERS = ['full models', 'stand-ins', 'boxes', 'dots'];
 /** Triangles a frame may spend on units and their shadows; the levels of detail are tuned to stay under it. */
 export const UNIT_TRI_BUDGET = 2.5e6;
+/** Battle time (s) the benchmark fast-forwards to: the last and heaviest wave of the largest scenario is arriving. */
+const BENCH_TIME = 880;
 
 export class Perf {
   constructor(app, renderer) {
@@ -72,9 +75,14 @@ export class Perf {
     app.loadPreset('combined'); app.startBattle();
     document.getElementById('modal').hidden = true;
     app.paused = true;
-    for (let k = 0; k < 500; k++) app.sim.step();
-    app.sim.events.length = 0;
-    const sim = app.sim, cells = new Map();
+    // fast-forward to the final assault, when the field is fullest (the horde comes on in waves)
+    const sim = app.sim, until = BENCH_TIME;
+    while (sim.time < until && !sim.result) {
+      for (let k = 0; k < 150 && sim.time < until && !sim.result; k++) { sim.step(); sim.events.length = 0; }
+      this.el.textContent = `benchmark: fast-forwarding the battle… ${Math.round((sim.time / until) * 100)}%`;
+      await raf();
+    }
+    const cells = new Map();
     for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === 1) { const k = ((sim.y[i] / 80) | 0) * 100 + ((sim.x[i] / 80) | 0); cells.set(k, (cells.get(k) || 0) + 1); }
     let bk = 0, bv = 0; for (const [k, v] of cells) if (v > bv) { bv = v; bk = k; }
     const hx = (bk % 100) * 80 + 40, hy = ((bk / 100) | 0) * 80 + 40, keep = app.keepCentre;
