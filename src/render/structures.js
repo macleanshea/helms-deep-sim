@@ -4,6 +4,7 @@
 // 0 dressed stone, 1 timber, 2 plain/dark, 3 roof slate.
 
 import { MeshBuilder } from './mesh.js';
+import { MAT } from './materials.js';
 import { KEEP, N_WALL, N_RING, WALL_HALF } from '../map.js';
 import { WALL_H, PLATEAU_Z, RING_TOP } from '../config.js';
 
@@ -138,7 +139,7 @@ function ramp(m, line, half, zOf, base, rail) {
 }
 
 export function buildStructures(map, segs) {
-  const m = new MeshBuilder();
+  const m = new MeshBuilder(); m.mat = MAT.ASHLAR;
   seed = 4242;
   const H = WALL_H, BASE = -4;
 
@@ -333,5 +334,5 @@ export function buildStructures(map, segs) {
       m.frameBox([x, y, gz + hgt + sz * 0.3], [Math.cos(a) * sz, Math.sin(a) * sz, (rnd() - 0.5) * sz * 0.5], [-Math.sin(a) * sz * 0.7, Math.cos(a) * sz * 0.7, 0], [0, 0, sz * 0.5], col, gate && k % 2 ? 1 : 0);
     }
   }
-  return m.build();
+  return m.build(false);
 }

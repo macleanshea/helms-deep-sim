@@ -230,3 +230,9 @@ h3 { margin: 0 0 8px; }
   .cmd svg { width: 24px; height: 24px; }
   #leftHud { width: 270px; }
 }
+
+/* performance overlay (?perf, F2) */
+#perf { position: absolute; left: 12px; top: 62px; z-index: 30; margin: 0; padding: 9px 12px; pointer-events: none;
+  font: 11px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: #cfe3ee; white-space: pre;
+  background: rgba(8, 11, 14, 0.82); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; }
+.mode-setup #perf { left: 328px; }

@@ -29,33 +29,58 @@ vec3 rockFace(vec2 q){
 }
 `;
 
-// sun + ambient + shadow map + a handful of point lights (explosion flashes, fires)
+// Lighting. Colours come in and go out in display space; the sums are done in linear light:
+// a sky/ground ambient, the sun or moon with a soft shadow, up to six flash lights, and a specular
+// lobe whose width and strength come from the material. The view direction is constant (the camera
+// is orthographic), so the highlights cost almost nothing.
 const LIGHT = `
-uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb;
-uniform mat4 uShadowVP; uniform highp sampler2DShadow uShadow; uniform float uShadowOn;
+uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uView; uniform float uWet; uniform float uExposure;
+uniform mat4 uShadowVP; uniform highp sampler2DShadow uShadow; uniform float uShadowOn; uniform float uShadowTexel;
 uniform vec4 uLPos[6]; uniform vec3 uLCol[6];
 float shadowAt(vec3 wp, float ndl){
   if (uShadowOn < .5) return 1.;
   vec4 sc = uShadowVP*vec4(wp,1.); vec3 p = sc.xyz*0.5+0.5;
   if (p.x<0.||p.x>1.||p.y<0.||p.y>1.||p.z>1.||p.z<0.) return 1.;
-  float bias = 0.0016 + 0.005*(1.-ndl);
-  return texture(uShadow, vec3(p.xy, p.z - bias));
+  float z = p.z - (0.0016 + 0.005*(1.-ndl)), e = uShadowTexel;
+  return 0.25*(texture(uShadow, vec3(p.xy+vec2(-e, -0.4*e), z)) + texture(uShadow, vec3(p.xy+vec2(0.4*e, -e), z))
+             + texture(uShadow, vec3(p.xy+vec2(e, 0.4*e), z)) + texture(uShadow, vec3(p.xy+vec2(-0.4*e, e), z)));
 }
-vec3 lighting(vec3 albedo, vec3 n, vec3 wp, float occl){
+vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
+  vec3 a = albedo*albedo;
   float ndl = max(dot(n,uSun),0.);
-  float sh = min(shadowAt(wp, ndl), occl);
-  vec3 l = uAmb*(0.6+0.4*n.z) + uSunCol*ndl*mix(0.12, 1., sh);
+  float sh = shadowAt(wp, ndl);
+  float gl = 1.-rough, pw = 6. + gl*gl*260., sk = spec*(pw+8.)*0.035;
+  vec3 l = mix(uAmb*vec3(0.62,0.57,0.5), uAmb, n.z*0.5+0.5)*ao + uSunCol*ndl*mix(0.1, 1., sh);
+  vec3 s = uSunCol*pow(max(dot(n, normalize(uSun+uView)),0.), pw)*sk*sh*step(1e-4, ndl);
+  s += uAmb*spec*gl*0.5*pow(1.-max(dot(n,uView),0.), 3.);                 // the sky caught at grazing angles
   for (int i=0;i<6;i++){
-    vec3 d = uLPos[i].xyz - wp; float r = uLPos[i].w; float att = max(0., 1. - dot(d,d)/(r*r));
-    l += uLCol[i]*att*att*(0.35+0.65*max(dot(n, normalize(d)),0.));
+    vec3 d = uLPos[i].xyz - wp; float r = uLPos[i].w; float att = max(0., 1. - dot(d,d)/(r*r)); att *= att;
+    if (att <= 0.) continue;
+    vec3 ld = normalize(d);
+    l += uLCol[i]*att*(0.35+0.65*max(dot(n, ld),0.));
+    s += uLCol[i]*att*pow(max(dot(n, normalize(ld+uView)),0.), pw)*sk;
   }
-  return albedo*l;
+  vec3 c = (a*l + s)*uExposure;
+  return sqrt(c/(1.+0.22*c));
 }
 uniform vec3 uFog; uniform vec4 uWorld; // world w,h and fade distances
 vec3 fogged(vec3 c, vec2 wxy){
   vec2 o = max(max(-wxy, wxy - uWorld.xy), vec2(0.));
   return mix(c, uFog, smoothstep(uWorld.z, uWorld.w, length(o)));
 }
+`;
+
+// Material lookup (see materials.js): layer L sampled at q metres along the surface.
+const MATERIAL = `
+uniform mediump sampler2DArray uMatA; uniform mediump sampler2DArray uMatB; uniform float uMatScale[16]; uniform vec3 uMatMean[16];
+vec4 matA(float L, vec2 q, vec2 dx, vec2 dy){ float k = uMatScale[int(L)]; vec4 t = textureGrad(uMatA, vec3(q*k, L), dx*k, dy*k); return vec4(t.rgb/uMatMean[int(L)], t.a); }
+vec4 matB(float L, vec2 q, vec2 dx, vec2 dy){ float k = uMatScale[int(L)]; return textureGrad(uMatB, vec3(q*k, L), dx*k, dy*k); }
+`;
+
+const NOISE_LITE = `
+float hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
+float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
+float fbm3(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*noise(p); p=p*2.07+11.; a*=.5; } return s/0.875; }
 `;
 
 export const VS_TERRAIN = `#version 300 es
@@ -67,40 +92,61 @@ void main(){ vW = aPos; vN = aNormal; gl_Position = uVP*vec4(aPos,1.); }`;
 export const FS_TERRAIN = `#version 300 es
 precision highp float;
 in vec3 vW; in vec3 vN; out vec4 o;
-uniform sampler2D uAlbedo; uniform sampler2D uDecal; uniform sampler2D uHM; uniform vec4 uAlbRect; uniform float uDetail; uniform float uTime;
-${NOISE}${LIGHT}
+uniform sampler2D uAlbedo; uniform sampler2D uDecal; uniform sampler2D uHM; uniform vec4 uAlbRect; uniform float uTime;
+${NOISE_LITE}${LIGHT}${MATERIAL}
 void main(){
   vec3 n = normalize(vN);
   vec2 uv = (vW.xy - uAlbRect.xy)/uAlbRect.zw;
-  vec3 c = texture(uAlbedo, uv).rgb;
-  vec4 m = texture(uHM, uv);          // height, rock, dirt, water
-  // steep faces: the top-down texture smears, so texture them side-on as fractured rock
+  vec3 c = texture(uAlbedo, uv).rgb;                  // broad colour, baked once from the masks
+  vec4 m = texture(uHM, uv);                          // height, rock, dirt, water
+  vec3 dpx = dFdx(vW), dpy = dFdy(vW);
   float steep = smoothstep(0.2, 0.5, 1.-n.z);
-  if (steep > 0.) {
-    vec2 t = normalize(vec2(-n.y, n.x) + 1e-5);
-    vec3 rk = rockFace(vec2(dot(vW.xy, t), vW.z));
-    c = mix(c, rk, steep*0.94);
+  // close-up detail from the material layers, blended by the same masks
+  float wr = smoothstep(0.3, 0.7, m.g), wd = clamp(m.b*1.25, 0., 1.)*(1.-wr), wg = (1.-wr)*(1.-wd);
+  vec4 A = vec4(0.), B = vec4(0.);
+  if (wg > 0.02) { A += wg*matA(4., vW.xy, dpx.xy, dpy.xy); B += wg*matB(4., vW.xy, dpx.xy, dpy.xy); }
+  if (wd > 0.02) { A += wd*matA(5., vW.xy, dpx.xy, dpy.xy); B += wd*matB(5., vW.xy, dpx.xy, dpy.xy); }
+  if (wr > 0.02) { A += wr*matA(3., vW.xy, dpx.xy, dpy.xy); B += wr*matB(3., vW.xy, dpx.xy, dpy.xy); }
+  float ws = max(1e-3, (wg > 0.02 ? wg : 0.) + (wd > 0.02 ? wd : 0.) + (wr > 0.02 ? wr : 0.));
+  A /= ws; B /= ws;
+  c *= mix(vec3(1.), A.rgb, 0.85);
+  vec3 nd = normalize(n + vec3(B.xy*2.-1., 0.)*0.85);
+  float rough = B.z, spec = B.w;
+  // steep faces: the top-down texture smears, so texture them side-on as rock, from both horizontal axes
+  if (steep > 0.01) {
+    float wx = n.x*n.x, wy = n.y*n.y, wsum = wx + wy + 1e-4; wx /= wsum; wy /= wsum;
+    vec4 a1 = matA(3., vW.yz, dpx.yz, dpy.yz), a2 = matA(3., vW.xz, dpx.xz, dpy.xz);
+    vec4 b1 = matB(3., vW.yz, dpx.yz, dpy.yz), b2 = matB(3., vW.xz, dpx.xz, dpy.xz);
+    // the same layer much larger gives the face its big fractures and hides the repeat
+    vec3 big = wx*matA(3., vW.yz*0.21, dpx.yz*0.21, dpy.yz*0.21).rgb + wy*matA(3., vW.xz*0.21, dpx.xz*0.21, dpy.xz*0.21).rgb;
+    vec3 rk = vec3(0.43,0.42,0.40) * (wx*a1.rgb + wy*a2.rgb) * mix(vec3(1.), big, 0.75);
+    rk *= 0.86 + 0.28*noise(vW.xy*0.021 + vW.z*0.013);
+    rk *= 1. - 0.25*smoothstep(0.55, 0.95, noise(vec2((vW.x + vW.y)*0.3, vW.z*0.012 + 3.)));   // rain streaks
+    vec2 p1 = b1.xy*2.-1., p2 = b2.xy*2.-1.;
+    vec3 ns = normalize(n + (vec3(0., p1.x, p1.y)*wx + vec3(p2.x, 0., p2.y)*wy)*0.9);
+    c = mix(c, rk, steep*0.94); nd = normalize(mix(nd, ns, steep));
+    rough = mix(rough, wx*b1.z + wy*b2.z, steep); spec = mix(spec, wx*b1.w + wy*b2.w, steep);
   }
   // a dusting of old snow on the high shelves of the mountain
-  float snow = smoothstep(175., 230., vW.z + (fbm3(vW.xy*0.015)-.5)*70.) * smoothstep(0.6, 0.85, n.z) * smoothstep(0.35, 0.6, fbm3(vW.xy*0.05));
-  c = mix(c, vec3(0.72,0.74,0.78)*(0.85+0.2*noise(vW.xy*0.4)), snow*0.75);
-  if (uDetail > 0.) {
-    float grass = (1.-m.g)*(1.-m.b)*(1.-m.a)*(1.-steep);
-    float blades = noise(vec2(vW.x*3.7 + noise(vW.xy*0.8)*2., vW.y*3.1))*0.55 + noise(vW.xy*11.)*0.45;
-    float pebbles = 1. - smoothstep(0., 0.12, voro(vW.xy*1.6).x)*0.5;
-    float d = mix(noise(vW.xy*1.3)*0.5 + noise(vW.xy*6.1)*0.5, blades, grass);
-    c *= 1. + (d-.5)*uDetail*1.6;
-    c *= mix(1., pebbles, m.b*(1.-grass)*uDetail*1.4);
+  if (vW.z > 100.) {
+    float snow = smoothstep(175., 230., vW.z + (fbm3(vW.xy*0.015)-.5)*70.) * smoothstep(0.6, 0.85, n.z) * smoothstep(0.35, 0.6, fbm3(vW.xy*0.05));
+    c = mix(c, vec3(0.72,0.74,0.78)*(0.85+0.2*noise(vW.xy*0.4)), snow*0.75);
+    rough = mix(rough, 0.6, snow); nd = normalize(mix(nd, n, snow*0.7));
   }
+  // rain soaks level ground: darker and glossier
+  float wet = uWet*smoothstep(0.5, 0.9, n.z)*(0.4 + 0.6*wd);
+  c *= 1. - 0.22*wet; rough = mix(rough, rough*0.45, wet); spec = mix(spec, max(spec, 0.5), wet);
   // water: a dark, moving surface that catches what light there is
   if (m.a > 0.3) {
     float w = smoothstep(0.3, 0.7, m.a);
-    float rip = noise(vec2(vW.x*0.5, vW.y*1.6 - uTime*1.7)) * noise(vec2(vW.x*1.3 + uTime*0.6, vW.y*0.7));
-    vec3 wc = vec3(0.05,0.08,0.09) + uFog*1.4 + uSunCol*0.12*pow(rip, 2.)*2.4;
-    c = mix(c, wc, w*0.85);
+    float r1 = noise(vec2(vW.x*0.5, vW.y*1.6 - uTime*1.7)), r2 = noise(vec2(vW.x*1.3 + uTime*0.6, vW.y*0.7));
+    vec3 wc = vec3(0.08,0.11,0.12) + uFog*1.2;
+    c = mix(c, wc, w*0.88);
+    nd = normalize(mix(nd, vec3((r1-.5)*0.5, (r2-.5)*0.5, 1.), w));
+    rough = mix(rough, 0.1, w); spec = mix(spec, 1., w);
   }
-  if (vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
-  o = vec4(fogged(lighting(c, n, vW, 1.), vW.xy), 1.);
+  if (vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; rough = mix(rough, 0.85, d.a); }
+  o = vec4(fogged(shade(c, nd, vW, rough, spec, 1.), vW.xy), 1.);
 }`;
 
 export const FS_BAKE = `#version 300 es
@@ -158,57 +204,45 @@ void main(){ vUV = a; gl_Position = vec4(a*2.-1., 0., 1.); }`;
 export const VS_STRUCT = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in float aPart; layout(location=3) in vec4 aColor;
 uniform mat4 uVP;
-out vec3 vW; out vec3 vN; out vec3 vC; out float vMat;
-void main(){ vW = aPos; vN = aNormal; vC = aColor.rgb; vMat = aPart; gl_Position = uVP*vec4(aPos,1.); }`;
+out vec3 vW; out vec3 vN; out vec3 vC; flat out float vMat;
+void main(){ vW = aPos; vN = aNormal; vC = aColor.rgb; vMat = aColor.a*255.; gl_Position = uVP*vec4(aPos,1.); }`;
 
+// The fortress. Each face is textured from whichever axis it faces most squarely, in world space, so
+// courses of masonry run level and line up from one piece of wall to the next.
 export const FS_STRUCT = `#version 300 es
 precision highp float;
-in vec3 vW; in vec3 vN; in vec3 vC; in float vMat; out vec4 o;
+in vec3 vW; in vec3 vN; in vec3 vC; flat in float vMat; out vec4 o;
 uniform sampler2D uDecal;
-${NOISE}${LIGHT}
+${NOISE_LITE}${LIGHT}${MATERIAL}
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
-  if (vMat < 0.5) {
-    if (abs(n.z) > 0.6) {
-      // flagstones: irregular slabs, worn and stained
-      vec2 v = voro(vW.xy*0.45);
-      float fa = 1. - smoothstep(0.12, 0.35, fwidth(vW.x*0.45) + fwidth(vW.y*0.45));
-      c *= mix(0.97, (0.82 + 0.3*v.y) * mix(0.62, 1., smoothstep(0., 0.07, v.x)), fa);
-      c *= 0.88 + 0.24*fbm3(vW.xy*1.7);
-      c = mix(c, c*vec3(0.85,0.9,0.8), smoothstep(0.6,0.8,fbm3(vW.xy*0.15))*0.5);
-    } else {
-      // dressed ashlar in running bond, every course a little different
-      vec2 t = normalize(vec2(-n.y, n.x)+1e-4);
-      float u = dot(vW.xy, t);
-      vec2 uv = vec2(u*0.46, vW.z*0.9);
-      float row = floor(uv.y); uv.x += mod(row,2.)*0.5 + hash(vec2(row, 5.))*0.3;
-      vec2 id = floor(uv), f = fract(uv);
-      float chip = 0.04 + 0.05*noise(vW.xy*3.+vW.z*3.);
-      float joint = smoothstep(0.,chip,f.x)*smoothstep(0.,chip,1.-f.x)*smoothstep(0.,chip*1.6,f.y)*smoothstep(0.,chip*1.6,1.-f.y);
-      float hv = hash(id+row*7.);
-      float fa = 1. - smoothstep(0.18, 0.45, fwidth(uv.y));
-      c *= mix(0.92, (0.8+0.32*hv) * mix(0.55,1.,joint), fa);
-      c *= mix(vec3(1.), vec3(1.04,1.0,0.94), step(0.7, hash(id+3.1)));     // the odd warmer stone
-      c *= 0.88+0.24*fbm3(vec2(u, vW.z)*2.3);
+  float id = floor(vMat + 0.5);
+  if (id == 16.) { o = vec4(c, 1.); return; }
+  float L = id > 16.5 ? 7. : id;
+  vec3 an = abs(n), dpx = dFdx(vW), dpy = dFdy(vW);
+  bool top = an.z > (L == 8. ? 0.96 : 0.6);
+  vec2 q, qx, qy; vec3 T, Bt; float u;
+  if (top) { q = vW.xy; qx = dpx.xy; qy = dpy.xy; T = vec3(1.,0.,0.); Bt = vec3(0.,1.,0.); u = vW.x + vW.y; if (L == 1.) L = 2.; }
+  else if (an.x > an.y) { q = vW.yz; qx = dpx.yz; qy = dpy.yz; T = vec3(0.,1.,0.); Bt = vec3(0.,0.,1.); u = vW.y; }
+  else { q = vW.xz; qx = dpx.xz; qy = dpy.xz; T = vec3(1.,0.,0.); Bt = vec3(0.,0.,1.); u = vW.x; }
+  if (id > 16.5) { q = q.yx; qx = qx.yx; qy = qy.yx; vec3 t = T; T = Bt; Bt = t; }
+  vec4 A = matA(L, q, qx, qy), B = matB(L, q, qx, qy);
+  c *= A.rgb;
+  vec2 bn = B.xy*2.-1.;
+  n = normalize(n + (T*bn.x + Bt*bn.y)*0.9);
+  float rough = B.z, spec = B.w;
+  if (L < 2.5) {
+    c *= 0.9 + 0.2*fbm3(vec2(u, vW.z)*0.11 + 3.);                       // broad weathering hides the repeat
+    if (!top) {
       // rain streaks running down from the parapets, damp and moss at the foot
-      c *= 1. - 0.22*smoothstep(0.5, 0.9, noise(vec2(u*0.9, vW.z*0.06)));
-      c = mix(c, vec3(0.2,0.24,0.15), smoothstep(3.5, 0., vW.z - 0.5*noise(vec2(u*0.5, 1.)))*0.35*smoothstep(0.4,0.7,noise(vec2(u*0.35, 7.))));
+      c *= 1. - 0.2*smoothstep(0.5, 0.9, noise(vec2(u*0.9, vW.z*0.06)));
+      c = mix(c, vec3(0.2,0.24,0.15), smoothstep(3.5, 0., vW.z - 0.5*noise(vec2(u*0.5, 1.)))*0.35*smoothstep(0.4, 0.7, noise(vec2(u*0.35, 7.))));
     }
-  } else if (vMat < 1.5) {
-    // timber: planks with grain and iron-dark gaps
-    float pl = dot(vW.xy, vec2(0.71,0.71))*2.2 + vW.z*0.2;
-    float g = noise(vec2(pl*0.6, vW.z*7. + hash(vec2(floor(pl),1.))*20.));
-    c *= (0.72+0.36*hash(vec2(floor(pl), 3.))) * (0.7+0.3*smoothstep(0.,0.1,fract(pl))) * (0.85 + 0.3*g);
-  } else if (vMat > 2.5) {
-    // slate: overlapping courses of small tiles
-    vec2 t = normalize(vec2(-n.y, n.x)+1e-4);
-    float u = dot(vW.xy, t)*2.2, row = floor(vW.z*2.6);
-    float tile = fract(u + mod(row,2.)*0.5);
-    float fs = 1. - smoothstep(0.2, 0.5, fwidth(vW.z*2.6));
-    c *= mix(0.9, 1., 1.-fs) * mix(1., (0.78 + 0.3*hash(vec2(floor(u + mod(row,2.)*0.5), row))), fs) * (0.7 + 0.3*smoothstep(0., 0.15, fract(vW.z*2.6))) * (0.85+0.15*smoothstep(0.,0.08,tile)*smoothstep(0.,0.08,1.-tile));
+    float wet = uWet*(top ? 1. : 0.35);
+    c *= 1. - 0.2*wet; rough = mix(rough, rough*0.45, wet); spec = mix(spec, max(spec, 0.45), wet);
   }
-  if (n.z > 0.7 && vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
-  o = vec4(fogged(lighting(c, n, vW, 1.), vW.xy), 1.);
+  if (vN.z > 0.7 && vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
+  o = vec4(fogged(shade(c, n, vW, rough, spec, 1.), vW.xy), 1.);
 }`;
 
 export const VS_DEPTH = `#version 300 es
@@ -219,47 +253,78 @@ export const FS_DEPTH = `#version 300 es
 precision highp float;
 void main(){}`;
 
-// instanced, lightly animated low-poly figures and vehicles
+// Instanced figures, vehicles and props, animated in the vertex shader by "part":
+//   1/2 thighs and 7/8 shins (walk cycle with a knee), 3 weapon arm and 10 forearm (strike / recoil),
+//   4 free arm (swings with the stride), 5 banner, 6 main rotor, 9 tail rotor.
 export const VS_UNIT = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in float aPart; layout(location=3) in vec4 aColor;
 layout(location=4) in vec4 iPosYaw; layout(location=5) in vec2 iSP; layout(location=6) in vec4 iColor; layout(location=7) in vec4 iAnim;
 uniform mat4 uVP; uniform float uTime; uniform float uShadowPass; uniform vec3 uSun;
-uniform vec4 uPivot; // hip z, shoulder x, shoulder z, swing
+uniform vec4 uPivot;  // hip z, shoulder x, shoulder z, swing
+uniform vec4 uPivot2; // knee z, rotor x, elbow (or tail rotor) x and z
 uniform float uRecoil;
-out vec3 vW; out vec3 vN; out vec3 vC; out float vFlash;
+out vec3 vW; out vec3 vN; out vec3 vC; out float vFlash; out vec3 vO; out vec3 vNo; flat out float vMat; flat out vec2 vYaw;
 vec2 rot(vec2 v, float a){ float c=cos(a), s=sin(a); return vec2(v.x*c - v.y*s, v.x*s + v.y*c); }
 void main(){
   vec3 p = aPos; vec3 n = aNormal;
   float walk = iAnim.x, atk = iAnim.y, ph = iSP.y;
   if (aPart > 0.5) {
-    if (aPart < 2.5) { float a = sin(ph + (aPart < 1.5 ? 0. : 3.1416))*0.75*walk; p.z -= uPivot.x; p.xz = rot(p.xz, a); p.z += uPivot.x; }
-    else if (aPart < 3.5) { p.x -= uPivot.y; p.z -= uPivot.z; p.xz = rot(p.xz, -atk*uPivot.w); p.x += uPivot.y - atk*uRecoil; p.z += uPivot.z; }
+    bool shin = aPart > 6.5 && aPart < 8.5;
+    if (aPart < 2.5 || shin) {
+      float lp = ph + ((aPart < 1.5 || (aPart > 6.5 && aPart < 7.5)) ? 0. : 3.1416);
+      if (shin) { float b = max(0., cos(lp))*0.95*walk; p.z -= uPivot2.x; p.xz = rot(p.xz, -b); n.xz = rot(n.xz, -b); p.z += uPivot2.x; }
+      float a = sin(lp)*0.62*walk; p.z -= uPivot.x; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.z += uPivot.x;
+    }
+    else if (aPart < 3.5 || aPart > 9.5) {
+      if (aPart > 9.5) { float e = -atk*uPivot.w*0.45; p.x -= uPivot2.z; p.z -= uPivot2.w; p.xz = rot(p.xz, e); n.xz = rot(n.xz, e); p.x += uPivot2.z; p.z += uPivot2.w; }
+      float a = -atk*uPivot.w; p.x -= uPivot.y; p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += uPivot.y - atk*uRecoil; p.z += uPivot.z;
+    }
+    else if (aPart < 4.5) { float a = -sin(ph)*0.5*walk; p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.z += uPivot.z; }
     else if (aPart < 5.5) { p.y += sin(uTime*5. + p.x*3. + ph)*0.16*clamp(-p.x-0.2, 0., 1.); }
-    else { p.xy = rot(p.xy, uTime*27.); }
+    else if (aPart < 6.5) { p.x -= uPivot2.y; p.xy = rot(p.xy, uTime*27.); n.xy = rot(n.xy, uTime*27.); p.x += uPivot2.y; }
+    else { p.x -= uPivot2.z; p.z -= uPivot2.w; p.xz = rot(p.xz, uTime*41.); n.xz = rot(n.xz, uTime*41.); p.x += uPivot2.z; p.z += uPivot2.w; }
   }
   p.z += abs(sin(ph))*0.07*walk;
   float tilt = iAnim.z*6.2832;
   if (tilt > 0.001) { p.xz = rot(p.xz, tilt); n.xz = rot(n.xz, tilt); }
   p *= iSP.x;
-  p.xy = rot(p.xy, iPosYaw.w); n.xy = rot(n.xy, iPosYaw.w);
+  float cy = cos(iPosYaw.w), sy = sin(iPosYaw.w);
+  p.xy = vec2(p.x*cy - p.y*sy, p.x*sy + p.y*cy); n.xy = vec2(n.x*cy - n.y*sy, n.x*sy + n.y*cy);
   vec3 w = iPosYaw.xyz + p;
   if (uShadowPass > 0.5) { w.xy -= uSun.xy/uSun.z*max(w.z - iPosYaw.z, 0.); w.z = iPosYaw.z + 0.07; }
-  vW = w; vN = n; vC = aColor.rgb*iColor.rgb; vFlash = iColor.a;
+  vW = w; vN = n; vC = aColor.rgb*iColor.rgb; vFlash = iColor.a; vO = aPos; vNo = aNormal; vMat = aColor.a*255.; vYaw = vec2(cy, sy);
   gl_Position = uVP*vec4(w,1.);
 }`;
 
 export const FS_UNIT = `#version 300 es
 precision highp float;
-in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; out vec4 o;
-uniform float uShadowPass; uniform float uLift;
-${LIGHT}
+in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; in vec3 vO; in vec3 vNo; flat in float vMat; flat in vec2 vYaw; out vec4 o;
+uniform float uShadowPass; uniform float uLift; uniform float uMatOn;
+${LIGHT}${MATERIAL}
 void main(){
   if (uShadowPass > 0.5) { o = vec4(0.,0.,0.,0.34); return; }
-  vec3 n = normalize(vN);
-  vec3 c = lighting(vC, n, vW, 1.);
-  c += vC*uLift*(0.55+0.45*n.z);                   // keep figures readable at night
-  c = mix(c, vec3(1.), vFlash*0.8);
-  o = vec4(fogged(c, vW.xy), 1.);
+  vec3 n = normalize(vN), c = vC;
+  float id = floor(vMat + 0.5), rough = 0.8, spec = 0.12;
+  if (id == 16.) { o = vec4(mix(c*1.4, vec3(1.), vFlash*0.8), 1.); return; }
+  if (uMatOn > 0.5) {
+    // textured in the model's own space, so the pattern stays put on a moving limb
+    float L = id > 16.5 ? 7. : id;
+    vec3 an = abs(vNo), dpx = dFdx(vO), dpy = dFdy(vO);
+    vec2 q, qx, qy; vec3 T, Bt;
+    if (an.z > an.x && an.z > an.y) { q = vO.xy; qx = dpx.xy; qy = dpy.xy; T = vec3(1.,0.,0.); Bt = vec3(0.,1.,0.); }
+    else if (an.x > an.y) { q = vO.yz; qx = dpx.yz; qy = dpy.yz; T = vec3(0.,1.,0.); Bt = vec3(0.,0.,1.); }
+    else { q = vO.xz; qx = dpx.xz; qy = dpy.xz; T = vec3(1.,0.,0.); Bt = vec3(0.,0.,1.); }
+    if (id > 16.5) { q = q.yx; qx = qx.yx; qy = qy.yx; vec3 t = T; T = Bt; Bt = t; }
+    vec4 A = matA(L, q, qx, qy), B = matB(L, q, qx, qy);
+    c *= A.rgb;
+    vec2 bn = B.xy*2.-1.; vec3 d = T*bn.x + Bt*bn.y;
+    d.xy = vec2(d.x*vYaw.x - d.y*vYaw.y, d.x*vYaw.y + d.y*vYaw.x);
+    n = normalize(n + d*0.8); rough = B.z; spec = B.w;
+  }
+  vec3 col = shade(c, n, vW, rough, spec, 1.);
+  col += vC*uLift*(0.55+0.45*n.z);                   // keep figures readable at night
+  col = mix(col, vec3(1.), vFlash*0.8);
+  o = vec4(fogged(col, vW.xy), 1.);
 }`;
 
 // billboards (mode 0), streaks stretched along a world axis (1) and ground-hugging quads (2)
