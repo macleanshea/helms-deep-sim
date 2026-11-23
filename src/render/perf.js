@@ -67,8 +67,11 @@ export class Perf {
     return L.join('\n');
   }
 
-  /** Step through the fixed benchmark views of the busiest preset. Resolves with one row per view. */
-  async bench() {
+  /**
+   * Step through the fixed benchmark views of the busiest preset. Resolves with one row per view.
+   * `settle` frames are skipped after each camera move, then `frames` are sampled.
+   */
+  async bench(settle = 20, frames = 90) {
     const app = this.app, raf = () => new Promise((r) => requestAnimationFrame(r));
     this.toggle(true);
     if (app.mode === 'battle') app.backToSetup();
@@ -86,13 +89,13 @@ export class Perf {
     for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === 1) { const k = ((sim.y[i] / 80) | 0) * 100 + ((sim.x[i] / 80) | 0); cells.set(k, (cells.get(k) || 0) + 1); }
     let bk = 0, bv = 0; for (const [k, v] of cells) if (v > bv) { bv = v; bk = k; }
     const hx = (bk % 100) * 80 + 40, hy = ((bk / 100) | 0) * 80 + 40, keep = app.keepCentre;
-    const views = [['whole map', null], ['horde, zoom 2.5', [hx, hy, 2.5]], ['horde, zoom 3.5', [hx, hy, 3.5]], ['horde, zoom 6', [hx, hy, 6]], ['horde, zoom 10', [hx, hy, 10]], ['horde, zoom 14', [hx, hy, 14]], ['horde, zoom 24', [hx, hy, 24]], ['horde, zoom 36', [hx, hy, 36]], ['keep, zoom 4', [keep[0], keep[1], 4]], ['keep, zoom 12', [keep[0], keep[1], 12]]];
+    const views = [['whole map', null], ['horde, zoom 2.5', [hx, hy, 2.5]], ['horde, zoom 3.5', [hx, hy, 3.5]], ['horde, zoom 6', [hx, hy, 6]], ['horde, zoom 11', [hx, hy, 11]], ['horde, zoom 14', [hx, hy, 14]], ['horde, zoom 24', [hx, hy, 24]], ['horde, zoom 36', [hx, hy, 36]], ['keep, zoom 4', [keep[0], keep[1], 4]], ['keep, zoom 12', [keep[0], keep[1], 12]]];
     const rows = [];
     for (const [view, c] of views) {
       if (c) { app.cam.x = c[0]; app.cam.y = c[1]; app.cam.zoom = c[2]; } else app.homeView();
-      for (let k = 0; k < 20; k++) await raf();
+      for (let k = 0; k < settle; k++) await raf();
       this.n = 0;
-      for (let k = 0; k < 90; k++) await raf();
+      for (let k = 0; k < frames; k++) await raf();
       rows.push({ view, ...this.snapshot() });
       this.benchRows = rows; this.el.textContent = this.text();
     }
