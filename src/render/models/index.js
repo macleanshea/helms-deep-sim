@@ -7,20 +7,27 @@
 
 import { MeshBuilder } from '../mesh.js';
 import { legacy } from './legacy.js';
+import { infantry } from './infantry.js';
+import { horde } from './horde.js';
+import { vehicles } from './vehicles.js';
+import { siege } from './siege.js';
+import { aircraft } from './aircraft.js';
+import { props } from './props.js';
 
 /**
  * Animation constants: hip height, shoulder pivot x and z, swing (rad) and recoil (m) of the weapon arm,
- * then knee height, main rotor x, and elbow (or tail rotor) x and z.
+ * then knee height, main rotor x, elbow (or tail rotor) x and z, and how far fore and aft of the
+ * centre a four-legged creature's legs pivot.
  */
 const ANIM = {
   default: [0.84, 0.2, 1.3, 0.25, 0.12],
   uruk: [0.84, 0.2, 1.3, 1.5, 0], archer: [0.84, 0.2, 1.3, 0.2, 0.1], berserker: [0.84, 0.2, 1.3, 1.7, 0], chief: [0.84, 0.2, 1.3, 1.6, 0], sapper: [0.84, 0.2, 1.3, 0, 0],
-  warg: [0.6, 0.1, 1.4, 1.2, 0], troll: [1.5, 0.3, 2.8, 1.5, 0], ladder: [0.84, 0, 0, 0, 0], ram: [0, 0, 0, 0, -1.3], catapult: [0, 0.8, 1.4, -1.5, 0],
+  warg: [0.6, 0.1, 1.4, 1.2, 0, 0, 0, 0, 0, 0.6], troll: [1.5, 0.3, 2.8, 1.5, 0], ladder: [0.84, 0, 0, 0, 0], ram: [0, 0, 0, 0, -1.3], catapult: [0, 0.8, 1.4, -1.5, 0],
   tower: [0, 2.5, 12.3, -1.5708, 0], tankTurret: [0, 0, 0, 0, 0.5], ifvTurret: [0, 0, 0, 0, 0.18], howitzer: [0, 0, 0, 0, 0.6], mortar: [0, 0, 0, 0, 0.12],
   helo: [0, 0, 0, 0, 0, 0, 0.4, 0, 0], transport: [0, 0, 0, 0, 0, 0, 0.2, 0, 0],
 };
 
-const modules = [];
+const modules = [infantry, horde, vehicles, siege, aircraft, props];
 
 function make(fn) { const m = new MeshBuilder(); fn(m); return m.build(); }
 
@@ -46,9 +53,9 @@ export function buildModels() {
     const anim = (h && h.anim) || ANIM[name] || ANIM.default;
     out[name] = {
       name, full, mid, lod: boxLod(ref), bbox: full.bbox,
-      anim: [0, 1, 2, 3, 4, 5, 6, 7, 8].map((k) => anim[k] || 0),
+      anim: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((k) => anim[k] || 0),
       // large things are never reduced to a box: they stay recognisable from any distance
-      big: b[4] > 3.2 || b[1] - b[0] > 4,
+      big: h && h.big != null ? h.big : b[4] > 3.2 || b[1] - b[0] > 4,
     };
   }
   return out;

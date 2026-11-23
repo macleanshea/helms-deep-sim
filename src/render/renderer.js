@@ -27,7 +27,7 @@ const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
 // zoom (CSS px per metre) from which each level of detail applies, and where full models take over
 const DOT_ZOOM = 2.0, BOX_ZOOM = 3.4;
-const HERO_ZOOM = { high: 10, medium: 13, low: 16 };
+const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
 // how linear light is scaled from the display-space mood colours in main.js
 const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
 
@@ -473,7 +473,7 @@ export class Renderer {
 
   /** Which geometry a model is drawn with at a level of detail (0 full, 1 stand-in, 2 box, 3 far). */
   _geo(m, tier, shadow, props) {
-    if (props) return tier <= 1 ? m.full : m.mid || m.full;
+    if (props) return tier === 0 ? m.full : m.mid || m.full;
     if (tier === 0) return shadow ? m.mid || m.full : m.full;
     if (tier === 1 || m.big) return m.mid || m.full;
     return m.lod;
@@ -488,7 +488,7 @@ export class Renderer {
       if (!n) continue;
       if (shadowPass && (name === 'moat' || name === 'mine' || name === 'cube')) continue;
       const geo = this._geo(m, tier, shadowPass, props), a = m.anim;
-      gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]);
+      gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]); gl.uniform1f(p.u.uLegX, a[9]);
       gl.uniform1f(p.u.uMatOn, geo === m.full ? 1 : 0);   // stand-ins are too small on screen for texture to show
       gl.bindVertexArray(props ? geo.pvao : geo.vao);
       if (geo.itype) gl.drawElementsInstanced(gl.TRIANGLES, geo.n, geo.itype, 0, n); else gl.drawArraysInstanced(gl.TRIANGLES, 0, geo.n, n);

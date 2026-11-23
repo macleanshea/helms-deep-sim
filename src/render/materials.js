@@ -82,8 +82,9 @@ M rock(vec2 uv){
   vec2 w = uv + (vec2(pfbm(uv,3.,3), pfbm(uv+.5,3.,3))-.5)*0.3;
   float f = pfbm(w, 4., 6);
   float n1 = pn(w*4., vec2(4.)), n2 = pn(w*9.+3.7, vec2(9.)), n3 = pn(w*23.+1.3, vec2(23.));
-  float crack = min(1., (1.-smoothstep(0., 0.05, abs(n1*2.-1.)))*0.9 + (1.-smoothstep(0., 0.06, abs(n2*2.-1.)))*0.5 + (1.-smoothstep(0., 0.09, abs(n3*2.-1.)))*0.22);
-  float facet = step(0.5, n1)*0.5 + step(0.5, n2)*0.3 + n3*0.2;
+  float crack = min(1., (1.-smoothstep(0., 0.09, abs(n1*2.-1.)))*0.55 + (1.-smoothstep(0., 0.1, abs(n2*2.-1.)))*0.32 + (1.-smoothstep(0., 0.14, abs(n3*2.-1.)))*0.2);
+  crack *= 0.45 + 0.75*pn(w*14.+5.1, vec2(14.));                                     // creases fade in and out along their length
+  float facet = smoothstep(0.42, 0.58, n1)*0.5 + smoothstep(0.4, 0.6, n2)*0.3 + n3*0.2;
   float strata = 0.5+0.5*sin(uv.y*TAU*7. + pfbm(uv,4.,3)*7.);
   M m; m.h = f*0.5 + facet*0.35 + strata*0.07 - crack*0.4;
   vec3 c = vec3(0.5)*(0.68 + 0.42*f + 0.22*(facet-.5)) * (1.-0.42*crack) * (0.95+0.1*strata);

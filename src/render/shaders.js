@@ -49,10 +49,10 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
   vec3 a = albedo*albedo;
   float ndl = max(dot(n,uSun),0.);
   float sh = shadowAt(wp, ndl);
-  float gl = 1.-rough, pw = 6. + gl*gl*260., sk = spec*(pw+8.)*0.035;
+  float gl = 1.-rough, pw = 6. + gl*gl*220., sk = spec*min((pw+8.)*0.011, 1.1);
   vec3 l = mix(uAmb*vec3(0.62,0.57,0.5), uAmb, n.z*0.5+0.5)*ao + uSunCol*ndl*mix(0.1, 1., sh);
   vec3 s = uSunCol*pow(max(dot(n, normalize(uSun+uView)),0.), pw)*sk*sh*step(1e-4, ndl);
-  s += uAmb*spec*gl*0.5*pow(1.-max(dot(n,uView),0.), 3.);                 // the sky caught at grazing angles
+  s += uAmb*spec*gl*0.35*pow(1.-max(dot(n,uView),0.), 3.);                 // the sky caught at grazing angles
   for (int i=0;i<6;i++){
     vec3 d = uLPos[i].xyz - wp; float r = uLPos[i].w; float att = max(0., 1. - dot(d,d)/(r*r)); att *= att;
     if (att <= 0.) continue;
@@ -262,7 +262,7 @@ layout(location=4) in vec4 iPosYaw; layout(location=5) in vec2 iSP; layout(locat
 uniform mat4 uVP; uniform float uTime; uniform float uShadowPass; uniform vec3 uSun;
 uniform vec4 uPivot;  // hip z, shoulder x, shoulder z, swing
 uniform vec4 uPivot2; // knee z, rotor x, elbow (or tail rotor) x and z
-uniform float uRecoil;
+uniform float uRecoil; uniform float uLegX; // fore-and-aft offset of the leg pivots on four-legged creatures
 out vec3 vW; out vec3 vN; out vec3 vC; out float vFlash; out vec3 vO; out vec3 vNo; flat out float vMat; flat out vec2 vYaw;
 vec2 rot(vec2 v, float a){ float c=cos(a), s=sin(a); return vec2(v.x*c - v.y*s, v.x*s + v.y*c); }
 void main(){
@@ -273,7 +273,7 @@ void main(){
     if (aPart < 2.5 || shin) {
       float lp = ph + ((aPart < 1.5 || (aPart > 6.5 && aPart < 7.5)) ? 0. : 3.1416);
       if (shin) { float b = max(0., cos(lp))*0.95*walk; p.z -= uPivot2.x; p.xz = rot(p.xz, -b); n.xz = rot(n.xz, -b); p.z += uPivot2.x; }
-      float a = sin(lp)*0.62*walk; p.z -= uPivot.x; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.z += uPivot.x;
+      float lx = uLegX*sign(aPos.x), a = sin(lp)*0.62*walk; p.x -= lx; p.z -= uPivot.x; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += lx; p.z += uPivot.x;
     }
     else if (aPart < 3.5 || aPart > 9.5) {
       if (aPart > 9.5) { float e = -atk*uPivot.w*0.45; p.x -= uPivot2.z; p.z -= uPivot2.w; p.xz = rot(p.xz, e); n.xz = rot(n.xz, e); p.x += uPivot2.z; p.z += uPivot2.w; }
