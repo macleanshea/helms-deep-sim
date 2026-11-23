@@ -2,12 +2,13 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
-import { KEEP } from '../map.js';
+import { KEEP, N_WALL } from '../map.js';
 import { supportMethods } from './support.js';
 import { moraleMethods } from './morale.js';
+import { directorMethods } from './director.js';
 
 export { SUPPLY_R } from './support.js';
 export const MAX_UNITS = 1 << 16;
@@ -37,6 +38,7 @@ export class Sim {
     const o = setup.options || {};
     this.opt = { ...DEFAULT_OPTIONS, ...o, support: { ...DEFAULT_OPTIONS.support, ...(o.support || {}) } };
     this.rand = mulberry(this.opt.seed || 1);
+    this.rand2 = mulberry((this.opt.seed || 1) ^ 0x9e3779b9); // the horde's own dice: the director's choices
     this.mtype = map.type; this.mseg = map.seg; this.cz = map.cz; this.portal = map.portal;
 
     const N = MAX_UNITS;
@@ -53,6 +55,8 @@ export class Sim {
     this.aux = new Float32Array(N); this.aux2 = new Int32Array(N).fill(-1);
     this.hitT = new Float32Array(N).fill(-10); this.fireT = new Float32Array(N).fill(-10);
     this.next = new Int32Array(N); this.cnext = new Int32Array(N);
+    this.gen = new Uint16Array(N);      // bumped each time a slot is reused, so a stored unit reference can be checked
+    this.holdR = new Float32Array(N);   // fire discipline: 0 fire at will, >0 hold until the enemy is this close (m), <0 hold fire
     this.n = 0; this.free = [];
 
     this.head = new Int32Array(FW * FH);
@@ -61,6 +65,7 @@ export class Sim {
     this.danger = new Uint8Array(OW * OH);
     this.navCnt = new Uint8Array(GW * GH);
     this.loss = [new Uint16Array(OW * OH), new Uint16Array(OW * OH)];
+    this.hot = new Float32Array(OW * OH); this.hotList = []; // where the garrison's mortars and guns have been firing from
 
     // fortification state
     const NC = GW * GH;
@@ -103,31 +108,60 @@ export class Sim {
     this.result = null; this.routing = false; this.routT = 0;
     this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0 };
     this.support = {};
-    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: SUPPORT[k].cd };
+    const sb = !!this.opt.sandbox;
+    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
+    this.cp = sb ? 0 : this.opt.cpStart;
+    this.cpStats = { earned: this.cp, bounty: 0, spent: 0, calls: 0 };
+    this.bountyUnit = 0;
     this._cand = new Int32Array(24);
     this.defBox = [0, 0, 0, 0]; this.orcMaxX = 0;
     this.linkT = new Float32Array(N);
     this._bx = NaN; this._by = 0; this._bp = 0;
     this._initMorale();
     this.miscGroup = [this.newGroup(DEF, true), this.newGroup(ORC, true)];
+    // the defence is reported on by sector: three stretches of the Deeping Wall and the Hornburg
+    // named by landmark rather than compass point, so the names hold whichever way the map is drawn
+    this.sectors = [['the wall by the keep', 'keep end'], ['the centre of the wall', 'centre'], ['the cliff end of the wall', 'cliff end'], ['the Hornburg', 'Hornburg']].map(([name, short], k) => {
+      if (k === 3) return { name, short, x: KEEP.cx - KEEP.r, y: KEEP.cy };
+      const sg = this.segs[Math.floor(((k + 0.5) * N_WALL) / 3)];
+      return { name, short, x: sg.x, y: sg.y };
+    });
+    this._alertT = new Map();
 
-    for (const g of setup.groups) {
-      const pos = groupPositions(map, g);
-      const ti = U[g.type], d = UNITS[ti];
-      const n = Math.min(g.count, pos.length / 2);
-      if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); continue; }
-      const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
-      const face = d.team === DEF ? Math.PI : 0;
-      for (let k = 0; k < n; k++) {
-        const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (this.rand() - 0.5) * 0.3, gid);
-        if (i < 0) break;
-        if (d.team === ORC) { this.state[i] = g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = g.delay || 0; }
-      }
-    }
+    // later waves of the horde wait beyond the valley mouth until the director brings them on
+    const reserve = [];
+    for (const g of setup.groups) { if (g.team === ORC && g.phase > 0) reserve.push(g); else this._spawnGroup(g); }
+    for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
+    this._initDirector(setup.groups, reserve);
     this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
     this._findArtillery();
-    for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
+    // what one bounty point is worth: the pool divided over every engine, troll and captain the horde has
+    if (!sb) {
+      let w = 0;
+      for (const k in BOUNTY) w += BOUNTY[k] * (this.stats.startOrc[k] || 0);
+      this.bountyUnit = w > 0 ? (BOUNTY_SHARE * this.opt.cpRate * (this.opt.dawn > 0 ? this.opt.dawn : 1200)) / w : 0;
+    }
     this._startMorale();
+  }
+
+  /** Put a formation on the field. `atX` overrides where (late arrivals); returns how many found room. */
+  _spawnGroup(g, atX, marching) {
+    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX });
+    const ti = U[g.type], d = UNITS[ti];
+    const n = Math.min(g.count, pos.length / 2);
+    if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
+    if (!n) return 0;
+    const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
+    if (d.fearless) this.gFearless[gid] = 1;
+    const face = d.team === DEF ? Math.PI : 0;
+    let made = 0;
+    for (let k = 0; k < n; k++) {
+      const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
+      if (i < 0) break;
+      made++;
+      if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; }
+    }
+    return made;
   }
 
   // ---------------------------------------------------------------- units
@@ -136,6 +170,7 @@ export class Sim {
     if (this.free.length) i = this.free.pop(); else if (this.n < MAX_UNITS) i = this.n++; else return -1;
     const d = UNITS[ti];
     this.alive[i] = 1; this.team[i] = d.team; this.type[i] = ti; this.state[i] = S_IDLE; this.ord[i] = -1;
+    this.gen[i]++; this.holdR[i] = 0;
     this.x[i] = this.px[i] = x; this.y[i] = this.py[i] = y; this.vx[i] = this.vy[i] = 0; this.sepx[i] = this.sepy[i] = 0;
     this.bx[i] = x; this.by[i] = y;
     this.rot[i] = rot; this.trot[i] = rot;
@@ -155,6 +190,26 @@ export class Sim {
   }
 
   maxAmmo(i) { const d = UNITS[this.type[i]]; return d.pool ? d.pool : Math.ceil((d.ammo || 0) * Math.min(this.opt.ammoMult, 50)); }
+
+  /** Which sector a wall segment belongs to. */
+  segSector(k) { return k >= N_WALL ? 3 : Math.min(2, Math.floor((k * 3) / N_WALL)); }
+  /** Which sector a point on the defenders' side falls in. */
+  sectorAt(x, y) {
+    const dx = x - KEEP.cx, dy = y - KEEP.cy;
+    if (dx * dx + dy * dy < (KEEP.r + 14) * (KEEP.r + 14)) return 3;
+    const y0 = this.map.wallJoin.y, y1 = this.map.wallTop.y;
+    return Math.max(0, Math.min(2, Math.floor(((y - y0) / (y1 - y0)) * 3)));
+  }
+
+  /**
+   * Tell the player something, at most once every `gap` seconds per key. Alerts carry a map
+   * position so the UI can ping it and jump the camera there.
+   */
+  _alert(key, gap, text, cls, x, y, banner, big) {
+    if (key) { const t = this._alertT.get(key); if (t !== undefined && this.time < t) return false; this._alertT.set(key, this.time + gap); }
+    this.events.push({ type: banner ? 'banner' : 'log', text, cls, x, y, big: !!big });
+    return true;
+  }
 
   /** Height of a unit's feet above datum. */
   unitZ(i) {
@@ -192,6 +247,11 @@ export class Sim {
       if (!silent) {
         this.stats.kills[key] = (this.stats.kills[key] || 0) + 1;
         this.stats.lostOrc[d.key] = (this.stats.lostOrc[d.key] || 0) + 1;
+        if (this.bountyUnit && BOUNTY[d.key]) {
+          const amt = this.bountyUnit * BOUNTY[d.key];
+          this.cp = Math.min(this.opt.cpCap, this.cp + amt); this.cpStats.bounty += amt; this.cpStats.earned += amt;
+          this.events.push({ type: 'cp', amt, x, y });
+        }
       }
       if (d.role === R.LADDER || d.role === R.TOWER) {
         const k = this.aux2[i];
@@ -501,6 +561,7 @@ export class Sim {
   step() {
     if (this.result) return;
     this.tick++; this.time += DT;
+    if (!this.opt.sandbox && this.cp < this.opt.cpCap) { const inc = Math.min(this.opt.cpCap - this.cp, this.opt.cpRate * DT); this.cp += inc; this.cpStats.earned += inc; }
     if (this.tick % 5 === 1) this._buildAux();
     this._buildGrids();
     if ((this.navDirty && this.tick - this.lastNav >= 3) || this.tick - this.lastNav >= 20) this._nav();
@@ -519,8 +580,15 @@ export class Sim {
     if (this.aircraft.length) this._aircraft();
     if (this.drops.length) this._drops();
     if (this.tick % 10 === 3) this._supply();
+    if (this.tick % 20 === 7) this._ammoWatch();
+    if (this.tick % 50 === 9) {
+      // firing positions cool off; the ones still hot are what the catapults go looking for
+      const hot = this.hot, list = this.hotList; list.length = 0;
+      for (let c = 0; c < hot.length; c++) { if (hot[c] <= 0) continue; if ((hot[c] *= 0.8) < 1) hot[c] = 0; else if (hot[c] >= 48 && list.length < 64) list.push(c); }
+    }
     if (this.clays.length && this.tick % 3 === 0) this._claymores();
     if (this.tick % 5 === 2) this._morale();
+    if (this.dir && this.tick % 5 === 4) this._director();
     if (this.focus && this.time > this.focus.until) this.focus = null;
     if (this.tick % 5 === 0) this._checkEnd();
   }
@@ -618,6 +686,8 @@ export class Sim {
       return;
     }
     let speed = d.speed;
+    const pin = this.gPin[g];
+    if (pin) speed *= pin === 2 ? 0.3 : 0.65; // heads down under fire
     if (this.gConf[g] > this.time) { if (((this.tick + i) & 7) < 5) { this.vx[i] *= 0.6; this.vy[i] *= 0.6; return; } speed *= 0.5; }
     switch (d.role) {
       case R.ARCHER: {
@@ -628,7 +698,7 @@ export class Sim {
             const dx = this.x[t] - x, dy = this.y[t] - y, d2 = dx * dx + dy * dy;
             if (d2 <= w.range * w.range) {
               this.vx[i] *= 0.5; this.vy[i] *= 0.5;
-              if (this.cd[i] <= 0) {
+              if (this.cd[i] <= 0 && pin < 2) {
                 this.cd[i] = w.reload * (0.8 + 0.4 * this.rand()); this.fireT[i] = this.time;
                 this.rot[i] = Math.atan2(dy, dx);
                 let acc = w.acc; if (this.el[t] && !el) acc *= 0.22;
@@ -715,16 +785,30 @@ export class Sim {
             const cw = this.map.cellOf(this.tx[i], this.ty[i]);
             this.ladderAt[cw] = i; this.lad[cw] = 1; this.navDirty = true;
             this.fx.dust(this.x[i], this.y[i], this.map.groundZ(this.x[i], this.y[i]), tower ? 6 : 3); this.fx.sound('ladder', this.x[i], this.y[i], tower ? 1 : 0.6);
-            if (tower) this.events.push({ type: 'banner', text: 'A siege tower is against the wall!', cls: 'bad' });
-            else if (!this._ladderAnnounced) { this._ladderAnnounced = true; this.events.push({ type: 'banner', text: 'Ladders on the Deeping Wall', cls: 'warn' }); }
+            const where = this.sectors[this.segSector(k)].name;
+            if (tower) this._alert(null, 0, `A siege tower is against ${where}!`, 'bad', this.x[i], this.y[i], true);
+            else if (!this._ladderAnnounced) { this._ladderAnnounced = true; this._alert(null, 0, 'Ladders on the Deeping Wall', 'warn', this.x[i], this.y[i], true); }
+            else this._alert('ladUp' + this.segSector(k), 25, `Ladders are up on ${where}`, 'warn', this.x[i], this.y[i]);
           }
           return;
         }
-        if (k < 0 || this.segs[k].breached) { if (k >= 0) this.segs[k].claimed--; k = this._pickLadderSeg(y); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++; }
+        if (k < 0 || this.segs[k].breached) {
+          if (k >= 0) this.segs[k].claimed--;
+          // most crews of a wave make for the stretch of wall it has been aimed at
+          const aim = this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
+          k = this._pickLadderSeg(aim); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++;
+        }
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, d.sz, 0); return; }
         const s = this.segs[k];
         const ax = s.ox + (tower ? s.nx * 2.2 : 0), ay = s.oy + (tower ? s.ny * 2.2 : 0);
         const dx = ax - x, dy = ay - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 130 && !this.ammo2[i]) {
+          // seen coming: one warning per engine while there is still time to do something about it
+          this.ammo2[i] = 1;
+          const where = this.sectors[this.segSector(k)].name;
+          if (tower) this._alert(null, 0, `A siege tower is closing on ${where}`, 'warn', x, y);
+          else this._alert('ladIn' + this.segSector(k), 30, `Ladder crews are making for ${where}`, 'warn', x, y);
+        }
         if (l < 2.5) { this.state[i] = S_ACT; this.aux[i] = this.time + (tower ? 3 : 4); this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-s.ny, -s.nx); return; }
         const bc = this._move(i, dx / l, dy / l, speed, d.sz, 0);
         if (tower) {
@@ -733,7 +817,7 @@ export class Sim {
           // a tower that cannot get forward lets its company out where it stands
           if (Math.abs(this.x[i] - this.bx[i]) + Math.abs(this.y[i] - this.by[i]) > 1.5) { this.bx[i] = this.x[i]; this.by[i] = this.y[i]; this.linkT[i] = this.time; }
           else if (this.time - this.linkT[i] > 9) {
-            this.events.push({ type: 'log', text: 'A siege tower is stuck — its company dismounts', cls: 'good' });
+            this._alert(null, 0, 'A siege tower is stuck — its company dismounts', 'good', x, y);
             this.fx.death(this.type[i], x, y, this.map.groundZ(x, y), this.rot[i], NaN, 0, 0);
             this.kill(i, null, true);
           }
@@ -749,6 +833,7 @@ export class Sim {
           return;
         }
         const dx = gseg.ox - x, dy = gseg.oy - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 140 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('ramIn', 20, 'A battering ram is on the causeway', 'bad', x, y); }
         if (l < 5.5) {
           this.linkT[i] = this.time;
           this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-gseg.ny, -gseg.nx);
@@ -778,6 +863,7 @@ export class Sim {
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, 0, 0); return; }
         const s = this.segs[k];
         const dx = s.ox - x, dy = s.oy - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
         if (l < 3) { this.state[i] = S_ACT; this.aux[i] = this.time + 1.6; this.vx[i] = this.vy[i] = 0; this.fx.sound('fuse', x, y, 0.8); return; }
         if ((this.tick + i) % 6 === 0) this.fx.spark(x, y, this.unitZ(i) + 1.5);
         this._move(i, dx / l, dy / l, speed, 0, 0);
@@ -793,6 +879,9 @@ export class Sim {
           this.rot[i] = Math.atan2(ty - y, tx - x);
           this._launch(x, y, this.cz[c] + 3, tx, ty, this.surfZ(tx, ty), w, ORC, 3, w.flight);
           this.fx.sound('catapult', x, y, 0.7);
+          // the alert points at the engine, not at where its rocks land: that is the thing to strike
+          const sec = this.sectorAt(tx, ty);
+          this._alert('catFire' + sec, 75, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
           return;
         }
         if ((this.tick + i) % 10 === 0 && this._catTarget(i, w)) { this.state[i] = S_ACT; this.vx[i] = this.vy[i] = 0; this.cd[i] = 2 + this.rand() * 3; return; }
@@ -846,6 +935,21 @@ export class Sim {
     const x = this.x[i], y = this.y[i];
     const b = this.defBox;
     if (x < b[0] - w.range || x > b[2] + w.range) return false;
+    // counter-battery: every other catapult hunts the mortars and guns that keep firing from one place
+    if ((i & 1) === 0 && this.hotList.length) {
+      const r2c = w.range * w.range, m2c = w.min * w.min;
+      let bestH = -1, bd = 1e12;
+      for (const c of this.hotList) {
+        const dx = (c % OW) * OCS + 8 - x, dy = ((c / OW) | 0) * OCS + 8 - y, d2 = dx * dx + dy * dy;
+        if (d2 <= r2c && d2 >= m2c && d2 < bd) { bd = d2; bestH = c; }
+      }
+      if (bestH >= 0) {
+        this.tx[i] = (bestH % OW) * OCS + 8; this.ty[i] = ((bestH / OW) | 0) * OCS + 8;
+        this._alert('cbat', 45, 'Catapults are ranging on your mortars — move them, hold them (T), or kill the catapults', 'warn', this.tx[i], this.ty[i]);
+        return true;
+      }
+      if (x < b[0] - 150) return false; // keep rolling forward until the guns are in reach
+    }
     const x0 = Math.max(0, ((x - w.range) / DCS) | 0), x1 = Math.min(DW - 1, ((x + w.range) / DCS) | 0);
     const y0 = Math.max(0, ((y - w.range) / DCS) | 0), y1 = Math.min(DH - 1, ((y + w.range) / DCS) | 0);
     const r2 = w.range * w.range, m2 = w.min * w.min;
@@ -869,18 +973,28 @@ export class Sim {
     const fresh = !s.breached;
     for (let j = k - 1; j <= k + 1; j++) { const q = this.segs[j]; if (q && q.kind === 'wall') this.breachSeg(j, j !== k); }
     this.explode(s.x, s.y, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
-    if (fresh) this.events.push({ type: 'banner', text: s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : 'The wall is breached!', cls: 'bad', big: true });
+    if (fresh) this._alert(null, 0, s.culvert ? 'The culvert is blown — the Deeping Wall is breached!' : `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is breached!`, 'bad', s.x, s.y, true, true);
   }
 
   damageSeg(k, dmg) {
     const s = this.segs[k];
     if (s.breached || s.maxHp > 1e8) return;
+    const before = s.hp / s.maxHp;
     s.hp -= dmg;
     if (s.hp <= 0) {
       this.breachSeg(k);
-      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : 'A wall section has collapsed!';
-      this.events.push({ type: 'banner', text: txt, cls: 'bad', big: s.kind === 'gate' });
+      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
+      this._alert(null, 0, txt, 'bad', s.x, s.y, true, s.kind === 'gate');
+      return;
     }
+    // warn while there is still something to be done about it
+    const now = s.hp / s.maxHp;
+    if (s.kind === 'gate' || s.kind === 'postern') {
+      const what = s.kind === 'gate' ? 'The gate' : 'The postern door';
+      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, true);
+      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, true);
+      else if (before >= 1) this._alert(null, 0, `${what} is under attack`, 'warn', s.x, s.y);
+    } else if (before > 0.5 && now <= 0.5) this._alert('wallHp' + this.segSector(k), 30, `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is being battered down`, 'warn', s.x, s.y);
   }
 
   breachSeg(k, quiet) {
@@ -969,6 +1083,9 @@ export class Sim {
   _fire(i, d, w, slot, eg, x, y, c) {
     const cdA = slot ? this.cd2 : this.cd, el = eg ? 1 : 0;
     const z0 = (eg ? this.segTop[this.mseg[c]] : this.map.groundZ(x, y)) + (d.cls === C.INF ? 1.4 : 2.2);
+    // fire discipline: a focus-fire order overrides it
+    const hold = this.focus ? 0 : this.holdR[i];
+    if (hold < 0) { cdA[i] = 0.4; return; }
     if (w.arc) {
       const o = this.artyOrd[this.grp[i]];
       if (o && o.mode === 'hold') { cdA[i] = 0.5; return; }
@@ -985,6 +1102,7 @@ export class Sim {
       const tx = this.tx[i] + (this.rand() + this.rand() - 1) * w.scatter, ty = this.ty[i] + (this.rand() + this.rand() - 1) * w.scatter;
       const dist = Math.hypot(tx - x, ty - y);
       this.ammo[i]--; cdA[i] = w.reload * (0.9 + 0.25 * this.rand()); this.fireT[i] = this.time; this.stats.shots++;
+      this.hot[((y / OCS) | 0) * OW + ((x / OCS) | 0)] += w.aoe > 8 ? 40 : 16; // muzzle flashes give the position away
       const ang = Math.atan2(ty - y, tx - x);
       if (d.cls === C.INF) this.rot[i] = ang; else this.trot[i] = ang;
       this._launch(x, y, z0, tx, ty, this.surfZ(tx, ty), w, DEF, 2, w.flight + dist / 400);
@@ -994,13 +1112,15 @@ export class Sim {
     }
     const tA = slot ? this.target2 : this.target;
     const range = el ? w.range * (this.segTop[this.mseg[c]] > 15 ? 1.2 : 1.12) : w.range;
+    // holding fire to a set distance shortens the reach but not the accuracy curve: close shots hit far more often
+    const reach = hold > 0 && hold < range ? Math.max(hold, (w.min || 0) + 15) : range;
     let t = tA[i], dx = 0, dy = 0, d2 = 0, ok = false;
     if (t >= 0 && this.alive[t] && this.team[t] === ORC) {
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
-      ok = d2 <= range * range && d2 >= (w.min || 0) * (w.min || 0);
+      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0);
     }
     if (!ok) {
-      t = this._acquireDirect(i, w, range, eg, x, y);
+      t = this._acquireDirect(i, w, reach, eg, x, y);
       tA[i] = t;
       if (t < 0) { cdA[i] = 0.25 + this.rand() * 0.4; return; }
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
@@ -1035,6 +1155,7 @@ export class Sim {
         if (this.ob[tc] & OB.MOAT) acc *= el ? 1.15 : 0.45;
       }
     }
+    if (w.sup) this.gSup[this.grp[t]] += w.sup; // near misses keep heads down too
     const hit = this.rand() < acc;
     if (hit) this.damage(t, w.dmg, w);
     else if (this.rand() < 0.3) {
@@ -1077,6 +1198,22 @@ export class Sim {
     if (f) {
       const dx = f.x - x, dy = f.y - y, rr = range + f.r;
       if (dx * dx + dy * dy < rr * rr) {
+        if (w.pref) {
+          // marksmen and anti-armour go for whatever of theirs stands inside the marked circle: this is how a captain is hunted
+          const hv = this.hvt, f2 = f.r * f.r;
+          let best = -1, bs = 1e18;
+          for (let k = 0; k < hv.length; k++) {
+            const j = hv[k];
+            if (!this.alive[j] || !(UNITS[this.type[j]].hvt & w.pref)) continue;
+            const fx = this.x[j] - f.x, fy = this.y[j] - f.y;
+            if (fx * fx + fy * fy > f2) continue;
+            const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
+            if (e2 > r2 || e2 < m2) continue;
+            const sc = e2 * (0.5 + this.rand());
+            if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+          }
+          if (best >= 0) return best;
+        }
         for (let k = 0; k < 3; k++) {
           const j = this._randOrcNear(f.x, f.y, f.r);
           if (j < 0) break;
@@ -1190,7 +1327,7 @@ export class Sim {
     this.fx.explosion(x, y, z, r, w.fxk || 0);
     const x0 = Math.max(0, ((x - r) / FINE) | 0), x1 = Math.min(FW - 1, ((x + r) / FINE) | 0);
     const y0 = Math.max(0, ((y - r) / FINE) | 0), y1 = Math.min(FH - 1, ((y + r) / FINE) | 0);
-    const r2 = r * r, enemy = team === DEF ? ORC : DEF;
+    const r2 = r * r, enemy = team === DEF ? ORC : DEF, sup = team === DEF ? w.sup || 0 : 0;
     const high = this.elev[this.map.cellOf(x, y)] ? 1 : 0;
     this._bx = x; this._by = y; this._bp = r;
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
@@ -1198,6 +1335,7 @@ export class Sim {
         if (!this.alive[j] || (!ff && this.team[j] !== enemy)) continue;
         const dx = this.x[j] - x, dy = this.y[j] - y, d2 = dx * dx + dy * dy;
         if (d2 >= r2) continue;
+        if (sup && this.team[j] === ORC) this.gSup[this.grp[j]] += sup;
         // fragmentation is patchy: small targets are either caught or spared, big ones soak the blast
         const f = 1 - Math.sqrt(d2) / r;
         let dm;
@@ -1266,9 +1404,18 @@ export class Sim {
     else { const c = this.map.cellOf(x, y); if (!cost[c]) return -1; this.srcBuf[0] = c; }
     const dir = new Uint8Array(GW * GH);
     this.solver.solve(cost, this.srcBuf, ns, dir, veh ? this.navVeh : this.navDef);
-    const idx = this.orderSeq++ % 12;
+    // take a path slot nobody is following; only when all are busy does the least-used order give its slot up
+    const MAXO = 32, use = new Int32Array(MAXO);
+    for (let i = 0; i < this.n; i++) if (this.alive[i] && this.team[i] === DEF && this.state[i] === S_MOVE && this.ord[i] >= 0) use[this.ord[i]]++;
+    // a slot just handed out stays reserved for a moment: its units are assigned right after this returns
+    const hold = this._orderHold || (this._orderHold = new Float32Array(MAXO).fill(-1));
+    for (let k = 0; k < MAXO; k++) if (hold[k] >= this.time) use[k] += 1e6;
+    let idx = 0;
+    for (let k = 1; k < MAXO; k++) if (use[k] < use[idx]) idx = k;
+    for (let k = 0; k < MAXO; k++) if (!use[k]) { idx = k; break; }
+    hold[idx] = this.time + 2.5;
     this.orders[idx] = { dir, x, y, r };
-    for (let i = 0; i < this.n; i++) if (this.ord[i] === idx) this.ord[i] = -1;
+    if (use[idx]) for (let i = 0; i < this.n; i++) if (this.ord[i] === idx) this.ord[i] = -1;
     return idx;
   }
 
@@ -1308,6 +1455,9 @@ export class Sim {
 
   stop(ids) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; } }
 
+  /** Fire discipline for the given defenders: 0 at will, a distance in metres to hold until, or -1 to hold fire. */
+  setStance(ids, v) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.holdR[i] = v; this.target[i] = -1; this.target2[i] = -1; } }
+
   /** Send the listed [distance, unit] pairs to free positions inside the Hornburg. */
   _toKeep(list) {
     if (!list.length) return 0;
@@ -1337,20 +1487,23 @@ export class Sim {
     return list.length;
   }
 
-  /** Fall back: every foot soldier outside the Hornburg runs for its walls. */
-  orderRetreat() {
+  /**
+   * Fall back to the Hornburg. With no list, every foot soldier outside it goes (the general
+   * retreat); with a list of unit ids, only those — a sector can be given up while the rest hold.
+   */
+  orderRetreat(ids) {
     const list = [];
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || this.team[i] !== DEF) continue;
+    const consider = (i) => {
+      if (!this.alive[i] || this.team[i] !== DEF) return;
       const d = UNITS[this.type[i]];
-      if (d.cls !== C.INF || !d.speed) continue;
+      if (d.cls !== C.INF || !d.speed) return;
       const dk = Math.hypot(this.x[i] - KEEP.cx, this.y[i] - KEEP.cy);
       if (dk > KEEP.r + 6) list.push([dk, i]);
-    }
+    };
+    if (ids) for (const i of ids) consider(i); else for (let i = 0; i < this.n; i++) consider(i);
     if (!list.length) return 0;
     this._toKeep(list);
-    this.retreated = true;
-    this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn' });
+    if (!ids) { this.retreated = true; this.events.push({ type: 'banner', text: 'Fall back to the keep!', cls: 'warn', x: KEEP.cx, y: KEEP.cy }); }
     return list.length;
   }
 
@@ -1443,6 +1596,7 @@ export class Sim {
     if (this.routing) { if (this.time > this.routT + 14) this._finish(true, 'The horde has broken and fled the valley.'); return; }
     if (this.opt.rout > 0 && this.count[ORC] <= this.initial[ORC] * this.opt.rout) {
       this.routing = true; this.routT = this.time;
+      this._dropReserves();
       for (let i = 0; i < this.n; i++) if (this.alive[i] && this.team[i] === ORC && this.state[i] !== S_DONE && this.state[i] !== S_CLIMB) this.state[i] = S_FLEE;
       this.events.push({ type: 'banner', text: 'The horde breaks — they are running!', cls: 'good' });
       return;
@@ -1456,6 +1610,15 @@ export class Sim {
   }
 
   // ------------------------------------------------------------- queries
+  /** Cheap fingerprint of the whole battle state, for checking that runs are reproducible. */
+  hash() {
+    let h = 0x811c9dc5;
+    const mix = (v) => { h = Math.imul(h ^ (v | 0), 0x01000193); };
+    mix(this.tick); mix(this.count[0]); mix(this.count[1]); mix(this.defCombat);
+    for (let i = 0; i < this.n; i++) { if (!this.alive[i]) continue; mix(i); mix(this.x[i] * 16); mix(this.y[i] * 16); mix(this.hp[i]); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  }
+
   defenderAt(x, y, r) {
     let best = -1, bd = r * r;
     for (let i = 0; i < this.n; i++) {
@@ -1468,4 +1631,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods);

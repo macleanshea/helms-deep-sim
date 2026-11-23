@@ -83,61 +83,103 @@ function alongRing(type, count, a0, a1, r = KEEP.r) {
   return out;
 }
 
+// How the horde's strength is shared out between its waves. Each wave has a character: the
+// vanguard is light and fast, the escalade brings ladders and berserkers, the siege train
+// brings the engines, and the final assault brings everything that is left. Numbers are
+// relative weights per unit type.
+export const WAVE_KINDS = {
+  probe:    { name: 'Vanguard',      w: { uruk: 0.6, archer: 0.6, berserker: 0.3, warg: 1.5, ladder: 0.3, tower: 0,   troll: 0,   ram: 0,   sapper: 0,   catapult: 0,   chief: 0 } },
+  escalade: { name: 'Escalade',      w: { uruk: 1.0, archer: 1.0, berserker: 1.4, warg: 0.5, ladder: 1.6, tower: 1.0, troll: 0.4, ram: 0.3, sapper: 0.5, catapult: 0.5, chief: 1.0 } },
+  siege:    { name: 'Siege train',   w: { uruk: 1.0, archer: 1.0, berserker: 0.5, warg: 0.3, ladder: 0.5, tower: 1.0, troll: 1.6, ram: 1.5, sapper: 1.5, catapult: 1.5, chief: 1.0 } },
+  assault:  { name: 'Main assault',  w: { uruk: 1.0, archer: 1.0, berserker: 1.0, warg: 0.4, ladder: 1.1, tower: 1.0, troll: 1.0, ram: 0.9, sapper: 1.0, catapult: 1.0, chief: 1.0 } },
+  final:    { name: 'Final assault', w: { uruk: 1.4, archer: 1.4, berserker: 1.2, warg: 1.2, ladder: 1.0, tower: 0.6, troll: 1.0, ram: 0.6, sapper: 0.8, catapult: 0.8, chief: 1.2 } },
+};
+function waveKinds(W) {
+  if (W <= 1) return ['final'];
+  if (W === 2) return ['assault', 'final'];
+  if (W === 3) return ['probe', 'assault', 'final'];
+  const out = ['probe'];
+  for (let k = 1; k < W - 1; k++) out.push(k & 1 ? 'escalade' : 'siege');
+  out.push('final');
+  return out;
+}
+
 /**
- * Lay the horde out in successive waves stretching back down the valley.
- * Each wave is a small army of its own and steps off `gap` seconds after the last.
+ * Build the horde as a series of waves. Wave 0 is laid out on the field; the others are
+ * tagged with their `phase` and held off-map (their x is the distance behind the wave's front
+ * rank, so it is negative) until the assault director brings them on.
+ *   mix: unit shares and counts, `waves` (how many), `sizes` (relative infantry weight per wave).
  */
 export function horde(total, mix = {}) {
   const m = { uruk: 0.7, archer: 0.2, berserker: 0.06, warg: 0.03, ...mix };
-  const waves = mix.waves ?? (total > 12000 ? 4 : total > 5000 ? 3 : total > 1500 ? 2 : 1);
-  const gap = mix.gap ?? 60;
+  const W = mix.waves ?? (total > 12000 ? 6 : total > 5000 ? 5 : total > 1500 ? 4 : 3);
+  const kinds = waveKinds(W);
   const g = [];
   const V = Math.PI / 2;
   const lanes = [140, 276, 412, 548, 684, 820];
   const Wd = 116;
-  const ladders = mix.ladders ?? Math.max(4, Math.round(total / 170));
-  const trolls = mix.trolls ?? Math.round(total / 420);
-  const rams = mix.rams ?? Math.max(1, Math.round(total / 3000));
-  const sappers = mix.sappers ?? Math.max(2, Math.round(total / 900));
-  const cats = mix.catapults ?? Math.round(total / 900);
-  const chiefs = mix.chiefs ?? Math.max(1, Math.round(total / 1500));
-  const towers = mix.towers ?? Math.round(total / 3600);
-  const share = (n, w) => Math.round((n * (w + 1)) / waves) - Math.round((n * w) / waves);
-  let x = 0;
+  const n = {
+    uruk: Math.round(total * m.uruk), archer: Math.round(total * m.archer), berserker: Math.round(total * m.berserker), warg: Math.round(total * m.warg),
+    ladder: mix.ladders ?? Math.max(4, Math.round(total / 170)), troll: mix.trolls ?? Math.round(total / 420), ram: mix.rams ?? Math.max(1, Math.round(total / 3000)),
+    sapper: mix.sappers ?? Math.max(2, Math.round(total / 900)), catapult: mix.catapults ?? Math.round(total / 900), chief: mix.chiefs ?? Math.max(1, Math.round(total / 1500)),
+    tower: mix.towers ?? Math.round(total / 3600),
+  };
+  // share each type out over the waves by weight, keeping the totals exact
+  const share = {};
+  for (const type in n) {
+    const w = kinds.map((k, i) => WAVE_KINDS[k].w[type] * ((type === 'uruk' || type === 'archer') && mix.sizes ? mix.sizes[i] / WAVE_KINDS[k].w.uruk : 1));
+    const sum = w.reduce((a, b) => a + b, 0) || 1;
+    let acc = 0, done = 0;
+    share[type] = w.map((v) => { acc += (n[type] * v) / sum; const c = Math.round(acc) - done; done += c; return c; });
+  }
   const gaps = lanes.slice(0, -1).map((y, k) => (y + lanes[k + 1]) / 2);
-  for (let w = 0; w < waves; w++) {
-    const delay = w * gap;
+  for (let w = 0; w < W; w++) {
+    let x = 0;
+    const first = g.length;
     // one rank of a wave: `cnt` units of a type spread over the given lanes, all at the same depth
-    const column = (type, cnt, ys = lanes, wd = Wd) => {
+    const column = (type, ys = lanes, wd = Wd) => {
+      const cnt = share[type][w];
       if (cnt <= 0) return 0;
       const sp = UNITS[U[type]].spacing;
       const per = Math.ceil(cnt / ys.length);
       const d = Math.ceil(per / (Math.floor(wd / sp) + 1)) * sp;
       let left = cnt;
-      for (const y of ys) { const c = Math.min(per, left); left -= c; if (c > 0) g.push(makeGroup(type, c, x - d / 2, y, V, wd, { delay })); }
+      for (const y of ys) { const c = Math.min(per, left); left -= c; if (c > 0) g.push(makeGroup(type, c, x - d / 2, y, V, wd, { phase: w, kind: kinds[w], hd: d / 2 })); }
       return d;
     };
     const next = (d) => { if (d > 0) x -= d + 6; };
-    next(column('berserker', share(Math.round(total * m.berserker), w)));
-    next(column('ladder', share(ladders, w)));
-    next(column('tower', share(towers, w), [lanes[2], lanes[1], lanes[3]], 40));
-    next(column('uruk', share(Math.round(total * m.uruk), w)));
-    next(column('archer', share(Math.round(total * m.archer), w)));
-    // the siege train and the captains bring up the rear of each wave
-    const sp = share(sappers, w), rm = share(rams, w);
-    const d1 = Math.max(
-      column('troll', share(trolls, w), [lanes[0], lanes[2], lanes[3], lanes[5]], 60),
-      column('chief', share(chiefs, w), [gaps[0], gaps[2], gaps[4]], 20),
-      sp ? column('sapper', sp, [443], 36) : 0,
-      rm ? column('ram', rm, [gaps[3] - 4], 30) : 0);
-    next(d1);
-    next(Math.max(column('catapult', share(cats, w), [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('warg', share(Math.round(total * m.warg), w), [lanes[1], lanes[4]], 70)));
-    x -= 22;
+    next(column('berserker'));
+    next(column('ladder'));
+    next(column('tower', [lanes[2], lanes[1], lanes[3]], 40));
+    next(column('uruk'));
+    next(column('archer'));
+    // the siege train follows the infantry; the captains drive each wave on from its rear
+    next(Math.max(column('troll', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('sapper', [443], 36), column('ram', [gaps[3] - 4], 30)));
+    next(Math.max(column('catapult', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('warg', [lanes[1], lanes[4]], 70), column('chief', [gaps[0], gaps[2], gaps[4]], 20)));
+    if (w === 0) {
+      // the vanguard stands on the field with its rear rank just inside the valley mouth
+      const shift = Math.min(600, Math.max(380, 24 - x));
+      for (let k = first; k < g.length; k++) g[k].x += shift;
+    }
   }
-  // slide the whole host so its rear rank stands just inside the valley mouth
-  const shift = Math.min(600, Math.max(380, 24 - x));
-  for (const q of g) q.x += shift;
   return g;
+}
+
+const NOTABLE = [['tower', 'siege tower'], ['ram', 'ram'], ['troll', 'troll'], ['catapult', 'catapult'], ['sapper', 'sapper'], ['ladder', 'ladder crew'], ['warg', 'warg rider'], ['berserker', 'berserker']];
+/** Per-wave strength and what to expect from it, read off the wave tags on attacker groups. */
+export function waveSummary(groups) {
+  const waves = [];
+  for (const g of groups) {
+    if (g.team !== ORC || g.phase == null) continue;
+    const w = waves[g.phase] || (waves[g.phase] = { k: g.phase, kind: g.kind, name: (WAVE_KINDS[g.kind] || WAVE_KINDS.assault).name, size: 0, by: {} });
+    w.size += g.count * (1 + (UNITS[U[g.type]].carry || 0));
+    w.by[g.type] = (w.by[g.type] || 0) + g.count;
+  }
+  for (let k = 0; k < waves.length; k++) {
+    const w = waves[k] || (waves[k] = { k, kind: 'assault', name: WAVE_KINDS.assault.name, size: 0, by: {} });
+    w.note = NOTABLE.filter(([t]) => w.by[t]).slice(0, 4).map(([t, nm]) => `${w.by[t]} ${nm}${w.by[t] > 1 ? 's' : ''}`).join(', ');
+  }
+  return waves;
 }
 
 /** A belt of field works in front of the Deeping Wall. */
@@ -184,59 +226,73 @@ function garrison(map, scale = 1) {
 export const PRESETS = [
   {
     key: 'garrison', name: 'The Hornburg Garrison',
-    blurb: 'A reinforced battalion behind wire and mines, against eighteen thousand Uruk-hai.',
+    blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
     build: (map) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(18000)],
-      options: {},
+      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { waves: 5 })],
+      options: { dawn: 1200, cpRate: 0.035 },
     }),
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles',
-    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — air support will decide this.',
+    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — how you spend your support will decide this.',
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
         ...alongRing('rifle', 70, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
         makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y), makeGroup('rifle', 24, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(8000),
+        ...fieldWorks(map, 0.6), ...horde(8000, { waves: 4 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 720 },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 8, cpRate: 0.035 },
     }),
   },
   {
     key: 'combined', name: 'Combined Arms vs. the Host',
-    blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming.',
+    blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
     build: (map) => ({
       groups: [
         ...garrison(map, 1.14),
         makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
         makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
         makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
-        ...fieldWorks(map, 1.3), ...horde(30000),
+        ...fieldWorks(map, 1.3), ...horde(30000, { waves: 6 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 } },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200, cpStart: 10, cpRate: 0.045 },
     }),
   },
   {
     key: 'recon', name: 'Recon Platoon',
-    blurb: 'Forty soldiers, two thousand orcs. A quick skirmish to learn the controls.',
+    blurb: 'Forty-odd soldiers and twenty-two hundred orcs in three waves. A short night to learn the controls.',
     build: (map) => ({
       groups: [
         ...alongWall(map, 'rifle', 26, 0.35, 0.65), ...alongWall(map, 'mg', 4, 0.4, 0.6), ...alongWall(map, 'marksman', 3, 0.42, 0.58),
-        ...alongRing('rifle', 8, 180, 210), makeGroup('mortar', 2, 1070, 460, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        ...alongRing('rifle', 8, 180, 210), ...alongRing('at', 2, 175, 200), makeGroup('mortar', 2, 1070, 460, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(2000, { ladders: 10, trolls: 3, rams: 1, sappers: 3, catapults: 2, chiefs: 2, towers: 1 }),
+        ...horde(2200, { waves: 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
       ],
-      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 900 },
+      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 10, cpRate: 0.045 },
     }),
   },
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
 ];
 
+/** Requisition cost of the defending side of a setup. */
+export function forceCost(groups) {
+  let c = 0;
+  for (const g of groups) if (g.team === DEF) c += (UNITS[U[g.type]].cost || 0) * g.count;
+  return c;
+}
+
+/**
+ * A preset as a setup: { groups, options, budget }. The budget is the cost of the garrison as
+ * issued plus a tenth, so the stock layout always fits and there is something left to spend.
+ */
 export function buildPreset(map, key) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
+  nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
   const s = p.build(map);
-  return { groups: s.groups, options: { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } } };
+  const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
+  if (!s.groups.length) options.sandbox = true; // nothing to hold a blank map against
+  return { groups: s.groups, options, budget: Math.ceil((forceCost(s.groups) * 1.1) / 100) * 100 };
 }

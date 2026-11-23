@@ -45,8 +45,24 @@ export const supportMethods = {
       }
       if (this.ammo[ci] <= 0) {
         this.kill(ci, null, true);
-        if (this.time > (this._dryT || 0)) { this._dryT = this.time + 25; this.events.push({ type: 'log', text: 'Ammo points are running dry — call a resupply drop', cls: 'warn' }); }
+        this._alert('cacheDry', 25, 'An ammo point has run dry — call a resupply drop', 'warn', x, y);
       }
+    }
+  },
+
+  /** Warn when the men holding a sector have mostly run out of ammunition. */
+  _ammoWatch() {
+    const armed = [0, 0, 0, 0], dry = [0, 0, 0, 0], sx = [0, 0, 0, 0], sy = [0, 0, 0, 0];
+    for (let i = 0; i < this.n; i++) {
+      if (!this.alive[i] || this.team[i] !== DEF) continue;
+      const d = UNITS[this.type[i]];
+      if (d.cls !== C.INF || !d.ammo) continue;
+      const k = this.sectorAt(this.x[i], this.y[i]);
+      armed[k]++;
+      if (this.ammo[i] < 1) { dry[k]++; sx[k] += this.x[i]; sy[k] += this.y[i]; }
+    }
+    for (let k = 0; k < 4; k++) {
+      if (armed[k] >= 4 && dry[k] * 2 >= armed[k]) this._alert('dry' + k, 90, `${this.sectors[k].name.replace(/^t/, 'T')} is out of ammunition`, 'bad', sx[k] / dry[k], sy[k] / dry[k]);
     }
   },
 
@@ -63,12 +79,16 @@ export const supportMethods = {
   },
 
   // ------------------------------------------------------ player orders
-  canSupport(kind) { const s = this.support[kind]; return s && s.left > 0 && this.time >= s.ready && !this.result; },
+  /** Can this kind of support be paid for (Command Points, or uses left in the sandbox)? */
+  affordSupport(kind) { const s = this.support[kind]; return !!s && (this.opt.sandbox ? s.left > 0 : this.cp >= s.cost); },
+  canSupport(kind) { const s = this.support[kind]; return !!s && this.affordSupport(kind) && this.time >= s.ready && !this.result; },
 
   callSupport(kind, x, y, x2 = x, y2 = y) {
     if (!this.canSupport(kind)) return false;
     const s = this.support[kind];
-    s.left--; s.ready = this.time + s.cd;
+    if (this.opt.sandbox) s.left--; else { this.cp -= s.cost; this.cpStats.spent += s.cost; }
+    this.cpStats.calls++;
+    s.ready = this.time + s.cd;
     const rnd = this.rand;
     if (kind === 'air') {
       let dx = x2 - x, dy = y2 - y, L = Math.hypot(dx, dy), cx = x, cy = y;
@@ -88,32 +108,32 @@ export const supportMethods = {
         this.timed.push({ t: ti - 0.8, f: () => this._launch(rx, ry, this._altAt('jet', rx, ry, dx * speed, dy * speed) - 5, bx, by, this.map.groundZ(bx, by), W.bomb, DEF, 4, 0.8) });
       }
       this.timed.push({ t: this.time + (sd - 500) / speed, f: () => this.fx.sound('jet', cx, cy, 1) });
-      this.events.push({ type: 'log', text: 'Fast air inbound — bombs in 5 seconds', cls: 'good' });
+      this.events.push({ type: 'log', text: 'Fast air inbound — bombs in 5 seconds', cls: 'good', x: cx, y: cy });
     } else if (kind === 'arty') {
       for (let k = 0; k < 20; k++) {
         const a = rnd() * 6.2832, rr = 45 * Math.sqrt(rnd());
         const tx = x + Math.cos(a) * rr, ty = y + Math.sin(a) * rr;
         this.timed.push({ t: this.time + 4.5 + k * 0.45 + rnd() * 0.3, f: () => { this._launch(tx - 70, ty + 30, 300, tx, ty, this.map.groundZ(tx, ty), W.arty, DEF, 0, 0.6); this.fx.sound('incoming', tx, ty, 0.6); } });
       }
-      this.events.push({ type: 'log', text: 'Fire mission — shot, over', cls: 'good' });
+      this.events.push({ type: 'log', text: 'Fire mission — shot, over', cls: 'good', x, y });
     } else if (kind === 'gunship') {
       for (let j = 0; j < 2; j++) {
         const sx = WORLD_W + 150 + j * 90, sy = y - 120 + j * 240;
         this.aircraft.push({ kind: 'helo', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, phase: j * Math.PI, rot: Math.PI, t: 0, st: 0, until: 0, gcd: 0, rcd: 1 + j });
       }
       this.fx.sound('helo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Gunships on station in moments', cls: 'good' });
+      this.events.push({ type: 'log', text: 'Gunships on station in moments', cls: 'good', x, y });
     } else if (kind === 'supply') {
       const sp = 115, sd = 650;
       this.aircraft.push({ kind: 'cargo', x: x + sd, y: y, px: x + sd, py: y, vx: -sp, vy: 0, rot: Math.PI, t: 0, life: (sd + x + 300) / sp });
       this.timed.push({ t: this.time + sd / sp, f: () => { for (let k = 0; k < 2; k++) this.drops.push({ x: x + (k ? 9 : -9), y: y + (rnd() - 0.5) * 14, t: 0, T: 5.5 }); } });
       this.fx.sound('cargo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Resupply bird inbound', cls: 'good' });
+      this.events.push({ type: 'log', text: 'Resupply bird inbound', cls: 'good', x, y });
     } else if (kind === 'reinforce') {
       const sx = WORLD_W + 200, sy = y + 50;
       this.aircraft.push({ kind: 'transport', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, rot: Math.PI, t: 0, st: 0, until: 0, dropped: 0, grp: this.newGroup(DEF) });
       this.fx.sound('helo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Air assault platoon inbound', cls: 'good' });
+      this.events.push({ type: 'log', text: 'Air assault platoon inbound', cls: 'good', x, y });
     }
     return true;
   },
@@ -162,14 +182,15 @@ export const supportMethods = {
               if (t >= 0) { this._launch(a.x, a.y, a.z + 2, this.x[t], this.y[t], this.unitZ(t), W.heli_rkt, DEF, 1, 0.9); this.fx.sound('rocket', a.x, a.y, 0.8); }
             }
           } else if (a.dropped < 30 && this.tick % 2 === 0) {
+            // the whole platoon gets off: a spot that cannot be stood on is skipped, not counted
             const mix = ['rifle', 'rifle', 'rifle', 'rifle', 'rifle', 'mg', 'rifle', 'rifle', 'rifle', 'marksman', 'rifle', 'rifle', 'at', 'rifle', 'rifle'];
             const ti = U[mix[a.dropped % mix.length]], d = UNITS[ti];
-            const ang = a.dropped * 2.4, rr = 3 + Math.sqrt(a.dropped) * 2.4;
+            const n = a.tries = (a.tries || 0) + 1;
+            const ang = n * 2.4, rr = 3 + Math.sqrt(n) * 2.4;
             const ux = a.cx + Math.cos(ang) * rr, uy = a.cy + Math.sin(ang) * rr;
-            if (canPlace(this.map, d, ux, uy, null)) { const j = this.spawn(ti, ux, uy, Math.PI, a.grp); if (j >= 0) this.fx.dust(ux, uy, this.unitZ(j), 1.5); }
-            a.dropped++;
+            if (canPlace(this.map, d, ux, uy, null)) { const j = this.spawn(ti, ux, uy, Math.PI, a.grp); if (j >= 0) { this.fx.dust(ux, uy, this.unitZ(j), 1.5); a.dropped++; this.stats.reinforced = (this.stats.reinforced || 0) + 1; } }
           }
-          if (this.time >= a.until) a.st = 2;
+          if (a.kind === 'helo' ? this.time >= a.until : a.dropped >= 30 || a.tries >= 90) a.st = 2;
         } else {
           fly(WORLD_W + 400, a.cy - 100);
           keep = a.x < WORLD_W + 300;
