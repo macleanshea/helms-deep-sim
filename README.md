@@ -29,7 +29,9 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 ## Playing
 
 The battlefield is shown in an isometric 3D view modelled on the film's set: the Hornburg on
-its rock against the cliff, the causeway up to the gate, and the Deeping Wall with its culvert.
+its rock against the southern cliff (on your right as you look up the valley), its inner ward
+climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
+its culvert.
 
 ### Challenge and sandbox
 
@@ -44,6 +46,12 @@ Every scenario is a **challenge** by default:
 
 Switch **Battle Options → Sandbox** to lift every limit: place anything on either side, edit
 all options, and call support by a fixed number of uses. Sandbox battles are not scored.
+
+In the sandbox there is no need to lay out each wave by hand. **Raise a horde** (Attackers tab)
+builds a whole host of any size, split into waves with its ladders, engines and captains, and
+**Horde pacing** decides how those waves come on: paced to dawn (as in the challenges), one a
+minute with no lulls or aiming, or the whole host at once. Formations you place yourself are not
+part of any wave: they go on the field as placed, each after its own "advance after" delay.
 
 ### The night
 
@@ -74,16 +82,22 @@ attackers can be edited too, and hand-placed attacker formations take an "advanc
 
 | Input | Action |
 | --- | --- |
-| `Space`, `-`, `+`, `N` | Pause, slower, faster (1× to 8×), fast-forward to the next contact |
+| `Space`, `-`, `+`, `N` | Pause / resume, slower, faster (1× to 8×), fast-forward to the next contact |
+| **Strike** | |
 | `1` Air Strike (5 CP) | Click a target, or drag to set the run-in heading |
 | `2` Gunships (6 CP) | Two helicopters orbit the target for 40 s |
 | `3` Artillery (3 CP) | Off-map battery covers a 45 m circle |
+| `T` Fire Mission | Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
+| `F` Focus Fire | Drag a circle; every weapon in range concentrates on it, and marksmen pick out any captain inside |
+| **Resupply & reinforce** | |
 | `4` Resupply Drop (4 CP) | Parachuted crates; troops within 60 m re-arm |
 | `5` Air Assault (8 CP) | A helicopter inserts a fresh platoon |
-| `F` Focus Fire | Drag a circle; every weapon in range concentrates on it, and marksmen pick out any captain inside |
-| `H` Hold Mortars | Mortars and howitzers pause until released |
-| `V` Fire discipline | Selected troops: fire at will, hold to 150 m, hold to 75 m, hold fire |
 | `R` / `Shift+R` | Selected troops fall back to the keep / general retreat |
+| **Overlays** | |
+| `Z` Fire Zones | Where each mortar and howitzer section can land rounds (between minimum and maximum range) |
+| `V` Ranges | How far the rest of the garrison reaches, by weapon (just the selection, if troops are selected) |
+| **Command** | |
+| `H` Fire discipline | Selected troops: fire at will, hold to 150 m, hold to 75 m, hold fire |
 | `G` | Jump to the latest alert (again for earlier ones) |
 | `L` Losses | Shows where units of each side have been knocked out |
 | Drag, double-click | Box-select defenders; double-click selects every unit of that kind in view |
@@ -99,7 +113,7 @@ Orders can be given while paused. The battle waits while a dialog is open.
   cross anti-vehicle obstacles or moats.
 - Troops pressed against the foot of the wall are hard to hit from the battlements above.
 - Ammunition is the garrison's real limit. Shots at close range hit far more often than at long
-  range, so holding fire (`V`) stretches it; an amber pip marks a soldier who is out.
+  range, so holding fire (`H`) stretches it; an amber pip marks a soldier who is out.
 - Machine guns and shellfire **suppress**: a pinned company (▼) slows to a crawl, its archers
   stop shooting and its morale wears away. Berserkers cannot be pinned.
 - Both sides have command units (★). Lose one and nearby companies are briefly disorganised
@@ -110,6 +124,8 @@ Orders can be given while paused. The battle waits while a dialog is open.
   Catapults batter the wall and counter-battery mortars that keep firing from one place.
 - Alerts warn before the damage is done — a ram on the causeway, sappers running for the
   culvert, ladder crews closing, the gate at half strength, a sector out of ammunition.
+- A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
+  through the gap. Aircraft climb over the mountains and the keep rather than through them.
 
 Rendering quality steps down automatically on slower machines; add `?q=low` or `?q=high` to
 the URL to force it.

@@ -172,6 +172,7 @@ export const DEFAULT_OPTIONS = {
   support: { air: 4, gunship: 2, arty: 5, supply: 4, reinforce: 2 },
   dawn: 1200, // seconds until relief arrives (0 = never)
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)
+  pacing: 'director', // how a generated horde's waves come on: 'director' | 'steady' | 'massed' (sandbox only)
   morale: true, // companies waver, break and rally
   seed: 1,
 };

@@ -8,7 +8,19 @@ const W = WEAPONS;
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;
 export const SUPPLY_R = 60; // re-arm radius of caches and supply drops (m)
 
+// cruising height of each kind of aircraft over open ground, and how far it keeps above the hills
+const ALT = { jet: [125, 45], cargo: [105, 40], helo: [52, 28], transport: [48, 22] };
+
 export const supportMethods = {
+  /** Height an aircraft wants at x,y: its cruising height, or higher where the mountains demand it. */
+  _altAt(kind, x, y, vx = 0, vy = 0) {
+    const [base, clear] = ALT[kind];
+    let f = this.map.airFloor(x, y);
+    // fast movers look ahead so they are already climbing when the ridge arrives
+    for (const t of [1.2, 2.5, 4]) { if (!vx && !vy) break; f = Math.max(f, this.map.airFloor(x + vx * t, y + vy * t)); }
+    return Math.max(base, f + clear);
+  },
+
   _supply() {
     for (const ci of this.caches) {
       if (!this.alive[ci] || this.ammo[ci] <= 0) continue;
@@ -92,7 +104,8 @@ export const supportMethods = {
         const al = (k / (N - 1) - 0.5) * L, side = (k & 1 ? 1 : -1) * 11, j = k & 1;
         const bx = cx + dx * al - dy * side, by = cy + dy * al + dx * side;
         const ti = this.time + (sd + j * 70 + al) / speed;
-        this.timed.push({ t: ti - 0.8, f: () => this._launch(bx - dx * speed * 0.7, by - dy * speed * 0.7, 120, bx, by, this.map.groundZ(bx, by), W.bomb, DEF, 4, 0.8) });
+        const rx = bx - dx * speed * 0.7, ry = by - dy * speed * 0.7;
+        this.timed.push({ t: ti - 0.8, f: () => this._launch(rx, ry, this._altAt('jet', rx, ry, dx * speed, dy * speed) - 5, bx, by, this.map.groundZ(bx, by), W.bomb, DEF, 4, 0.8) });
       }
       this.timed.push({ t: this.time + (sd - 500) / speed, f: () => this.fx.sound('jet', cx, cy, 1) });
       this.events.push({ type: 'log', text: 'Fast air inbound — bombs in 5 seconds', cls: 'good', x: cx, y: cy });
@@ -159,14 +172,14 @@ export const supportMethods = {
               const t = this._randOrcNear(a.cx, a.cy, 150);
               if (t >= 0) {
                 const tx = this.x[t] + (this.rand() - 0.5) * 4, ty = this.y[t] + (this.rand() - 0.5) * 4;
-                this.fx.tracer(a.x, a.y, 55, tx, ty, this.map.groundZ(tx, ty) + 0.5, TR.CANNON); this.fx.sound('autocannon', a.x, a.y, 0.7);
+                this.fx.tracer(a.x, a.y, a.z + 2, tx, ty, this.map.groundZ(tx, ty) + 0.5, TR.CANNON); this.fx.sound('autocannon', a.x, a.y, 0.7);
                 this.explode(tx, ty, W.heli_gun.aoe, W.heli_gun.dmg, W.heli_gun, DEF, false);
               }
             }
             if ((a.rcd -= DT) <= 0) {
               a.rcd = 2.2;
               const t = this._randOrcNear(a.cx, a.cy, 150);
-              if (t >= 0) { this._launch(a.x, a.y, 55, this.x[t], this.y[t], this.unitZ(t), W.heli_rkt, DEF, 1, 0.9); this.fx.sound('rocket', a.x, a.y, 0.8); }
+              if (t >= 0) { this._launch(a.x, a.y, a.z + 2, this.x[t], this.y[t], this.unitZ(t), W.heli_rkt, DEF, 1, 0.9); this.fx.sound('rocket', a.x, a.y, 0.8); }
             }
           } else if (a.dropped < 30 && this.tick % 2 === 0) {
             // the whole platoon gets off: a spot that cannot be stood on is skipped, not counted
@@ -183,6 +196,11 @@ export const supportMethods = {
           keep = a.x < WORLD_W + 300;
         }
       }
+      // altitude: follow the ground over the mountains, climbing hard and letting down gently
+      const want = a.kind === 'transport' && a.st === 1 ? Math.max(26, this.map.terrZ(a.x, a.y) + 14) : this._altAt(a.kind, a.x, a.y, a.vx || (a.x - a.px) / DT, a.vy || (a.y - a.py) / DT);
+      a.pz = a.z ?? want;
+      if (a.z == null) a.z = want;
+      else a.z += Math.max(-9 * DT, Math.min((a.kind === 'jet' ? 70 : 30) * DT, (want - a.z) * 0.5));
       if (keep) list[k++] = a;
     }
     list.length = k;

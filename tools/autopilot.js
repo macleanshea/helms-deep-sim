@@ -85,7 +85,7 @@ export function autopilot(sim, policy = 'auto') {
       const s = siegeTarget();
       if (s) { for (const k of ['air', 'arty']) if (can(k) && call(k, s.x, s.y)) { lastSiege = sim.time; return; } }
     }
-    if (sim.defCombat < sim.initial[0] * 0.55 && can('reinforce') && call('reinforce', KEEP.cx - 20, KEEP.cy + 30)) return;
+    if (sim.defCombat < sim.initial[0] * 0.55 && can('reinforce') && call('reinforce', KEEP.cx - 24, KEEP.cy - 34)) return;
     const b = densestBlock();
     if (!b) return;
     const thresh = Math.max(60, sim.onField() * 0.03);

@@ -21,6 +21,7 @@ const MIN_GAP = 90;      // least time between two releases (s)
 const EARLY = 60;        // how far ahead of schedule a wave may be sent in when the last is spent (s)
 const SPENT = 0.25;      // a wave is spent when this fraction of it is still in the fight
 const APPROACH = 4.6;    // typical pace up the valley, for contact estimates (m/s)
+const STEADY_GAP = 60;   // 'steady' pacing: a wave every minute, as the horde used to come on
 
 // how hard each kind of wave leans on its chosen sector (0 = spread evenly)
 const AIMED = { escalade: 1.0, siege: 1.5, assault: 1.2 };
@@ -37,11 +38,15 @@ export const directorMethods = {
     const W = sum.length;
     const dawnEff = this.opt.dawn > 0 ? this.opt.dawn : 1200;
     const span = Math.max(0, dawnEff - TAIL);
-    const waves = sum.map((s, k) => ({ ...s, sector: -1, rel: W > 1 ? (k / (W - 1)) * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0 }));
+    // pacing (a sandbox choice): 'director' spreads the waves over the night and reacts to the fight,
+    // 'steady' sends one every minute, 'massed' marches the whole host on in one unbroken column
+    const pacing = this.opt.pacing === 'steady' || this.opt.pacing === 'massed' ? this.opt.pacing : 'director';
+    const waves = sum.map((s, k) => ({ ...s, sector: -1, rel: pacing === 'steady' ? k * STEADY_GAP : W > 1 ? (k / (W - 1)) * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0, depth: 0 }));
     let reserveN = 0, cmdReserve = 0;
     for (const g of reserve) {
       const d = UNITS[U[g.type]], n = g.count * (1 + (d.carry || 0));
       waves[g.phase].groups.push(g);
+      waves[g.phase].depth = Math.max(waves[g.phase].depth, -(g.x - (g.hd || 0)));
       waves[g.phase].left += n;
       reserveN += n;
       if (d.cmd) cmdReserve += g.count;
@@ -52,18 +57,25 @@ export const directorMethods = {
     let front = 0;
     for (const g of groups) if (g.team === ORC && g.phase === 0 && g.x > front) front = g.x;
     waves[0].contactT = Math.max(0, (this.map.wallJoin.x - 250 - front) / APPROACH);
-    this.dir = { W, waves, cur: 0, reserveN, cmdReserve, lull: false, lullS: 0, contact: false, aimY: -1, lossMark: null };
+    if (pacing === 'massed') {
+      // each wave steps off as the tail of the one before clears the valley mouth
+      let t = 0;
+      for (let k = 1; k < W; k++) { waves[k].rel = t; t += waves[k].depth / MARCH + 4; }
+    }
+    this.dir = { W, waves, cur: 0, reserveN, cmdReserve, lull: false, lullS: 0, contact: false, aimY: -1, lossMark: null, pacing };
   },
 
   _director() {
     const d = this.dir;
     if (!d || this.routing) return;
     const last = d.waves[d.cur];
-    // ranks of the wave now coming on
-    if (last.state === ARRIVING) {
-      const p = last.pend;
-      while (p.length && p[p.length - 1].t <= this.time) this._arrive(last, p.pop().g);
-      if (!p.length) last.state = COMMITTED;
+    // ranks of the waves now coming on (more than one can be on the march at once)
+    for (let k = 1; k <= d.cur; k++) {
+      const w = d.waves[k];
+      if (w.state !== ARRIVING) continue;
+      const p = w.pend;
+      while (p.length && p[p.length - 1].t <= this.time) this._arrive(w, p.pop().g);
+      if (!p.length) w.state = COMMITTED;
     }
     // how much of what is on the field is still fighting
     let routed = 0;
@@ -75,15 +87,16 @@ export const directorMethods = {
     d.lull = spent && !!next;
     if (d.lull) d.lullS += 0.5;
     if (!next) return;
+    const directed = d.pacing === 'director', quiet = d.pacing === 'massed';
     if (next.state === PENDING) {
-      const early = spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY);
+      const early = directed && spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY);
       if (early || this.time >= next.rel - WARN) {
         next.state = FORMING;
         next.relT = early ? this.time + WARN * 0.6 : next.rel;
         // the assaults in the middle of the night are thrown at the stretch of wall that looks weakest
-        next.sector = AIMED[next.kind] ? this._weakSector() : -1;
+        next.sector = directed && AIMED[next.kind] ? this._weakSector() : -1;
         const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
-        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${next.note ? ': ' + next.note : ''}${where}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
+        if (!quiet) this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${next.note ? ': ' + next.note : ''}${where}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
       }
     } else if (next.state === FORMING && this.time >= next.relT) {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
@@ -93,7 +106,7 @@ export const directorMethods = {
       // each rank comes over the edge when it would have marched that far
       next.pend = groups.map((g) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH);
-      this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
+      if (!quiet) this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
     }
   },
 
