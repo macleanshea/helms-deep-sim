@@ -324,7 +324,7 @@ export function buildUI(app, atlas) {
       <h1 style="font-size:22px">How to play</h1>
       <p class="sub">Set the field, then hold the Deep. Watch it unfold or take command.</p>
       <h4>Camera</h4>
-      <div class="keys"><div><kbd>Scroll</kbd></div><span>Zoom toward the cursor</span><div><kbd>Right-drag</kbd> <kbd>W A S D</kbd></div><span>Pan the map</span><div><kbd>Q</kbd> <kbd>E</kbd> or <kbd>Middle-drag</kbd></div><span>Rotate the view</span><div><kbd>Minimap</kbd></div><span>Click to jump</span></div>
+      <div class="keys"><div><kbd>Scroll</kbd></div><span>Zoom toward the cursor</span><div><kbd>Right-drag</kbd> <kbd>W A S D</kbd></div><span>Pan the map</span><div><kbd>Q</kbd> <kbd>E</kbd> or <kbd>Middle-drag</kbd></div><span>Rotate the view</span><div><kbd>Minimap</kbd></div><span>Click to jump</span><div><kbd>F2</kbd></div><span>Performance overlay</span></div>
       <h4>Setting up</h4>
       <div class="keys"><div><kbd>Click</kbd></div><span>With a unit picked: drop a block of troops</span><div><kbd>Drag</kbd></div><span>Draw a line — along a wall top to man the battlements, or across the valley to lay wire, mines or a moat</span><div><kbd>Click formation</kbd></div><span>Select it; drag to move, <kbd>[</kbd> <kbd>]</kbd> rotate, <kbd>Del</kbd> remove</span><div><kbd>Enter</kbd></div><span>Begin the battle</span></div>
       <h4>In battle</h4>

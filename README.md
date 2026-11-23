@@ -32,8 +32,8 @@ its rock against the southern cliff (on your right as you look up the valley), i
 climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
 its culvert.
 
-**Camera.** Scroll to zoom, right-drag or `WASD` to pan, middle-drag or `Q`/`E` to rotate,
-`Home` to reset the view.
+**Camera.** Scroll to zoom (from the whole valley down to a single squad), right-drag or `WASD`
+to pan, middle-drag or `Q`/`E` to rotate, `Home` to reset the view.
 
 **Setup.** Pick a scenario from the top bar or build your own. Choose a unit on the left, set
 how many per placement, then click the map to drop a block or drag to draw a line. Dragging
@@ -81,8 +81,22 @@ Orders can be given while paused.
   through the gap. Aircraft climb over the mountains and the keep rather than through them.
 - Win by breaking the horde or by holding until the relief column arrives at dawn.
 
-Rendering quality steps down automatically on slower machines; add `?q=low` or `?q=high` to
-the URL to force it.
+Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
+hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it.
+
+### Performance
+
+Press `F2` (or add `?perf` to the URL) for an overlay showing frame time, CPU time in the
+simulation and the renderer, GPU time per stage, triangles and draw calls. `?bench` runs the
+30,000-attacker preset through a fixed set of views and lists the same figures for each, which is
+the quickest way to see how much headroom a machine has. GPU timings need a browser that exposes
+`EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
+
+Units are drawn at one of four levels of detail chosen from the zoom: dots when the whole field
+is in view, then boxes, then blocky stand-ins of about seventy triangles, and the full models
+(about a thousand triangles for a soldier, several thousand for a vehicle) only once a figure is
+tall enough on screen for them to show. That keeps units and their shadows under roughly 2.5
+million triangles a frame at any zoom.
 
 ## How it works
 
@@ -92,10 +106,26 @@ the URL to force it.
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
   renderer interpolates between them.
 - `src/render/` — a WebGL2 renderer: an orthographic isometric camera, a height-field terrain
-  mesh, the fortress as one procedurally built mesh (rebuilt when a section is breached), a
-  static shadow map, instanced low-poly unit meshes animated in the vertex shader with
-  distance-based detail levels, 3D particles and short-lived lights, a persistent ground
-  decal layer, and bloom post-processing.
+  mesh, a static shadow map, 3D particles and short-lived lights, a persistent ground decal
+  layer, and bloom post-processing. Everything is generated in code; there are no image or
+  model files.
+  - `materials.js` generates the surface textures on the GPU at start-up: sixteen tiling
+    materials (dressed stone, flagstones, rock, grass, mud, timber, slate, iron, painted steel,
+    cloth, camouflage, hide and so on), each with colour detail, a normal map, roughness and
+    specular strength. Every vertex names its material.
+  - `mesh.js` is the model-building kit: boxes and beams, chamfered boxes, extruded outlines,
+    and smooth lofted shapes (tubes, limbs, spheres, lathed profiles), with a transform stack
+    and welded, indexed output.
+  - `models/` holds the units: a jointed figure builder (`figure.js`) and the soldiers, the
+    horde, vehicles, siege engines, aircraft and props built with it. Limbs and moving parts
+    are animated in the vertex shader. `legacy.js` keeps the original blocky models as the
+    mid-distance stand-ins.
+  - `structures.js` builds the fortress from cached pieces, so a breach rebuilds only the
+    section that fell.
+  - `shaders.js` lights everything in linear light: sky and ground ambient, sun or moon with a
+    soft shadow, specular highlights from the material, flash lights, and rain-wet ground at
+    night.
+  - `perf.js` is the performance overlay and benchmark.
 - `src/ui/`, `src/main.js` — panels, HUD, input, camera and the 2D overlay.
 - `src/config.js`, `src/scenarios.js`, `src/map.js` — unit and weapon tables, the preset
   orders of battle and the battlefield geometry. Tuning the game is mostly a matter of editing

@@ -517,7 +517,7 @@ export class Renderer {
       if (!disjoint) { const ms = gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; g[name] = g[name] == null ? ms : g[name] * 0.9 + ms * 0.1; }
       gl.deleteQuery(q); this._queries.shift();
     }
-    if (!this.perfOn && !this._queries.length) this.stats.gpu = {};
+    if (!this.perfOn && !this._queries.length) for (const k in g) delete g[k];
   }
 
   _drawParticles(n, minPx, tint, zoom, vw, vh) {
