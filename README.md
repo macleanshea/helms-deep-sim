@@ -3,8 +3,8 @@
 An RTS-style battle simulator for the browser: the Battle of the Hornburg, except the
 garrison is a modern combined-arms force. Garrison the fortress within your budget, press
 **Begin Battle**, and hold the Deep until dawn against a horde that comes on in waves — with
-air strikes, artillery, resupply drops and direct orders, the support paid for from a limited
-pool of Command Points.
+air strikes, artillery, resupply drops and direct orders — in a challenge the support is paid
+for from a limited pool of Command Points.
 
 It comfortably runs a thousand defenders against tens of thousands of attackers.
 
@@ -35,27 +35,33 @@ its culvert.
 
 ### Challenge and sandbox
 
-Every scenario is a **challenge** by default:
+The welcome screen offers two ways to play; the **Sandbox / Challenge** switch in the top bar
+changes between them at any time.
 
-- The enemy and the battle options are fixed. You choose and place the garrison within a
-  **requisition budget** (each unit has a cost; the budget is the stock garrison plus a tenth).
+A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first):
+
+- The enemy and the battle options are fixed. The garrison is issued at its full
+  **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
+  points (and each unit's cost in the left panel) and rework it. **Begin Battle** is greyed out
+  while the garrison costs more than the budget. The order of attack, wave by wave, sits below.
 - Support is paid for from one pool of **Command Points** that refills slowly through the
   night. Killing captains, trolls and siege engines pays a bounty.
 - The result is **scored** — the win, soldiers brought through, an intact gate and wall,
-  requisition left unspent — and the best score and medal per scenario are kept in the browser.
+  requisition points left unspent — and the best score and medal per scenario are kept in the
+  browser.
 
-Switch **Battle Options → Sandbox** to lift every limit: place anything on either side, edit
-all options, and call support by a fixed number of uses. Sandbox battles are not scored.
-
-In the sandbox there is no need to lay out each wave by hand. **Raise a horde** (Attackers tab)
-builds a whole host of any size, split into waves with its ladders, engines and captains, and
-**Horde pacing** decides how those waves come on: paced to dawn (as in the challenges), one a
-minute with no lulls or aiming, or the whole host at once. Formations you place yourself are not
-part of any wave: they go on the field as placed, each after its own "advance after" delay.
+The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
+autofill both armies, then change anything. Every option can be edited, and support has a
+fixed number of calls per kind instead of Command Points. There are no waves and no relief at
+dawn by default: the whole horde is on the field from the start, and the defenders win when the
+horde gives up with only a remnant left, or lose if the garrison is wiped out. Both win
+conditions (relief at dawn, and when the horde gives up) can be changed. **Raise a horde**
+(Attackers tab) draws up a whole host of any size with its ladders, engines and captains;
+formations you place yourself take an "advance after" delay. Sandbox battles are not scored.
 
 ### The night
 
-The horde attacks in waves: a vanguard that starts on the field, then escalades, the siege
+In a challenge the horde attacks in waves: a vanguard that starts on the field, then escalades, the siege
 train and a final assault, which wait beyond the valley mouth and march on in turn. Releases
 are paced so the last and heaviest wave lands shortly before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to each
@@ -69,14 +75,15 @@ mark on its bar).
 to pan, middle-drag or `Q`/`E` to rotate, `Home` to reset the view. `G` jumps to the latest
 alert; clicking an alert in the feed or a point on the minimap looks there too.
 
-**Setup.** Pick a scenario from the top bar. Choose a unit on the left, set how many per
+**Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left, set how many per
 placement, then click the map to drop a block or drag to draw a line; the dashed ring shows the
 weapon's reach from that spot. Dragging along a wall top mans the battlements. Under **Field
-works** the defenders can lay barbed wire, anti-vehicle obstacles, moats, mines and claymores;
+works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
-move, `[`/`]` to rotate, `Del` to remove. The right panel shows requisition spent, totals per
-unit type, the enemy's order of attack wave by wave, and the battle options. In the sandbox the
-attackers can be edited too, and hand-placed attacker formations take an "advance after" delay.
+move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle
+(requisition points spent and totals per unit type), the enemy's order of attack wave by wave,
+the battle options, support, and the win conditions. In the sandbox the attackers can be edited
+too, and hand-placed attacker formations take an "advance after" delay.
 
 **Battle.**
 
@@ -109,8 +116,8 @@ Orders can be given while paused. The battle waits while a dialog is open.
 **Rules worth knowing.**
 
 - Units walk up and down stairs and climb ladders and siege towers; nobody floats over the wall.
-- The culvert, water, rubble, wire, moats and obstacles all slow movement. Heavy engines can't
-  cross anti-vehicle obstacles or moats.
+- The culvert, water, rubble, wire and obstacles all slow movement. Heavy engines can't
+  cross anti-vehicle obstacles.
 - Troops pressed against the foot of the wall are hard to hit from the battlements above.
 - Ammunition is the garrison's real limit. Shots at close range hit far more often than at long
   range, so holding fire (`H`) stretches it; an amber pip marks a soldier who is out.
@@ -128,7 +135,11 @@ Orders can be given while paused. The battle waits while a dialog is open.
   through the gap. Aircraft climb over the mountains and the keep rather than through them.
 
 Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
-hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it.
+hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it. **Settings** (the
+gear next to Help) sets how far out units are drawn in more detail: Close up, Medium, Far (the
+default) or Very far. Each step moves the whole ladder of detail levels further out (see
+Performance below); further out costs frame rate in big battles. The choice is kept in the
+browser.
 
 ### Performance
 
@@ -139,11 +150,22 @@ set of views and lists the same figures for each: the quickest way to see how mu
 machine has. GPU timings need a browser that exposes
 `EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
 
-Units are drawn at one of four levels of detail chosen from the zoom: dots when the whole field
-is in view, then boxes, then blocky stand-ins of about seventy triangles, and the full models
-(about a thousand triangles for a soldier, several thousand for a vehicle) only once a figure is
-tall enough on screen for them to show. That keeps units and their shadows under roughly 2.5
-million triangles a frame at any zoom.
+Units are drawn at one of four levels of detail chosen from the zoom: dots, then boxes, then
+blocky stand-ins of about seventy triangles, and the full models (about a thousand triangles for
+a soldier, several thousand for a vehicle). The **Detailed models** setting places the ladder:
+full models take over at a zoom proportional to it, dots give way at its square root (so the
+whole valley stays cheap), and boxes give way to stand-ins midway between the two on a log
+scale. On high quality, in screen pixels per metre:
+
+| Setting | Dots below | Boxes below | Stand-ins below (full models from) |
+| --- | --- | --- | --- |
+| Close up | 1.4 | 2.8 | 5.5 |
+| Medium | 1.2 | 2.2 | 4.1 |
+| Far (default) | 1.1 | 1.9 | 3.3 |
+| Very far | 0.9 | 1.5 | 2.5 |
+
+Balanced and performance quality bring the full models (and so the boxes' upper limit) in
+closer.
 
 ## How it works
 
@@ -195,7 +217,7 @@ npm run matrix                                        # every challenge preset x
 Presets are `garrison`, `three-hundred`, `combined`, `recon` and `empty`. `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
-`--opt key=value` overrides any battle option (`sandbox=true` restores per-kind support uses),
+`--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
 `--json` prints one summary line including the score, and `--verify` runs twice and checks the
 state hashes match. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
 and survivors per scenario — the tuning target is that giving no orders loses, and the

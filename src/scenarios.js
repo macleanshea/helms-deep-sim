@@ -223,21 +223,21 @@ export const PRESETS = [
   {
     key: 'garrison', name: 'The Hornburg Garrison',
     blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
-    build: (map) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { waves: 5 })],
+    build: (map, sb) => ({
+      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { waves: sb ? 1 : 5 })],
       options: { dawn: 1200, cpRate: 0.035 },
     }),
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles',
     blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — how you spend your support will decide this.',
-    build: (map) => ({
+    build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
         ...alongRing('rifle', 70, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
         makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y), makeGroup('rifle', 24, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(8000, { waves: 4 }),
+        ...fieldWorks(map, 0.6), ...horde(8000, { waves: sb ? 1 : 4 }),
       ],
       options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 8, cpRate: 0.035 },
     }),
@@ -245,13 +245,13 @@ export const PRESETS = [
   {
     key: 'combined', name: 'Combined Arms vs. the Host',
     blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
-    build: (map) => ({
+    build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),
         makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
         makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
         makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
-        ...fieldWorks(map, 1.3), ...horde(30000, { waves: 6 }),
+        ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
       options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200, cpStart: 10, cpRate: 0.045 },
     }),
@@ -259,13 +259,13 @@ export const PRESETS = [
   {
     key: 'recon', name: 'Recon Platoon',
     blurb: 'Forty-odd soldiers and twenty-two hundred orcs in three waves. A short night to learn the controls.',
-    build: (map) => ({
+    build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 26, 0.35, 0.65), ...alongWall(map, 'mg', 4, 0.4, 0.6), ...alongWall(map, 'marksman', 3, 0.42, 0.58),
         ...alongRing('rifle', 8, 180, 210), ...alongRing('at', 2, 175, 200), makeGroup('mortar', 2, 1070, 460, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(2200, { waves: 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
+        ...horde(2200, { waves: sb ? 1 : 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
       ],
       options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 10, cpRate: 0.045 },
     }),
@@ -281,14 +281,20 @@ export function forceCost(groups) {
 }
 
 /**
- * A preset as a setup: { groups, options, budget }. The budget is the cost of the garrison as
- * issued plus a tenth, so the stock layout always fits and there is something left to spend.
+ * A preset as a setup: { groups, options, budget }. In a challenge the budget is exactly the cost
+ * of the garrison as issued: the stock layout spends all of it, and anything trimmed is saved.
+ * In the sandbox (`sandbox`, or a blank map) the whole horde stands on the field from the start,
+ * and the win conditions start at SANDBOX_OPTIONS (no relief; the horde gives up when only a
+ * remnant is left) for the player to change.
  */
-export function buildPreset(map, key) {
+export function buildPreset(map, key, sandbox = false) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
   nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
-  const s = p.build(map);
+  const s = p.build(map, sandbox);
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
-  if (!s.groups.length) options.sandbox = true; // nothing to hold a blank map against
-  return { groups: s.groups, options, budget: Math.ceil((forceCost(s.groups) * 1.1) / 100) * 100 };
+  if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);
+  return { groups: s.groups, options, budget: forceCost(s.groups) };
 }
+
+/** Where a sandbox's win conditions start: no relief column, and the horde gives up at 1% of its strength. */
+export const SANDBOX_OPTIONS = { sandbox: true, dawn: 0, rout: 0.01 };

@@ -20,7 +20,7 @@ export const RING_TOP = 21;   // Hornburg curtain wall walkway
 export const STEP = 3.3;      // largest height change a unit can walk between neighbouring cells
 
 // obstacle flags per nav cell
-export const OB = { WIRE: 1, AV: 2, MOAT: 4 };
+export const OB = { WIRE: 1, AV: 2 };
 
 // armour classes
 export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5 };
@@ -93,20 +93,18 @@ export const UNITS = [
     desc: 'Indirect fire 60–650 m. Fires over walls; holds fire near friendlies.' },
   { key: 'howitzer', cost: 220, team: DEF, name: 'Howitzer', cls: C.GUN, hp: 500, speed: 0, rad: 2.4, size: 10, spr: 6, w: 'howitzer', ammo: 24, spacing: 14, supply: 6,
     desc: 'Heavy artillery with map-wide reach. Static once emplaced.' },
-  { key: 'ifv', cost: 260, team: DEF, name: 'Infantry Fighting Vehicle', cls: C.VEH, hp: 1800, speed: 9, rad: 2.4, size: 8.5, spr: 7, turret: 8, w: 'autocannon', ammo: 400, spacing: 10, supply: 5,
+  { key: 'ifv', cost: 260, team: DEF, name: 'Fighting Vehicle', cls: C.VEH, hp: 1800, speed: 9, rad: 2.4, size: 8.5, spr: 7, turret: 8, w: 'autocannon', ammo: 400, spacing: 10, supply: 5,
     desc: 'Fast armoured vehicle with a 30 mm autocannon.' },
   { key: 'tank', cost: 420, team: DEF, name: 'Main Battle Tank', cls: C.VEH, hp: 3600, speed: 8, rad: 2.8, size: 10.5, spr: 9, turret: 10, w: 'tankgun', ammo: 40, w2: 'coax', ammo2: 700, spacing: 12, supply: 6,
     desc: 'Heavy armour. Main gun kills trolls; almost immune to blades.' },
   { key: 'cache', cost: 80, team: DEF, name: 'Ammo Cache', cls: C.CACHE, hp: 300, speed: 0, rad: 1.6, size: 5.5, spr: 11, pool: 150, spacing: 8,
     desc: 'Re-arms troops within 60 m until its stock runs out.' },
-  { key: 'cmd', cost: 120, team: DEF, name: 'Command Team', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
+  { key: 'cmd', cost: 120, team: DEF, name: 'Commander', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
     desc: 'Steadies every platoon within 110 m. If it falls, the garrison is shaken.' },
   { key: 'wire', cost: 2, team: DEF, name: 'Barbed Wire', cls: C.OBST, ob: 'wire', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 14, spacing: 3,
     desc: 'Slows infantry to a crawl until it is trampled flat or blown apart.' },
   { key: 'hedgehog', cost: 3, team: DEF, name: 'Anti-Vehicle Obstacle', cls: C.OBST, ob: 'av', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 15, spacing: 3,
     desc: 'Stops rams, catapults and siege towers. Gives whoever shelters behind it cover.' },
-  { key: 'moat', cost: 3, team: DEF, name: 'Moat', cls: C.OBST, ob: 'moat', hp: 1, speed: 0, rad: 2, size: 4.4, spr: 26, spacing: 3,
-    desc: 'A flooded ditch. Impassable to siege engines and vehicles, slow going on foot.' },
   { key: 'mine', cost: 4, team: DEF, name: 'Anti-Personnel Mine', cls: C.OBST, ob: 'mine', hp: 1, speed: 0, rad: 0.5, size: 2.4, spr: 27, spacing: 3,
     desc: 'Buried and invisible to the enemy. One blast, 5 m radius.' },
   { key: 'claymore', cost: 15, team: DEF, name: 'Claymore', cls: C.OBST, ob: 'claymore', hp: 1, speed: 0, rad: 0.5, size: 2.6, spr: 28, spacing: 7,
@@ -165,14 +163,13 @@ export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the tric
 
 export const DEFAULT_OPTIONS = {
   ammoMult: 1,
-  sandbox: false, // free build: unlimited placement, support counted in uses rather than Command Points
-  cpStart: 6,     // Command Points in hand when the battle opens
+  sandbox: false, // free build: both armies, no budget, no waves, support by uses, win conditions of the player's choosing
+  cpStart: 6,     // Command Points in hand when the battle opens (challenge)
   cpRate: 0.025,  // Command Points gained per second
   cpCap: 20,      // most that can be banked
   support: { air: 4, gunship: 2, arty: 5, supply: 4, reinforce: 2 },
   dawn: 1200, // seconds until relief arrives (0 = never)
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)
-  pacing: 'director', // how a generated horde's waves come on: 'director' | 'steady' | 'massed' (sandbox only)
   morale: true, // companies waver, break and rally
   seed: 1,
 };
