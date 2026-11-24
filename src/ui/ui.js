@@ -501,14 +501,15 @@ export function buildUI(app, atlas) {
       <div class="wl-brand"><svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg><div><h1>Helm’s Deep</h1><small>Modern Defense Simulator</small></div></div>
       <p class="lead">A modern garrison holds the Hornburg and the Deeping Wall against a host of Uruk-hai. Lay out riflemen, machine guns, mortars, armour and field works, then command the defence in real time: call in air strikes and artillery, direct your guns, keep the ammunition flowing and fall back to the keep when the wall gives way.</p>
       <div class="wl-modes">
-        <button class="wl-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no waves — the whole horde is on the field, and you set the win conditions.</span><em>Start building →</em></button>
-        <button class="wl-mode primary-mode" id="wlChallenge"><b>Challenge</b><span>Hold the Deep through the night against a horde that comes in waves, with the garrison your requisition can field. Scored, with medals for the best defence.</span><em>Take command →</em></button>
+        <button class="wl-mode primary-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no waves — the whole horde is on the field, and you set the win conditions.</span><em>Start building →</em></button>
+        <button class="wl-mode" id="wlChallenge"><b>Challenge</b><span>Hold the Deep through the night against a horde that comes in waves, with the garrison your requisition can field. Scored, with medals for the best defence.</span><em>Take command →</em></button>
       </div>
       <div class="wl-foot"><button class="link" id="wlHelp">How to play</button><span>You can switch modes any time from the top bar.</span></div></div>`;
     const go = (mode) => { onModalClose = null; ui.hideModal(); app.enterMode(mode); };
-    onModalClose = () => app.enterMode('challenge'); // Esc: straight into the challenge that is already loaded
+    onModalClose = () => app.enterMode('sandbox'); // Esc: the default, the sandbox
     $('wlSandbox').addEventListener('click', () => go('sandbox'));
     $('wlChallenge').addEventListener('click', () => go('challenge'));
+    $('wlSandbox').focus({ preventScroll: true }); // Enter or Space takes the default
     $('wlHelp').addEventListener('click', () => { onModalClose = null; ui.showHelp(); onModalClose = () => ui.showWelcome(); });
   };
 
