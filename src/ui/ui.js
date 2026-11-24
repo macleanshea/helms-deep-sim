@@ -544,7 +544,7 @@ export function buildUI(app, atlas) {
   const renderSettings = () => {
     const cur = app.settings.heroScale;
     menu.innerHTML = '<h3>Settings</h3>';
-    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out units are drawn in more detail. Each step moves the whole ladder — dots, then boxes, then simple stand-ins, then the full models — further out. Further out looks better but costs frame rate in big battles.</span>');
+    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out units are drawn in more detail. Further out looks better but costs frame rate in big battles.</span>');
     const seg = el('div', 'set-seg');
     for (const [v, t] of DETAIL) {
       const b = el('button', Math.abs(v - cur) < 1e-3 ? 'active' : '', t.replace(' (default)', ''));
