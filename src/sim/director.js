@@ -86,7 +86,7 @@ export const directorMethods = {
         // the assaults in the middle of the night are thrown at the stretch of wall that looks weakest
         next.sector = AIMED[next.kind] ? this._weakSector() : -1;
         const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
-        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${next.brings ? ' with ' + next.brings : ''}${where}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
+        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${where}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
       }
     } else if (next.state === FORMING && this.time >= next.relT) {
       next.state = ARRIVING; next.relT = this.time; d.cur++;

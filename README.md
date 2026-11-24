@@ -3,7 +3,8 @@
 An RTS-style battle simulator for the browser: the Battle of the Hornburg, except the
 garrison is a modern combined-arms force. Garrison the fortress within your budget, press
 **Begin Battle**, and hold the Deep until dawn against a horde that comes on in waves — with
-air strikes, artillery, resupply drops and direct orders, each with a limited number of calls.
+air strikes, artillery, resupply drops and direct orders — in a challenge the support is paid
+for from a limited pool of Command Points.
 
 It comfortably runs a thousand defenders against tens of thousands of attackers.
 
@@ -43,15 +44,17 @@ A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded fi
   **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
   points (and each unit's cost in the left panel) and rework it. **Begin Battle** is greyed out
   while the garrison costs more than the budget. The order of attack, wave by wave, sits above.
-- Each kind of support has a set number of calls and a cooldown between them.
+- Support is paid for from one pool of **Command Points** that refills slowly through the
+  night. Killing captains, trolls and siege engines pays a bounty.
 - The result is **scored** — the win, soldiers brought through, an intact gate and wall,
   requisition points left unspent — and the best score and medal per scenario are kept in the
   browser.
 
 The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
-autofill both armies, then change anything. Every option can be edited and support calls are
-set per kind. There are no waves and no relief at dawn: the whole horde is on the field from
-the start, and the battle runs until one side has been wiped out. **Raise a horde** (Attackers
+autofill both armies, then change anything. Every option can be edited, and support has a
+fixed number of calls per kind instead of Command Points. There are no waves and no relief at
+dawn: the whole horde is on the field from the start, and the battle runs until one side has
+been wiped out. **Raise a horde** (Attackers
 tab) draws up a whole host of any size with its ladders, engines and captains; formations you
 place yourself take an "advance after" delay. Sandbox battles are not scored.
 
@@ -61,7 +64,7 @@ In a challenge the horde attacks in waves: a vanguard that starts on the field, 
 train and a final assault, which wait beyond the valley mouth and march on in turn. Releases
 are paced so the last and heaviest wave lands shortly before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to each
-wave, says what kinds of troops and engines it brings, and names the stretch of wall it is aimed at — the middle waves go
+wave, says what it brings, and names the stretch of wall it is aimed at — the middle waves go
 for whichever sector looks weakest. `N` fast-forwards through a quiet spell.
 
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
@@ -87,14 +90,14 @@ attackers can be edited too, and hand-placed attacker formations take an "advanc
 | --- | --- |
 | `Space`, `-`, `+`, `N` | Pause / resume, slower, faster (1× to 8×), fast-forward to the next contact |
 | **Strike** | |
-| `1` Air Strike | Click a target, or drag to set the run-in heading |
-| `2` Gunships | Two helicopters orbit the target for 40 s |
-| `3` Artillery | Off-map battery covers a 45 m circle |
+| `1` Air Strike (5 CP) | Click a target, or drag to set the run-in heading |
+| `2` Gunships (6 CP) | Two helicopters orbit the target for 40 s |
+| `3` Artillery (3 CP) | Off-map battery covers a 45 m circle |
 | `T` Fire Mission | Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
 | `F` Focus Fire | Drag a circle; every weapon in range concentrates on it, and marksmen pick out any captain inside |
 | **Resupply & reinforce** | |
-| `4` Resupply Drop | Parachuted crates; troops within 60 m re-arm |
-| `5` Air Assault | A helicopter inserts a fresh platoon |
+| `4` Resupply Drop (4 CP) | Parachuted crates; troops within 60 m re-arm |
+| `5` Air Assault (8 CP) | A helicopter inserts a fresh platoon |
 | `R` / `Shift+R` | Selected troops fall back to the keep / general retreat |
 | **Overlays** | |
 | `Z` Fire Zones | Where each mortar and howitzer section can land rounds (between minimum and maximum range) |
@@ -153,7 +156,7 @@ million triangles a frame at any zoom.
 ## How it works
 
 - `src/sim/` — the simulation, with no DOM dependencies (`morale.js` holds morale and
-  suppression, `support.js` the support calls, `director.js` the pacing of
+  suppression, `support.js` the support calls and Command Points, `director.js` the pacing of
   the horde's waves). Units live in typed arrays, find each
   other through uniform grids, and the horde navigates with a congestion-aware flow field that
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
@@ -193,14 +196,14 @@ plays out the same way:
 ```bash
 node tools/headless.js garrison                       # preset, nobody giving orders
 node tools/headless.js --preset recon --policy auto   # with a stand-in commander
-node tools/headless.js --preset garrison --seed 3 --opt dawn=900 --json --verify
+node tools/headless.js --preset garrison --seed 3 --opt cpRate=0.05 --json --verify
 npm run matrix                                        # every preset x policy x seed, as a table
 ```
 
 Presets are `garrison`, `three-hundred`, `combined`, `recon` and `empty`. `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
-shells the thickest of the press) with the support calls it has; `none` gives no orders.
-`--opt key=value` overrides any battle option (`support.air=8` reaches the support table),
+shells the thickest of the press) within the Command Point budget; `none` gives no orders.
+`--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
 `--json` prints one summary line including the score, and `--verify` runs twice and checks the
 state hashes match. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
 and survivors per scenario — the tuning target is that giving no orders loses, and the

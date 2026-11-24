@@ -54,7 +54,7 @@ export function runBattle(cfg = {}) {
     def0: sim.initial[0], defEnd: sim.defCombat, orc0: sim.initial[1], orcEnd: sim.count[ORC],
     fled: sim.stats.fled, breaches: sim.stats.breaches, gateT: round(gateT, 0), ammoMin: round(ammoMin),
     calls: pilot ? pilot.calls : {},
-    supportCalls: sim.supportCalls,
+    cp: sim.opt.sandbox ? null : { earned: round(sim.cpStats.earned, 1), bounty: round(sim.cpStats.bounty, 1), spent: sim.cpStats.spent, left: round(sim.cp, 1) },
     lullS: sim.dir ? sim.dir.lullS : 0,
     score: sc ? sc.total : null, medal: sc && sc.medal ? sc.medal.key : null,
     tickAvg: round(total / Math.max(1, sim.tick)), tickMax: round(worst, 1), hash: sim.hash(),

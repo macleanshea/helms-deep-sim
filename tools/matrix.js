@@ -35,13 +35,13 @@ await Promise.all(Array.from({ length: Math.max(1, Math.min(os.cpus().length, jo
 process.stderr.write('\n');
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(pad('preset', 15) + pad('policy', 8) + pad('seed', 5) + pad('result', 7) + pad('end', 12) + pad('defenders', 12) + pad('horde left', 13) + pad('gate', 7) + pad('ammo', 6) + pad('score', 7) + pad('calls', 7) + 'tick ms');
+console.log(pad('preset', 15) + pad('policy', 8) + pad('seed', 5) + pad('result', 7) + pad('end', 12) + pad('defenders', 12) + pad('horde left', 13) + pad('gate', 7) + pad('ammo', 6) + pad('score', 7) + pad('cp', 14) + 'tick ms');
 for (const r of results) {
   if (r.error) { console.log(pad(r.preset, 15) + pad(r.policy, 8) + pad(r.seed, 5) + 'ERROR ' + r.error); continue; }
   const frac = r.dawn ? ` (${(r.t / r.dawn).toFixed(2)})` : '';
   console.log(pad(r.preset, 15) + pad(r.policy, 8) + pad(r.seed, 5) + pad(r.win === null ? '—' : r.win ? 'WIN' : 'loss', 7) + pad(Math.round(r.t) + frac, 12)
     + pad(`${r.defEnd}/${r.def0}`, 12) + pad(`${r.orcEnd}/${r.orc0}`, 13) + pad(r.gateT < 0 ? '—' : r.gateT, 7) + pad(Math.round(r.ammoMin * 100) + '%', 6)
-    + pad(r.score != null ? r.score : '—', 7) + pad(r.supportCalls ?? '—', 7) + `${r.tickAvg} / ${r.tickMax}`);
+    + pad(r.score != null ? r.score : '—', 7) + pad(r.cp ? `${r.cp.spent}/${r.cp.earned}` : '—', 14) + `${r.tickAvg} / ${r.tickMax}`);
 }
 // one line per preset x policy
 console.log('');

@@ -33,7 +33,7 @@ export function buildUI(app, atlas) {
   const tip = $('tooltip');
   function bindTip(node, title, body) {
     node.addEventListener('mouseenter', () => {
-      tip.innerHTML = `<b>${title}</b><span>${body}</span>`;
+      tip.innerHTML = `<b>${title}</b><span>${typeof body === 'function' ? body() : body}</span>`; // body may depend on the moment
       tip.hidden = false;
       const r = node.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
       let x = r.left + r.width / 2 - tw / 2, y = r.top - th - 8;
@@ -235,11 +235,15 @@ export function buildUI(app, atlas) {
     if (!sb) sel('Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; }, 'Hold out this long and the relief column arrives: you win. The horde paces its waves so the last and heaviest lands shortly before dawn.');
     sel('Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses in a short time breaks and runs; commanders steady the troops around them, and losing one shakes them.');
     if (!sb) sel('Horde gives up at', o.rout, [[0, 'Never — to the last'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The whole host routs when this little of it is left.');
-    const sh = el('h3', null, 'Support on call'); sh.style.marginTop = '12px'; options.append(sh);
     if (!sb) {
-      for (const k in SUPPORT) { const r = el('div', 'opt', `<span>${SUPPORT[k].name}</span><b>×${o.support[k]}</b>`); options.append(r); bindTip(r, SUPPORT[k].name, SUPPORT[k].desc); }
+      const sh = el('h3', null, 'Support'); sh.style.marginTop = '12px'; options.append(sh);
+      const r = el('div', 'opt', `<span>Command Points</span><b>${o.cpStart} to start · +${(o.cpRate * 60).toFixed(1)} / min</b>`);
+      options.append(r);
+      bindTip(r, 'Command Points', 'One pool pays for every support call. It refills slowly, and killing captains, trolls and siege engines pays a bounty.');
+      options.append(el('p', 'tip', Object.values(SUPPORT).map((q) => `${q.name} <b>${q.cost}</b>`).join(' · ')));
       return;
     }
+    const sh = el('h3', null, 'Support on call'); sh.style.marginTop = '12px'; options.append(sh);
     for (const k in SUPPORT) num(SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
     num('Random seed', o.seed, 1, 9999, (v) => { o.seed = v; }, 'The same setup with the same seed and the same orders plays out the same way. Change it for a different roll of the dice.');
   };
@@ -261,7 +265,12 @@ export function buildUI(app, atlas) {
     group.append(b);
     cmds[id] = { b, uses: b.querySelector('.uses'), cool: b.querySelector('.cool') };
   };
-  const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, `${SUPPORT[k].desc} <i class="cost">The number in the corner is how many calls are left.</i>`, () => app.armSupport(k));
+  // the purse every challenge support call is paid from (the sandbox counts uses instead)
+  const cpBox = el('div', 'cpbox', '<small>Command</small><b id="cpVal">0</b><div class="bar"><i id="cpBar"></i></div><small id="cpRate"></small>');
+  bindTip(cpBox, 'Command Points', 'Every support call is paid for from this one pool. It refills slowly through the night, and killing captains, trolls and siege engines pays a bounty — so what you spend now you cannot spend later.');
+  cmdbar.append(cpBox);
+  const supTip = (k) => () => `${SUPPORT[k].desc} <i class="cost">${app.sim && app.sim.opt.sandbox ? 'The number in the corner is how many calls are left.' : `Costs ${SUPPORT[k].cost} Command Points.`}</i>`;
+  const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
   addGroup('Strike');
   sup('air'); sup('gunship'); sup('arty');
   addCmd('fire', 'Fire Mission', 'T', ICONS.fire, 'Fire Mission', 'Direct your own mortars and howitzers. Opens the artillery panel; click the map to put every section that can reach onto the target, or task, hold and release sections one by one.', () => app.toggleFireMission());
@@ -348,6 +357,7 @@ export function buildUI(app, atlas) {
   const pauseBtn = document.querySelector('#speedCtl .seg[data-speed="0"]');
   const PAUSE_SVG = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 2h4v12H3zM9 2h4v12H9z" fill="currentColor"/></svg>';
   const PLAY_SVG = '<svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 2.2v11.6L13.6 8z" fill="currentColor"/></svg>';
+  const cpVal = $('cpVal'), cpBar = $('cpBar'), cpRate = $('cpRate');
   const ammoPct = $('ammoPct'), ammoBar = $('ammoBar'), clock = $('clock'), dawn = $('dawn'), selinfo = $('selinfo');
   const grpbar = $('grpbar'); let grpHtml = '';
   grpbar.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) app.recallGroup(b.dataset.g); });
@@ -403,9 +413,17 @@ export function buildUI(app, atlas) {
       pauseBtn.innerHTML = app.paused ? PLAY_SVG : PAUSE_SVG;
       pauseBtn.title = app.paused ? 'Resume (Space)' : 'Pause (Space)';
     }
+    const sb = !!sim.opt.sandbox;
+    cpBox.hidden = sb;
+    cmdbar.classList.toggle('sandbox', sb);
+    if (!sb) {
+      cpVal.textContent = Math.floor(sim.cp + 1e-6);
+      cpBar.style.width = (100 * (sim.cp - Math.floor(sim.cp + 1e-6))) + '%';
+      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'full' : `+${(sim.opt.cpRate * 60).toFixed(1)} / min`;
+    }
     for (const k in SUPPORT) {
       const s = sim.support[k], c = cmds[k], can = sim.affordSupport(k);
-      c.uses.textContent = s.left;
+      c.uses.textContent = sb ? s.left : s.cost;
       const cd = Math.max(0, s.ready - sim.time);
       c.cool.style.height = can ? (100 * cd / s.cd) + '%' : '0';
       c.b.classList.toggle('spent', !can);
@@ -459,7 +477,7 @@ export function buildUI(app, atlas) {
       <h4>Two ways to play</h4>
       <div class="keys"><div>Challenge</div><span>A scenario played as designed. The garrison is issued at its full requisition — open <b>Advanced</b> under Order of Battle to see the points and change what it fields. The horde comes in waves; hold until the relief arrives at dawn, or break it: it runs when it is down to the white mark on its bar. Scored, with medals.</span><div>Sandbox</div><span>Build both armies freely, from a blank map or autofilled from a scenario. The whole horde is on the field from the start and there is no relief: the battle runs until one side is wiped out. Not scored.</span></div>
       <h4>The night</h4>
-      <div class="keys"><div>Waves</div><span>In a challenge the horde comes on in waves — a vanguard, escalades with ladders, the siege train, and a final assault timed to land before dawn. The top bar counts down to each and says which stretch of wall it is aimed at. Cut a wave down quickly and you earn a lull.</span><div>Support</div><span>Air strikes, gunships, artillery, resupply and air assault each have a set number of calls (the figure on each button) and a cooldown between them. Spend them wisely.</span><div>Score</div><span>Challenges are scored on the win, soldiers brought through, an intact gate and wall, and requisition points left unspent.</span></div>
+      <div class="keys"><div>Waves</div><span>In a challenge the horde comes on in waves — a vanguard, escalades with ladders, the siege train, and a final assault timed to land before dawn. The top bar counts down to each and says which stretch of wall it is aimed at. Cut a wave down quickly and you earn a lull.</span><div>Command Points</div><span>In a challenge every support call is paid from one pool that refills slowly; killing captains, trolls and siege engines pays a bounty. A strike now is a resupply you cannot afford later. In the sandbox each kind of support has a set number of calls instead.</span><div>Score</div><span>Challenges are scored on the win, soldiers brought through, an intact gate and wall, and requisition points left unspent.</span></div>
       <h4>Camera</h4>
       <div class="keys"><div><kbd>Scroll</kbd></div><span>Zoom toward the cursor</span><div><kbd>Right-drag</kbd> <kbd>W A S D</kbd></div><span>Pan the map</span><div><kbd>Q</kbd> <kbd>E</kbd> or <kbd>Middle-drag</kbd></div><span>Rotate the view</span><div><kbd>G</kbd> · <kbd>Minimap</kbd></div><span>Jump to the latest alert (again for the one before) · click the minimap or any alert in the feed to look there</span><div><kbd>F2</kbd></div><span>Performance overlay</span></div>
       <h4>Setting up</h4>

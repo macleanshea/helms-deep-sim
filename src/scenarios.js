@@ -177,11 +177,7 @@ export function waveSummary(groups) {
   }
   for (let k = 0; k < waves.length; k++) {
     const w = waves[k] || (waves[k] = { k, kind: 'assault', name: WAVE_KINDS.assault.name, size: 0, by: {} });
-    const top = NOTABLE.filter(([t]) => w.by[t]).slice(0, 4);
-    w.note = top.map(([t, nm]) => `${w.by[t]} ${nm}${w.by[t] > 1 ? 's' : ''}`).join(', ');
-    // the same, without numbers, for the alerts that announce a wave
-    const kinds = top.map(([, nm]) => `${nm}s`);
-    w.brings = kinds.length > 1 ? `${kinds.slice(0, -1).join(', ')} and ${kinds[kinds.length - 1]}` : kinds[0] || '';
+    w.note = NOTABLE.filter(([t]) => w.by[t]).slice(0, 4).map(([t, nm]) => `${w.by[t]} ${nm}${w.by[t] > 1 ? 's' : ''}`).join(', ');
   }
   return waves;
 }
@@ -233,7 +229,7 @@ export const PRESETS = [
     blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
     build: (map, sb) => ({
       groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { waves: sb ? 1 : 5 })],
-      options: { dawn: 1200 },
+      options: { dawn: 1200, cpRate: 0.035 },
     }),
   },
   {
@@ -247,7 +243,7 @@ export const PRESETS = [
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(8000, { waves: sb ? 1 : 4 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900 },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 8, cpRate: 0.035 },
     }),
   },
   {
@@ -261,7 +257,7 @@ export const PRESETS = [
         makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
         ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200 },
+      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200, cpStart: 10, cpRate: 0.045 },
     }),
   },
   {
@@ -275,7 +271,7 @@ export const PRESETS = [
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
         ...horde(2200, { waves: sb ? 1 : 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
       ],
-      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600 },
+      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 10, cpRate: 0.045 },
     }),
   },
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
