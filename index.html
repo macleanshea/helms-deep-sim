@@ -20,7 +20,12 @@
       <div><b>HELM’S DEEP</b><small>Modern Defense Simulator</small></div>
     </div>
 
-    <div class="tb-group setup-only">
+    <div class="tb-group setup-only modesw" id="modeSw">
+      <button data-mode="sandbox">Sandbox</button>
+      <button data-mode="challenge">Challenge</button>
+    </div>
+
+    <div class="tb-group setup-only" id="presetBox">
       <span class="lbl">Scenario</span>
       <select id="preset" title="Load a ready-made order of battle"></select>
     </div>
@@ -47,7 +52,10 @@
     <div class="force orc" id="orcForce"><small id="orcLbl">The Horde</small><b id="orcCount">0</b><div class="bar"><i id="orcBar"></i><i id="orcRes" class="res"></i><u id="orcRout" hidden></u></div></div>
 
     <div class="tb-group">
-      <button id="btnHelp" class="icon" title="Controls">?</button>
+      <button id="btnHelp" class="txt" title="How to play (?)">Help</button>
+      <button id="btnSettings" class="icon" title="Settings" aria-haspopup="true">
+        <svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6z" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.9 1.2h2.2l.4 1.9 1.2.6 1.7-1 1.5 1.5-1 1.7.6 1.2 1.9.4v2.2l-1.9.4-.6 1.2 1 1.7-1.5 1.5-1.7-1-1.2.6-.4 1.9H6.9l-.4-1.9-1.2-.6-1.7 1-1.5-1.5 1-1.7-.6-1.2-1.9-.4V6.9l1.9-.4.6-1.2-1-1.7 1.5-1.5 1.7 1 1.2-.6z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+      </button>
       <button id="btnSound" class="icon" title="Sound on/off">
         <svg viewBox="0 0 16 16" width="14" height="14"><path d="M2 6h3l4-3v10l-4-3H2z" fill="currentColor"/><path class="waves" d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.6a6 6 0 0 1 0 8.8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
       </button>
@@ -66,19 +74,32 @@
     <div class="brush">
       <div class="row"><span class="lbl">Units per placement</span><input id="brushCount" type="number" min="1" max="5000" value="50"></div>
       <div class="chips" id="brushChips"></div>
-      <p class="tip" id="brushTip">Pick a unit, then <b>click</b> the map to drop a block or <b>drag</b> to draw a line. Drag along a wall top to man it.</p>
+      <p class="tip" id="brushTip">Pick a unit, then <b>click</b> the map to drop a block or <b>drag</b> to draw a line.</p>
     </div>
   </aside>
 
   <aside id="right" class="panel setup-only">
     <section id="inspector" hidden></section>
-    <section>
-      <h3>Order of Battle</h3>
+    <section id="oobSec">
+      <div class="sec-head"><h3>Order of Battle</h3><button id="btnAdvanced" class="mini" aria-expanded="false">Advanced <span class="chev">▸</span></button></div>
+      <p class="tip" id="oobNote"></p>
       <div id="roster"></div>
+    </section>
+    <section id="attackSec" hidden>
+      <h3>Order of Attack</h3>
+      <div id="attackList"></div>
     </section>
     <section>
       <h3>Battle Options</h3>
       <div id="options"></div>
+    </section>
+    <section>
+      <h3>Support</h3>
+      <div id="supportOpts"></div>
+    </section>
+    <section>
+      <h3>Win Conditions</h3>
+      <div id="winOpts"></div>
     </section>
   </aside>
 
@@ -94,6 +115,8 @@
   <div id="banner"></div>
   <div id="hint"></div>
   <div id="tooltip" hidden></div>
+  <div id="settingsMenu" class="panel" hidden></div>
+  <div id="coach" hidden><div class="spot"></div><div class="coach-card"><i class="arrow"></i><div class="coach-body"></div><button class="primary" id="coachOk">Got it</button></div></div>
   <div id="modal" hidden></div>
   <div id="loading"><div class="spinner"></div><span>Surveying the Deeping-coomb…</span></div>
 </div>

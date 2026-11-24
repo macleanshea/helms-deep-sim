@@ -25,9 +25,14 @@ const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v
 // region covered by the shadow map: the fortress and its approaches
 const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
-// zoom (CSS px per metre) from which each level of detail applies, and where full models take over
-const DOT_ZOOM = 2.0, BOX_ZOOM = 3.4;
+// Levels of detail by zoom (CSS px per metre): dots, boxes, stand-ins, full models. The player's
+// model-detail setting (`heroScale`) moves the whole ladder: full models take over at HERO_ZOOM x
+// heroScale (0.5 = twice as far out); dots move out more gently, with the square root of it, so the
+// whole valley stays cheap to draw; and boxes give way to stand-ins at the geometric midpoint, so
+// boxes and stand-ins each cover the same span of zoom at every setting.
+const DOT_ZOOM = 2.0;
 const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
+export const HERO_SCALE_DEFAULT = 0.3;
 // how linear light is scaled from the display-space mood colours in main.js
 const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
 
@@ -36,7 +41,7 @@ const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
 const MESH_OF = { rifle: [['rifle'], 1.3, 1], mg: [['mg'], 1.3, 1], marksman: [['marksman'], 1.3, 1], grenadier: [['grenadier'], 1.3, 1], at: [['at'], 1.3, 1], cmd: [['cmd'], 1.4, 0], mortar: [['mortar'], 1.3, 0], howitzer: [['howitzer'], 1.15, 0],
   ifv: [['ifv'], 1, 0], tank: [['tank'], 1, 0], cache: [['cache'], 1, 0], crate: [['crate'], 1, 0], uruk: [['uruk', 'urukB', 'urukC'], 1.3, 1], archer: [['archer', 'archerB'], 1.3, 1], berserker: [['berserker', 'berserkerB'], 1.4, 1], sapper: [['sapper'], 1.35, 0], chief: [['chief'], 1.6, 0],
   warg: [['warg'], 1.35, 1], troll: [['troll'], 1.25, 1], ladder: [['ladder'], 1, 0], ram: [['ram'], 1.15, 0], catapult: [['catapult'], 1.15, 0], tower: [['tower'], 1, 0] };
-const PROP_MESH = { wire: 'wire', av: 'hedgehog', moat: 'moat', mine: 'mine', claymore: 'claymore' };
+const PROP_MESH = { wire: 'wire', av: 'hedgehog', mine: 'mine', claymore: 'claymore' };
 
 function compile(gl, vs, fs) {
   const p = gl.createProgram();
@@ -170,7 +175,7 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     this.shadowVP = this._lightMatrix(); this.shadowTexel = 1 / this.shadowSize;
 
-    this.quality = 'high'; this.post = null;
+    this.quality = 'high'; this.post = null; this.heroScale = HERO_SCALE_DEFAULT;
     this.vp = new Float32Array(16);
     this.lpos = new Float32Array(24); this.lcol = new Float32Array(18);
     this.stats = { units: 0, parts: 0, dots: 0, tier: 0, draws: 0, tris: { terrain: 0, fort: 0, units: 0, shadows: 0, fx: 0 }, cpu: 0, gpu: {}, gpuOk: !!this.timerExt };
@@ -341,7 +346,7 @@ export class Renderer {
       const buf = new ArrayBuffer(ps.length * ISTRIDE), f = new Float32Array(buf), u = new Uint8Array(buf);
       ps.forEach((p, k) => {
         const o = k * 8, b = k * ISTRIDE, v = 215 + ((k * 37) % 40);
-        f[o] = p.x; f[o + 1] = p.y; f[o + 2] = this.map.groundZ(p.x, p.y); f[o + 3] = p.kind === 'moat' ? 0 : p.ang + (p.kind === 'av' ? k * 1.3 : 0); f[o + 4] = 1; f[o + 5] = 0;
+        f[o] = p.x; f[o + 1] = p.y; f[o + 2] = this.map.groundZ(p.x, p.y); f[o + 3] = p.ang + (p.kind === 'av' ? k * 1.3 : 0); f[o + 4] = 1; f[o + 5] = 0;
         u[b + 24] = v; u[b + 25] = v; u[b + 26] = v; u[b + 27] = 0;
       });
       gl.bindBuffer(gl.ARRAY_BUFFER, m.pbuf); gl.bufferData(gl.ARRAY_BUFFER, buf, gl.DYNAMIC_DRAW);
@@ -388,6 +393,13 @@ export class Renderer {
   }
 
   setQuality(q) { this.quality = q; }
+  /** Zoom (CSS px per metre) at which full models take over from stand-ins at the current settings. */
+  heroZoom(q = this.quality) { return this.lod(q).hero; }
+  /** Zooms below which units are dots, boxes and stand-ins; full models from `hero` up. */
+  lod(q = this.quality) {
+    const dot = DOT_ZOOM * Math.sqrt(this.heroScale), hero = Math.max(dot * 1.5, HERO_ZOOM[q] * this.heroScale);
+    return { dot, box: Math.sqrt(dot * hero), hero };
+  }
 
   _ensurePost(w, h, want) {
     const gl = this.gl;
@@ -486,7 +498,7 @@ export class Renderer {
     for (const name in this.meshes) {
       const m = this.meshes[name], n = props ? m.pn : m.n;
       if (!n) continue;
-      if (shadowPass && (name === 'moat' || name === 'mine' || name === 'cube')) continue;
+      if (shadowPass && (name === 'mine' || name === 'cube')) continue;
       const geo = this._geo(m, tier, shadowPass, props), a = m.anim;
       gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]); gl.uniform1f(p.u.uLegX, a[9]);
       gl.uniform1f(p.u.uMatOn, geo === m.full ? 1 : 0);   // stand-ins are too small on screen for texture to show
@@ -577,7 +589,8 @@ export class Renderer {
     this._time('units');
     if (sim) {
       for (const name in this.meshes) this.meshes[name].n = 0;
-      const tier = zc < DOT_ZOOM ? 3 : zc < BOX_ZOOM ? 2 : zc < HERO_ZOOM[q] ? 1 : 0;
+      const L = this.lod(q);
+      const tier = zc < L.dot ? 3 : zc < L.box ? 2 : zc < L.hero ? 1 : 0;
       st.tier = tier;
       dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
       this._fillDynamic(sim, fx, al, clock);

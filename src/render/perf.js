@@ -75,7 +75,7 @@ export class Perf {
     const app = this.app, raf = () => new Promise((r) => requestAnimationFrame(r));
     this.toggle(true);
     if (app.mode === 'battle') app.backToSetup();
-    app.loadPreset('combined'); app.startBattle();
+    app.loadPreset('combined', false, true); app.startBattle();
     document.getElementById('modal').hidden = true;
     app.paused = true;
     // fast-forward to the final assault, when the field is fullest (the horde comes on in waves)

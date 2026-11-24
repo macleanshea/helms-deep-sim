@@ -131,7 +131,7 @@ export const moraleMethods = {
       if (d < 240) this.gConf[g] = this.time + 4 + this.rand() * 4;
     }
     if (team === ORC) this.events.push({ type: 'banner', text: left ? 'An Uruk captain is down — his companies waver' : 'The last Uruk captain has fallen — the horde is leaderless', cls: 'good', x, y });
-    else this.events.push({ type: 'banner', text: left ? 'A command team is lost — the line is shaken' : 'The garrison has lost its commanders', cls: 'bad', x, y });
+    else this.events.push({ type: 'banner', text: left ? 'A commander is down — the line is shaken' : 'The garrison has lost its commanders', cls: 'bad', x, y });
     this.fx.sound('horn', x, y, 0.6);
   },
 };
