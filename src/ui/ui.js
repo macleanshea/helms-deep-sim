@@ -226,7 +226,7 @@ export function buildUI(app, atlas) {
     };
     const num = (box, label, val, min, max, fn, tipText) => {
       const r = el('div', 'opt'), i = el('input');
-      i.type = 'number'; i.min = min; i.max = max; i.value = val;
+      i.type = 'number'; i.min = min; i.max = max; i.value = val; i.disabled = !sb;
       i.addEventListener('change', () => { const v = Math.max(min, Math.min(max, +i.value | 0)); i.value = v; fn(v); app.optionsChanged(); });
       r.append(el('span', null, label), i); box.append(r);
       if (tipText) bindTip(r, label, tipText);
@@ -238,10 +238,11 @@ export function buildUI(app, atlas) {
     // support: Command Points in a challenge, a number of calls per kind in the sandbox
     if (sb) for (const k in SUPPORT) num(supportOpts, SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
     else {
-      const r = el('div', 'opt', `<span>Command Points</span><b>${o.cpStart} to start · +${(o.cpRate * 60).toFixed(1)} / min</b>`);
-      supportOpts.append(r);
-      bindTip(r, 'Command Points', 'One pool pays for every support call. It refills slowly, and killing captains, trolls and siege engines pays a bounty.');
-      supportOpts.append(el('p', 'tip', Object.values(SUPPORT).map((q) => `${q.name} <b>${q.cost}</b>`).join(' · ')));
+      // the same rows as the sandbox, read-only: the pool, then what each call costs from it
+      const cpTip = 'One pool pays for every support call. It refills slowly, and killing captains, trolls and siege engines pays a bounty.';
+      num(supportOpts, 'Command Points at start', o.cpStart, 0, 99, () => {}, cpTip);
+      num(supportOpts, 'Command Points per min', +(o.cpRate * 60).toFixed(1), 0, 99, () => {}, cpTip);
+      for (const k in SUPPORT) num(supportOpts, `${SUPPORT[k].name} cost`, SUPPORT[k].cost, 0, 99, () => {}, `${SUPPORT[k].desc} Costs ${SUPPORT[k].cost} Command Points a call.`);
     }
     // win conditions: the defenders win if either is met; they lose if the garrison is wiped out
     sel(winOpts, 'Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; },
