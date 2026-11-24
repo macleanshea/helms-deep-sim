@@ -538,7 +538,7 @@ export function buildUI(app, atlas) {
 
   // --------------------------------------------------------------- settings
   const menu = $('settingsMenu'), btnSettings = $('btnSettings');
-  const DETAIL = [[1, 'Close up', 'only when zoomed right in'], [0.75, 'Medium', 'from a middle distance'], [0.6, 'Far', 'from further out (default)'], [0.45, 'Very far', 'as soon as troops are more than boxes']];
+  const DETAIL = [[0.5, 'Close up', 'once troops are a fair size on screen'], [0.375, 'Medium', 'from a middle distance'], [0.3, 'Far', 'from further out (default)'], [0.225, 'Very far', 'almost as soon as troops are more than dots']];
   const renderSettings = () => {
     const cur = app.settings.heroScale;
     menu.innerHTML = '<h3>Settings</h3>';

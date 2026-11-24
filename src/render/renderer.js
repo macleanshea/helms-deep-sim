@@ -27,10 +27,11 @@ const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
 // zoom (CSS px per metre) from which each level of detail applies, and where full models take over.
 // HERO_ZOOM is scaled by the player's model-detail setting (`heroScale`: below 1 brings full models in
-// from further out); it never drops below the zoom at which boxes give way to stand-ins.
+// from further out, 0.5 from twice as far). Far enough out, full models replace the boxes as well as
+// the stand-ins; they never replace the dots.
 const DOT_ZOOM = 2.0, BOX_ZOOM = 3.4;
 const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
-export const HERO_SCALE_DEFAULT = 0.6;
+export const HERO_SCALE_DEFAULT = 0.3;
 // how linear light is scaled from the display-space mood colours in main.js
 const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
 
@@ -392,7 +393,7 @@ export class Renderer {
 
   setQuality(q) { this.quality = q; }
   /** Zoom (CSS px per metre) at which full models take over from stand-ins at the current settings. */
-  heroZoom(q = this.quality) { return Math.max(BOX_ZOOM + 0.4, HERO_ZOOM[q] * this.heroScale); }
+  heroZoom(q = this.quality) { return Math.max(DOT_ZOOM, HERO_ZOOM[q] * this.heroScale); }
 
   _ensurePost(w, h, want) {
     const gl = this.gl;
@@ -582,7 +583,7 @@ export class Renderer {
     this._time('units');
     if (sim) {
       for (const name in this.meshes) this.meshes[name].n = 0;
-      const tier = zc < DOT_ZOOM ? 3 : zc < BOX_ZOOM ? 2 : zc < this.heroZoom(q) ? 1 : 0;
+      const tier = zc < DOT_ZOOM ? 3 : zc >= this.heroZoom(q) ? 0 : zc < BOX_ZOOM ? 2 : 1;
       st.tier = tier;
       dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
       this._fillDynamic(sim, fx, al, clock);

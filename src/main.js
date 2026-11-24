@@ -1178,9 +1178,14 @@ function frame(now) {
 }
 
 // ---------------------------------------------------------------- settings
-const SETTINGS_KEY = 'hd-settings-v1';
+const SETTINGS_KEY = 'hd-settings-v2';
 app.settings = { heroScale: HERO_SCALE_DEFAULT };
-try { Object.assign(app.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch { /* private mode */ }
+try {
+  const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+  // v1 stored the detail step before every step's distance was doubled: keep the same step
+  const v1 = !saved && JSON.parse(localStorage.getItem('hd-settings-v1'));
+  Object.assign(app.settings, saved || (v1 ? { ...v1, heroScale: v1.heroScale / 2 } : {}));
+} catch { /* private mode */ }
 /** Change a setting, apply it and remember it on this browser. */
 app.setSetting = (k, v) => {
   app.settings[k] = v;

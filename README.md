@@ -135,8 +135,10 @@ Orders can be given while paused. The battle waits while a dialog is open.
 
 Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
 hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it. **Settings** (the
-gear next to Help) sets how far out the detailed unit models take over from the stand-ins —
-further out by default than before; the choice is kept in the browser.
+gear next to Help) sets how far out the detailed unit models take over: Close up, Medium, Far
+(the default) or Very far, each twice the distance it used to be. At Far and Very far the full
+models replace the boxes too, which costs frame rate in big battles. The choice is kept in the
+browser.
 
 ### Performance
 
