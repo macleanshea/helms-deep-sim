@@ -71,7 +71,7 @@ export function buildUI(app, atlas) {
     const sb = b.dataset.mode === 'sandbox';
     b.addEventListener('click', () => { if (!app.modeChosen || sb !== app.isSandbox()) app.enterMode(b.dataset.mode); b.blur(); });
     bindTip(b, sb ? 'Sandbox' : 'Challenge', sb
-      ? 'Build both armies freely on a blank map, or autofill it from a scenario. No budget and no waves: the whole horde is on the field, and the battle runs until one side is wiped out. Not scored.'
+      ? 'Build both armies freely on a blank map, or autofill it from a scenario. No budget and no waves: the whole horde is on the field. You win when it is cut below 0.5% of its strength, and lose if the garrison is wiped out. Not scored.'
       : 'Play a scenario as designed: hold the Deep until dawn against a horde that comes in waves, with the garrison you can field on its requisition. Scored, with medals.');
   }
   const btnBegin = $('btnBegin');
@@ -405,7 +405,7 @@ export function buildUI(app, atlas) {
     ammoPct.parentElement.classList.toggle('low', am < 0.3 && sim.opt.ammoMult <= 50);
     $('btnResult').hidden = !sim.result;
     clock.textContent = mmss(sim.time);
-    dawn.textContent = sim.opt.sandbox ? 'To the last' : sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
+    dawn.textContent = sim.opt.sandbox ? 'Win below 0.5% of the horde' : sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }
     // the pause button turns into a play button while the battle is paused
     if (pauseBtn.dataset.state !== String(app.paused)) {
@@ -475,7 +475,7 @@ export function buildUI(app, atlas) {
       <h1 style="font-size:22px">How to play</h1>
       <p class="sub">Garrison the Deep, then hold it against the horde. The battle waits while this is open.</p>
       <h4>Two ways to play</h4>
-      <div class="keys"><div>Challenge</div><span>A scenario played as designed. The garrison is issued at its full requisition — open <b>Advanced</b> under Order of Battle to see the points and change what it fields. The horde comes in waves; hold until the relief arrives at dawn, or break it: it runs when it is down to the white mark on its bar. Scored, with medals.</span><div>Sandbox</div><span>Build both armies freely, from a blank map or autofilled from a scenario. The whole horde is on the field from the start and there is no relief: the battle runs until one side is wiped out. Not scored.</span></div>
+      <div class="keys"><div>Challenge</div><span>A scenario played as designed. The garrison is issued at its full requisition — open <b>Advanced</b> under Order of Battle to see the points and change what it fields. The horde comes in waves; hold until the relief arrives at dawn, or break it: it runs when it is down to the white mark on its bar. Scored, with medals.</span><div>Sandbox</div><span>Build both armies freely, from a blank map or autofilled from a scenario. The whole horde is on the field from the start and there is no relief: you win when the horde is cut below 0.5% of its starting strength, and lose if the garrison is wiped out. Not scored.</span></div>
       <h4>The night</h4>
       <div class="keys"><div>Waves</div><span>In a challenge the horde comes on in waves — a vanguard, escalades with ladders, the siege train, and a final assault timed to land before dawn. The top bar counts down to each and says which stretch of wall it is aimed at. Cut a wave down quickly and you earn a lull.</span><div>Command Points</div><span>In a challenge every support call is paid from one pool that refills slowly; killing captains, trolls and siege engines pays a bounty. A strike now is a resupply you cannot afford later. In the sandbox each kind of support has a set number of calls instead.</span><div>Score</div><span>Challenges are scored on the win, soldiers brought through, an intact gate and wall, and requisition points left unspent.</span></div>
       <h4>Camera</h4>
@@ -498,7 +498,7 @@ export function buildUI(app, atlas) {
       <div class="wl-brand"><svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg><div><h1>Helm’s Deep</h1><small>Modern Defense Simulator</small></div></div>
       <p class="lead">A modern garrison holds the Hornburg and the Deeping Wall against a host of Uruk-hai. Lay out riflemen, machine guns, mortars, armour and field works, then command the defence in real time: call in air strikes and artillery, direct your guns, keep the ammunition flowing and fall back to the keep when the wall gives way.</p>
       <div class="wl-modes">
-        <button class="wl-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no clock — the battle runs until one side is wiped out.</span><em>Start building →</em></button>
+        <button class="wl-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no clock — fight until the horde is destroyed or the garrison falls.</span><em>Start building →</em></button>
         <button class="wl-mode primary-mode" id="wlChallenge"><b>Challenge</b><span>Hold the Deep through the night against a horde that comes in waves, with the garrison your requisition can field. Scored, with medals for the best defence.</span><em>Take command →</em></button>
       </div>
       <div class="wl-foot"><button class="link" id="wlHelp">How to play</button><span>You can switch modes any time from the top bar.</span></div></div>`;

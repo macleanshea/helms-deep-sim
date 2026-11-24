@@ -288,7 +288,8 @@ export function forceCost(groups) {
  * A preset as a setup: { groups, options, budget }. In a challenge the budget is exactly the cost
  * of the garrison as issued: the stock layout spends all of it, and anything trimmed is saved.
  * In the sandbox (`sandbox`, or a blank map) the whole horde stands on the field from the start,
- * with no relief at dawn and no breaking point: the battle runs until one side is gone.
+ * with no relief at dawn and no breaking point: the battle runs until the garrison
+ * falls or the horde is cut down below SANDBOX_WIN of its strength.
  */
 export function buildPreset(map, key, sandbox = false) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];

@@ -53,10 +53,10 @@ A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded fi
 The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
 autofill both armies, then change anything. Every option can be edited, and support has a
 fixed number of calls per kind instead of Command Points. There are no waves and no relief at
-dawn: the whole horde is on the field from the start, and the battle runs until one side has
-been wiped out. **Raise a horde** (Attackers
-tab) draws up a whole host of any size with its ladders, engines and captains; formations you
-place yourself take an "advance after" delay. Sandbox battles are not scored.
+dawn: the whole horde is on the field from the start. The defenders win once the horde is cut
+below 0.5% of its starting strength, and lose if the garrison is wiped out. **Raise a horde**
+(Attackers tab) draws up a whole host of any size with its ladders, engines and captains;
+formations you place yourself take an "advance after" delay. Sandbox battles are not scored.
 
 ### The night
 

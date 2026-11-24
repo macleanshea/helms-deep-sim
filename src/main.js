@@ -128,7 +128,7 @@ app.enterMode = (mode) => {
   const first = !app.modeChosen;
   app.modeChosen = true;
   if (first || sb !== app.isSandbox()) app.loadPreset(sb ? 'empty' : 'garrison', sb, true); else ui.refreshPresetList();
-  ui.toast(sb ? 'Sandbox: build both armies freely. The battle runs until one side is wiped out.' : 'Challenge: hold the Deep until dawn within your requisition. Battles are scored.');
+  ui.toast(sb ? 'Sandbox: build both armies freely. The battle runs until the garrison falls or the horde is cut below 0.5% of its strength.' : 'Challenge: hold the Deep until dawn within your requisition. Battles are scored.');
   ui.coach(sb ? 'sandbox' : 'challenge');
 };
 app.optionsChanged = () => { app.previewDirty = true; };
@@ -198,7 +198,7 @@ app.startBattle = () => {
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
   const wi0 = app.sim.waveInfo();
-  ui.toast(app.sim.opt.sandbox ? 'The horde advances. The battle ends when one side is wiped out. Space pauses; number keys call support.' : wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
+  ui.toast(app.sim.opt.sandbox ? 'The horde advances. You win when it is cut below 0.5% of its strength; you lose if the garrison is wiped out. Space pauses; number keys call support.' : wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
   app.skip = null;
   audio.horn();
   mmBase = null;
