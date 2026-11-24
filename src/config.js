@@ -99,7 +99,7 @@ export const UNITS = [
     desc: 'Heavy armour. Main gun kills trolls; almost immune to blades.' },
   { key: 'cache', cost: 80, team: DEF, name: 'Ammo Cache', cls: C.CACHE, hp: 300, speed: 0, rad: 1.6, size: 5.5, spr: 11, pool: 150, spacing: 8,
     desc: 'Re-arms troops within 60 m until its stock runs out.' },
-  { key: 'cmd', cost: 120, team: DEF, name: 'Command Team', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
+  { key: 'cmd', cost: 120, team: DEF, name: 'Commander', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
     desc: 'Steadies every platoon within 110 m. If it falls, the garrison is shaken.' },
   { key: 'wire', cost: 2, team: DEF, name: 'Barbed Wire', cls: C.OBST, ob: 'wire', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 14, spacing: 3,
     desc: 'Slows infantry to a crawl until it is trampled flat or blown apart.' },
