@@ -53,8 +53,9 @@ A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded fi
 The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
 autofill both armies, then change anything. Every option can be edited, and support has a
 fixed number of calls per kind instead of Command Points. There are no waves and no relief at
-dawn: the whole horde is on the field from the start. The defenders win once the horde is cut
-below 0.5% of its starting strength, and lose if the garrison is wiped out. **Raise a horde**
+dawn by default: the whole horde is on the field from the start, and the defenders win when the
+horde gives up with only a remnant left, or lose if the garrison is wiped out. Both win
+conditions (relief at dawn, and when the horde gives up) can be changed. **Raise a horde**
 (Attackers tab) draws up a whole host of any size with its ladders, engines and captains;
 formations you place yourself take an "advance after" delay. Sandbox battles are not scored.
 
@@ -80,8 +81,8 @@ weapon's reach from that spot. Dragging along a wall top mans the battlements. U
 works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
 move, `[`/`]` to rotate, `Del` to remove. The right panel shows the enemy's order of attack wave by
-wave, the order of battle (requisition points spent and totals per unit type) and the battle
-options. In the sandbox the
+wave, the order of battle (requisition points spent and totals per unit type), the battle
+options, support, and the win conditions. In the sandbox the
 attackers can be edited too, and hand-placed attacker formations take an "advance after" delay.
 
 **Battle.**

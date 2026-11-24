@@ -161,13 +161,9 @@ export const SUPPORT = {
 export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
 export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
-// A sandbox battle is won once the horde is cut down below this fraction of its starting strength
-// (the stragglers left scattered over the valley are not worth hunting down one by one).
-export const SANDBOX_WIN = 0.005;
-
 export const DEFAULT_OPTIONS = {
   ammoMult: 1,
-  sandbox: false, // free build: both armies, no budget, no waves or relief, support by uses; runs until the garrison falls or the horde is all but gone
+  sandbox: false, // free build: both armies, no budget, no waves, support by uses, win conditions of the player's choosing
   cpStart: 6,     // Command Points in hand when the battle opens (challenge)
   cpRate: 0.025,  // Command Points gained per second
   cpCap: 20,      // most that can be banked

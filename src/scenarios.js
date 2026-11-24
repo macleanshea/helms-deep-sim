@@ -288,8 +288,8 @@ export function forceCost(groups) {
  * A preset as a setup: { groups, options, budget }. In a challenge the budget is exactly the cost
  * of the garrison as issued: the stock layout spends all of it, and anything trimmed is saved.
  * In the sandbox (`sandbox`, or a blank map) the whole horde stands on the field from the start,
- * with no relief at dawn and no breaking point: the battle runs until the garrison
- * falls or the horde is cut down below SANDBOX_WIN of its strength.
+ * and the win conditions start at SANDBOX_OPTIONS (no relief; the horde gives up when only a
+ * remnant is left) for the player to change.
  */
 export function buildPreset(map, key, sandbox = false) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
@@ -300,5 +300,5 @@ export function buildPreset(map, key, sandbox = false) {
   return { groups: s.groups, options, budget: forceCost(s.groups) };
 }
 
-/** What sandbox mode overrides: no relief, no rout, just the two armies. */
-export const SANDBOX_OPTIONS = { sandbox: true, dawn: 0, rout: 0 };
+/** Where a sandbox's win conditions start: no relief column, and the horde gives up at 1% of its strength. */
+export const SANDBOX_OPTIONS = { sandbox: true, dawn: 0, rout: 0.01 };

@@ -71,7 +71,7 @@ export function buildUI(app, atlas) {
     const sb = b.dataset.mode === 'sandbox';
     b.addEventListener('click', () => { if (!app.modeChosen || sb !== app.isSandbox()) app.enterMode(b.dataset.mode); b.blur(); });
     bindTip(b, sb ? 'Sandbox' : 'Challenge', sb
-      ? 'Build both armies freely on a blank map, or autofill it from a scenario. No budget and no waves: the whole horde is on the field. You win when it is cut below 0.5% of its strength, and lose if the garrison is wiped out. Not scored.'
+      ? 'Build both armies freely on a blank map, or autofill it from a scenario. No budget and no waves: the whole horde is on the field, and you choose the win conditions. Not scored.'
       : 'Play a scenario as designed: hold the Deep until dawn against a horde that comes in waves, with the garrison you can field on its requisition. Scored, with medals.');
   }
   const btnBegin = $('btnBegin');
@@ -211,41 +211,43 @@ export function buildUI(app, atlas) {
   };
 
   // ------------------------------------------------------------- options
-  const options = $('options');
+  const options = $('options'), supportOpts = $('supportOpts'), winOpts = $('winOpts');
   ui.refreshOptions = () => {
     const o = app.setup.options, sb = !!o.sandbox;
-    options.innerHTML = '';
+    options.innerHTML = supportOpts.innerHTML = winOpts.innerHTML = '';
     // a challenge's options are part of the scenario and shown for reference; the sandbox's are the player's
-    const sel = (label, cur, list, fn, tipText) => {
+    const sel = (box, label, cur, list, fn, tipText) => {
       const r = el('div', 'opt'), s = el('select');
       for (const [v, t] of list) { const op = el('option', null, t); op.value = v; s.append(op); }
       if (!list.some(([v]) => v === cur)) { const op = el('option', null, String(cur)); op.value = cur; s.append(op); }
       s.value = cur; s.disabled = !sb; s.addEventListener('change', () => { fn(+s.value); s.blur(); app.optionsChanged(); });
-      r.append(el('span', null, label), s); options.append(r);
+      r.append(el('span', null, label), s); box.append(r);
       if (tipText) bindTip(r, label, tipText);
     };
-    const num = (label, val, min, max, fn, tipText) => {
+    const num = (box, label, val, min, max, fn, tipText) => {
       const r = el('div', 'opt'), i = el('input');
       i.type = 'number'; i.min = min; i.max = max; i.value = val;
       i.addEventListener('change', () => { const v = Math.max(min, Math.min(max, +i.value | 0)); i.value = v; fn(v); app.optionsChanged(); });
-      r.append(el('span', null, label), i); options.append(r);
+      r.append(el('span', null, label), i); box.append(r);
       if (tipText) bindTip(r, label, tipText);
     };
-    sel('Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. When it runs dry they fight hand to hand.');
-    if (!sb) sel('Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; }, 'Hold out this long and the relief column arrives: you win. The horde paces its waves so the last and heaviest lands shortly before dawn.');
-    sel('Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses in a short time breaks and runs; commanders steady the troops around them, and losing one shakes them.');
-    if (!sb) sel('Horde gives up at', o.rout, [[0, 'Never — to the last'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The whole host routs when this little of it is left.');
-    if (!sb) {
-      const sh = el('h3', null, 'Support'); sh.style.marginTop = '12px'; options.append(sh);
+    // battle options
+    sel(options, 'Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. When it runs dry they fight hand to hand.');
+    sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses in a short time breaks and runs; commanders steady the troops around them, and losing one shakes them.');
+    if (sb) num(options, 'Random seed', o.seed, 1, 9999, (v) => { o.seed = v; }, 'The same setup with the same seed and the same orders plays out the same way. Change it for a different roll of the dice.');
+    // support: Command Points in a challenge, a number of calls per kind in the sandbox
+    if (sb) for (const k in SUPPORT) num(supportOpts, SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
+    else {
       const r = el('div', 'opt', `<span>Command Points</span><b>${o.cpStart} to start · +${(o.cpRate * 60).toFixed(1)} / min</b>`);
-      options.append(r);
+      supportOpts.append(r);
       bindTip(r, 'Command Points', 'One pool pays for every support call. It refills slowly, and killing captains, trolls and siege engines pays a bounty.');
-      options.append(el('p', 'tip', Object.values(SUPPORT).map((q) => `${q.name} <b>${q.cost}</b>`).join(' · ')));
-      return;
+      supportOpts.append(el('p', 'tip', Object.values(SUPPORT).map((q) => `${q.name} <b>${q.cost}</b>`).join(' · ')));
     }
-    const sh = el('h3', null, 'Support on call'); sh.style.marginTop = '12px'; options.append(sh);
-    for (const k in SUPPORT) num(SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
-    num('Random seed', o.seed, 1, 9999, (v) => { o.seed = v; }, 'The same setup with the same seed and the same orders plays out the same way. Change it for a different roll of the dice.');
+    // win conditions: the defenders win if either is met; they lose if the garrison is wiped out
+    sel(winOpts, 'Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; },
+      `Hold out this long and the relief column arrives: you win.${sb ? '' : ' The horde paces its waves so the last and heaviest lands shortly before dawn.'}`);
+    sel(winOpts, 'Horde gives up at', o.rout, [[0, 'Never — to the last'], [0.01, '1% remaining'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The whole host breaks and flees when this little of it is left: you win. The white mark on its bar in battle shows the point.');
+    winOpts.append(el('p', 'tip', 'You win when either is met, and lose if the garrison is wiped out.'));
   };
 
   // --------------------------------------------------------- command bar
@@ -405,7 +407,7 @@ export function buildUI(app, atlas) {
     ammoPct.parentElement.classList.toggle('low', am < 0.3 && sim.opt.ammoMult <= 50);
     $('btnResult').hidden = !sim.result;
     clock.textContent = mmss(sim.time);
-    dawn.textContent = sim.opt.sandbox ? 'Win below 0.5% of the horde' : sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
+    dawn.textContent = sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }
     // the pause button turns into a play button while the battle is paused
     if (pauseBtn.dataset.state !== String(app.paused)) {
@@ -475,7 +477,7 @@ export function buildUI(app, atlas) {
       <h1 style="font-size:22px">How to play</h1>
       <p class="sub">Garrison the Deep, then hold it against the horde. The battle waits while this is open.</p>
       <h4>Two ways to play</h4>
-      <div class="keys"><div>Challenge</div><span>A scenario played as designed. The garrison is issued at its full requisition — open <b>Advanced</b> under Order of Battle to see the points and change what it fields. The horde comes in waves; hold until the relief arrives at dawn, or break it: it runs when it is down to the white mark on its bar. Scored, with medals.</span><div>Sandbox</div><span>Build both armies freely, from a blank map or autofilled from a scenario. The whole horde is on the field from the start and there is no relief: you win when the horde is cut below 0.5% of its starting strength, and lose if the garrison is wiped out. Not scored.</span></div>
+      <div class="keys"><div>Challenge</div><span>A scenario played as designed. The garrison is issued at its full requisition — open <b>Advanced</b> under Order of Battle to see the points and change what it fields. The horde comes in waves; hold until the relief arrives at dawn, or break it: it runs when it is down to the white mark on its bar. Scored, with medals.</span><div>Sandbox</div><span>Build both armies freely, from a blank map or autofilled from a scenario. The whole horde is on the field from the start, and you set the win conditions: by default no relief comes, and you win when the horde gives up with only a remnant left. You lose if the garrison is wiped out. Not scored.</span></div>
       <h4>The night</h4>
       <div class="keys"><div>Waves</div><span>In a challenge the horde comes on in waves — a vanguard, escalades with ladders, the siege train, and a final assault timed to land before dawn. The top bar counts down to each and says which stretch of wall it is aimed at. Cut a wave down quickly and you earn a lull.</span><div>Command Points</div><span>In a challenge every support call is paid from one pool that refills slowly; killing captains, trolls and siege engines pays a bounty. A strike now is a resupply you cannot afford later. In the sandbox each kind of support has a set number of calls instead.</span><div>Score</div><span>Challenges are scored on the win, soldiers brought through, an intact gate and wall, and requisition points left unspent.</span></div>
       <h4>Camera</h4>
@@ -498,7 +500,7 @@ export function buildUI(app, atlas) {
       <div class="wl-brand"><svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg><div><h1>Helm’s Deep</h1><small>Modern Defense Simulator</small></div></div>
       <p class="lead">A modern garrison holds the Hornburg and the Deeping Wall against a host of Uruk-hai. Lay out riflemen, machine guns, mortars, armour and field works, then command the defence in real time: call in air strikes and artillery, direct your guns, keep the ammunition flowing and fall back to the keep when the wall gives way.</p>
       <div class="wl-modes">
-        <button class="wl-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no clock — fight until the horde is destroyed or the garrison falls.</span><em>Start building →</em></button>
+        <button class="wl-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely on an open map, or autofill it from a scenario. No budget and no waves — the whole horde is on the field, and you set the win conditions.</span><em>Start building →</em></button>
         <button class="wl-mode primary-mode" id="wlChallenge"><b>Challenge</b><span>Hold the Deep through the night against a horde that comes in waves, with the garrison your requisition can field. Scored, with medals for the best defence.</span><em>Take command →</em></button>
       </div>
       <div class="wl-foot"><button class="link" id="wlHelp">How to play</button><span>You can switch modes any time from the top bar.</span></div></div>`;

@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, SANDBOX_WIN, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { KEEP, N_WALL } from '../map.js';
@@ -1591,11 +1591,6 @@ export class Sim {
     if (this.defCombat <= 0) return this._finish(false, 'The garrison has been wiped out.');
     if (this.count[ORC] <= 0) return this._finish(true, this.routing || this.stats.fled > this.initial[ORC] * 0.2 ? 'The horde has broken and fled the valley.' : 'The horde has been annihilated.');
     if (this.routing) { if (this.time > this.routT + 14) this._finish(true, 'The horde has broken and fled the valley.'); return; }
-    if (this.opt.sandbox) {
-      // no relief and no breaking point: the garrison falls, or the horde is cut down to a last few stragglers
-      if (this.count[ORC] < this.initial[ORC] * SANDBOX_WIN) this._finish(true, 'The horde has been destroyed — only a few stragglers are left in the valley.');
-      return;
-    }
     if (this.opt.rout > 0 && this.count[ORC] <= this.initial[ORC] * this.opt.rout) {
       this.routing = true; this.routT = this.time;
       this._dropReserves();
