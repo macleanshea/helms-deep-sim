@@ -19,7 +19,6 @@ const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const len = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
-export const vec = { sub, add, mul, dot, cross, len, unit };
 
 /** Ring lying flat (for upright bodies): centre and radii along x and y. */
 export const ringZ = (x, y, z, rx, ry = rx, col) => ({ c: [x, y, z], u: [rx, 0, 0], v: [0, ry, 0], col });

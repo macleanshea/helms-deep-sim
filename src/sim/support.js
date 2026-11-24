@@ -1,11 +1,11 @@
 // Logistics and player-called support: resupply, air strikes, gunships, artillery,
 // air assault. Mixed into Sim.prototype.
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, WEAPONS, TR, C } from '../config.js';
+import { WORLD_W, WORLD_H, DT, DEF, UNITS, U, WEAPONS, TR, C } from '../config.js';
 import { canPlace } from '../scenarios.js';
 
 const W = WEAPONS;
-const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;
+const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS; // must match the defender grid in sim.js
 export const SUPPLY_R = 60; // re-arm radius of caches and supply drops (m)
 
 // cruising height of each kind of aircraft over open ground, and how far it keeps above the hills

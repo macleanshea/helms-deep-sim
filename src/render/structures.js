@@ -7,6 +7,7 @@
 // flagstones on level ones.
 
 import { MeshBuilder } from './mesh.js';
+import { dim } from './models/figure.js';
 import { MAT } from './materials.js';
 import { KEEP, N_WALL, N_RING, WALL_HALF } from '../map.js';
 import { WALL_H, PLATEAU_Z, RING_TOP } from '../config.js';
@@ -16,7 +17,6 @@ const CORE = [0.31, 0.29, 0.27]; // rubble core exposed where masonry has been t
 const WOOD = [0.36, 0.25, 0.15], DARK = [0.05, 0.05, 0.05], SLATE = [0.25, 0.27, 0.31], IRON = [0.2, 0.2, 0.22];
 const LAMP = [0.95, 0.62, 0.26];  // a window with a light behind it
 const DEG = Math.PI / 180, TAU = Math.PI * 2;
-const dim = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
 
 let seed = 1;
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };

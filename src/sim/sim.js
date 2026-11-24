@@ -5,12 +5,12 @@
 import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
+import { mulberry } from '../rng.js';
 import { KEEP, N_WALL } from '../map.js';
 import { supportMethods } from './support.js';
 import { moraleMethods } from './morale.js';
 import { directorMethods } from './director.js';
 
-export { SUPPLY_R } from './support.js';
 export const MAX_UNITS = 1 << 16;
 const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast grid
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
@@ -25,11 +25,6 @@ const KDIR = [5, 6, 7, 4, -1, 0, 3, 2, 1];
 const NOFX = new Proxy({}, { get: () => () => {} });
 let sharedSolver = null;
 const W = WEAPONS;
-
-function mulberry(seed) {
-  let a = seed >>> 0;
-  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-}
 
 export class Sim {
   constructor(map, setup, fx) {
@@ -1617,17 +1612,6 @@ export class Sim {
     mix(this.tick); mix(this.count[0]); mix(this.count[1]); mix(this.defCombat);
     for (let i = 0; i < this.n; i++) { if (!this.alive[i]) continue; mix(i); mix(this.x[i] * 16); mix(this.y[i] * 16); mix(this.hp[i]); }
     return (h >>> 0).toString(16).padStart(8, '0');
-  }
-
-  defenderAt(x, y, r) {
-    let best = -1, bd = r * r;
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || this.team[i] !== DEF) continue;
-      const dx = this.x[i] - x, dy = this.y[i] - y, rr = this.rad[i];
-      const d = dx * dx + dy * dy - rr * rr;
-      if (d < bd) { bd = d; best = i; }
-    }
-    return best;
   }
 }
 

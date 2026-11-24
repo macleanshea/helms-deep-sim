@@ -8,7 +8,7 @@
 // --verify (run twice and compare state hashes). HORDE=n in the environment still works.
 import { pathToFileURL } from 'node:url';
 import { buildMap } from '../src/map.js';
-import { buildPreset, horde, forceCost } from '../src/scenarios.js';
+import { buildPreset, horde, forceCost, PRESETS } from '../src/scenarios.js';
 import { scoreBattle } from '../src/score.js';
 import { Sim } from '../src/sim/sim.js';
 import { DEF, ORC } from '../src/config.js';
@@ -19,6 +19,7 @@ let sharedMap = null;
 /** Run one battle to its end (or `max` seconds) and return a summary object. */
 export function runBattle(cfg = {}) {
   const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null } = cfg;
+  if (!PRESETS.some((p) => p.key === preset)) throw new Error(`unknown preset "${preset}" (try ${PRESETS.map((p) => p.key).join(', ')})`);
   const map = sharedMap || (sharedMap = buildMap());
   const setup = buildPreset(map, preset);
   if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN));
@@ -70,7 +71,11 @@ function parseArgs(argv) {
     const k = a.slice(2);
     if (k === 'json' || k === 'quiet' || k === 'verify') { flags[k] = true; continue; }
     const v = argv[++i];
-    if (k === 'opt') { const [ok, ov] = v.split('='); cfg.opts[ok] = ov === 'true' ? true : ov === 'false' ? false : +ov; }
+    if (k === 'opt') {
+      // numbers and true/false are parsed; anything else (e.g. pacing=steady) stays a string
+      const [ok, ov = ''] = v.split('='), num = Number(ov);
+      cfg.opts[ok] = ov === 'true' ? true : ov === 'false' ? false : ov !== '' && !Number.isNaN(num) ? num : ov;
+    }
     else if (k === 'preset') cfg.preset = v;
     else if (k === 'policy') cfg.policy = v;
     else if (k === 'seed') cfg.seed = +v;
@@ -88,7 +93,8 @@ function parseArgs(argv) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const { cfg, flags } = parseArgs(process.argv.slice(2));
   const loud = !flags.json && !flags.quiet;
-  const res = runBattle({ ...cfg, log: loud ? (s) => console.log(s) : null });
+  let res;
+  try { res = runBattle({ ...cfg, log: loud ? (s) => console.log(s) : null }); } catch (err) { console.error(err.message); process.exit(1); }
   if (flags.verify) {
     const again = runBattle(cfg);
     if (again.hash !== res.hash) { console.error(`NOT DETERMINISTIC: ${res.hash} vs ${again.hash}`); process.exit(1); }

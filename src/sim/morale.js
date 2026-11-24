@@ -7,7 +7,7 @@
 // abandon their post for the Hornburg. Killing a commander shocks and confuses every
 // company around him.
 
-import { DEF, ORC, UNITS, C } from '../config.js';
+import { ORC, UNITS, C } from '../config.js';
 import { KEEP } from '../map.js';
 
 const MAXG = 4096;

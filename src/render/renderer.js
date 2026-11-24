@@ -8,14 +8,14 @@
 //  - corpses, craters and scorch marks are stamped into a persistent decal texture
 //  - optional post-processing: MSAA resolve, bloom, vignette
 
-import { WORLD_W, WORLD_H, UNITS, DEF, U, C, R } from '../config.js';
+import { WORLD_W, WORLD_H, UNITS, DEF, U, R } from '../config.js';
 import { HM_W, HM_H, MARGIN, GZ_W, HM_RES } from '../map.js';
 import { COLS, SPR } from './atlas.js';
 import { buildModels } from './models/index.js';
 import { buildMaterials } from './materials.js';
 import { buildStructures } from './structures.js';
 import { viewMatrix, SIN_P, COS_P } from './camera.js';
-import { S_DONE, S_CLIMB, LADDER_TIME, TOWER_TIME } from '../sim/sim.js';
+import { S_DONE, S_CLIMB, LADDER_TIME } from '../sim/sim.js';
 import * as SH from './shaders.js';
 
 const PSTRIDE = 52, PF = 13;         // particle instance: bytes / floats
@@ -510,7 +510,10 @@ export class Renderer {
   _collectTimes() {
     const gl = this.gl, ext = this.timerExt;
     if (!ext) return;
-    const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT), g = this.stats.gpu;
+    const g = this.stats.gpu;
+    // nothing in flight (the perf overlay is off): skip the query, a synchronous round trip to the GPU
+    if (!this._queries.length) { if (!this.perfOn) for (const k in g) delete g[k]; return; }
+    const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
     while (this._queries.length && this._queries[0].q !== this._query) {
       const { name, q } = this._queries[0];
       if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
@@ -581,7 +584,7 @@ export class Renderer {
       st.tier = tier;
       dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
       this._fillDynamic(sim, fx, al, clock);
-      for (const name in this.meshes) { const m = this.meshes[name]; if (m.n) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf); gl.bufferData(gl.ARRAY_BUFFER, m.u8.subarray(0, m.n * ISTRIDE), gl.DYNAMIC_DRAW); } }
+      for (const name in this.meshes) { const m = this.meshes[name]; if (m.n) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf); gl.bufferData(gl.ARRAY_BUFFER, m.u8, gl.DYNAMIC_DRAW, 0, m.n * ISTRIDE); } }
       gl.disable(gl.BLEND);
       this._drawMeshes(env, clock, tier, false, true);
       if (env.shadows && tier < 3) {
@@ -622,7 +625,7 @@ export class Renderer {
 
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
   _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
-    const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, tx, ty, target2 } = sim;
+    const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
     const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
     const hw = vw / 2 + 60, hh = vh / 2 + 120;
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;

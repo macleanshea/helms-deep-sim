@@ -1,12 +1,12 @@
-// Stand-ins for a player in headless runs. They only use the sim's public order API.
+// Stand-ins for a player in headless runs. They give orders through the sim's public order API,
+// and read its attacker density grid (ocCount) and danger-close map to choose targets.
 //
 //   auto    a reasonably careful commander: keeps the line in ammunition, spends on siege engines
 //           before they reach the wall, shells the thickest of the press, holds a reserve for resupply
 //   dump    the old crude one: whatever is available goes on the densest cell
 import { UNITS, U, DEF, SUPPORT } from '../src/config.js';
 import { KEEP } from '../src/map.js';
-
-const OCS = 16, OW = 90, OH = 60;
+import { LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH } from '../src/sim/sim.js'; // the sim's coarse attacker grid
 
 export function autopilot(sim, policy = 'auto') {
   const calls = {};
