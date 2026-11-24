@@ -43,7 +43,7 @@ A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded fi
 - The enemy and the battle options are fixed. The garrison is issued at its full
   **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
   points (and each unit's cost in the left panel) and rework it. **Begin Battle** is greyed out
-  while the garrison costs more than the budget. The order of attack, wave by wave, sits above.
+  while the garrison costs more than the budget. The order of attack, wave by wave, sits below.
 - Support is paid for from one pool of **Command Points** that refills slowly through the
   night. Killing captains, trolls and siege engines pays a bounty.
 - The result is **scored** — the win, soldiers brought through, an intact gate and wall,
@@ -80,10 +80,10 @@ placement, then click the map to drop a block or drag to draw a line; the dashed
 weapon's reach from that spot. Dragging along a wall top mans the battlements. Under **Field
 works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
-move, `[`/`]` to rotate, `Del` to remove. The right panel shows the enemy's order of attack wave by
-wave, the order of battle (requisition points spent and totals per unit type), the battle
-options, support, and the win conditions. In the sandbox the
-attackers can be edited too, and hand-placed attacker formations take an "advance after" delay.
+move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle
+(requisition points spent and totals per unit type), the enemy's order of attack wave by wave,
+the battle options, support, and the win conditions. In the sandbox the attackers can be edited
+too, and hand-placed attacker formations take an "advance after" delay.
 
 **Battle.**
 

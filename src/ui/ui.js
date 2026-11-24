@@ -147,7 +147,7 @@ export function buildUI(app, atlas) {
   ui.refreshRoster = () => {
     const sandbox = app.isSandbox(), open = sandbox || app.oobOpen;
     ui.refreshBegin();
-    // a challenge's order of attack: what comes when (above the order of battle)
+    // a challenge's order of attack: what comes when (below the order of battle)
     const ws = sandbox ? [] : waveSummary(app.setup.groups).filter((w) => w.size > 0);
     attackSec.hidden = ws.length < 2;
     attackList.innerHTML = '';
@@ -157,7 +157,7 @@ export function buildUI(app, atlas) {
     btnAdv.setAttribute('aria-expanded', String(open));
     btnAdv.classList.toggle('open', open);
     oobNote.hidden = open;
-    oobNote.innerHTML = 'The garrison is issued at its full requisition. Open <b>Advanced</b> to see the points and change what it fields.';
+    oobNote.innerHTML = 'The garrison is issued at its full requisition, open <b>Advanced</b> to make adjustments.';
     roster.hidden = !open;
     roster.innerHTML = '';
     if (!open) return;
