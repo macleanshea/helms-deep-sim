@@ -25,11 +25,12 @@ const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v
 // region covered by the shadow map: the fortress and its approaches
 const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
 
-// zoom (CSS px per metre) from which each level of detail applies, and where full models take over.
-// HERO_ZOOM is scaled by the player's model-detail setting (`heroScale`: below 1 brings full models in
-// from further out, 0.5 from twice as far). Far enough out, full models replace the boxes as well as
-// the stand-ins; they never replace the dots.
-const DOT_ZOOM = 2.0, BOX_ZOOM = 3.4;
+// Levels of detail by zoom (CSS px per metre): dots, boxes, stand-ins, full models. The player's
+// model-detail setting (`heroScale`) moves the whole ladder: full models take over at HERO_ZOOM x
+// heroScale (0.5 = twice as far out); dots move out more gently, with the square root of it, so the
+// whole valley stays cheap to draw; and boxes give way to stand-ins at the geometric midpoint, so
+// boxes and stand-ins each cover the same span of zoom at every setting.
+const DOT_ZOOM = 2.0;
 const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
 export const HERO_SCALE_DEFAULT = 0.3;
 // how linear light is scaled from the display-space mood colours in main.js
@@ -393,7 +394,12 @@ export class Renderer {
 
   setQuality(q) { this.quality = q; }
   /** Zoom (CSS px per metre) at which full models take over from stand-ins at the current settings. */
-  heroZoom(q = this.quality) { return Math.max(DOT_ZOOM, HERO_ZOOM[q] * this.heroScale); }
+  heroZoom(q = this.quality) { return this.lod(q).hero; }
+  /** Zooms below which units are dots, boxes and stand-ins; full models from `hero` up. */
+  lod(q = this.quality) {
+    const dot = DOT_ZOOM * Math.sqrt(this.heroScale), hero = Math.max(dot * 1.5, HERO_ZOOM[q] * this.heroScale);
+    return { dot, box: Math.sqrt(dot * hero), hero };
+  }
 
   _ensurePost(w, h, want) {
     const gl = this.gl;
@@ -583,7 +589,8 @@ export class Renderer {
     this._time('units');
     if (sim) {
       for (const name in this.meshes) this.meshes[name].n = 0;
-      const tier = zc < DOT_ZOOM ? 3 : zc >= this.heroZoom(q) ? 0 : zc < BOX_ZOOM ? 2 : 1;
+      const L = this.lod(q);
+      const tier = zc < L.dot ? 3 : zc < L.box ? 2 : zc < L.hero ? 1 : 0;
       st.tier = tier;
       dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
       this._fillDynamic(sim, fx, al, clock);

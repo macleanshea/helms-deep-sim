@@ -538,15 +538,16 @@ export function buildUI(app, atlas) {
 
   // --------------------------------------------------------------- settings
   const menu = $('settingsMenu'), btnSettings = $('btnSettings');
-  const DETAIL = [[0.5, 'Close up', 'once troops are a fair size on screen'], [0.375, 'Medium', 'from a middle distance'], [0.3, 'Far', 'from further out (default)'], [0.225, 'Very far', 'almost as soon as troops are more than dots']];
+  const DETAIL = [[0.5, 'Close up'], [0.375, 'Medium'], [0.3, 'Far (default)'], [0.225, 'Very far']];
   const renderSettings = () => {
     const cur = app.settings.heroScale;
     menu.innerHTML = '<h3>Settings</h3>';
-    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out the full, high-quality unit models replace the simpler stand-ins. Further out looks better but costs frame rate in big battles.</span>');
+    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out units are drawn in more detail. Each step moves the whole ladder — dots, then boxes, then simple stand-ins, then the full models — further out. Further out looks better but costs frame rate in big battles.</span>');
     const seg = el('div', 'set-seg');
-    for (const [v, t, d] of DETAIL) {
-      const b = el('button', Math.abs(v - cur) < 1e-3 ? 'active' : '', t);
-      b.title = `Full models ${d}`;
+    for (const [v, t] of DETAIL) {
+      const b = el('button', Math.abs(v - cur) < 1e-3 ? 'active' : '', t.replace(' (default)', ''));
+      const L = app.lodAt(v), f = (z) => z.toFixed(1);
+      b.title = `${t}: dots below ${f(L.dot)} px/m, boxes to ${f(L.box)}, stand-ins to ${f(L.hero)}, full models beyond`;
       b.addEventListener('click', () => { app.setSetting('heroScale', v); renderSettings(); });
       seg.append(b);
     }

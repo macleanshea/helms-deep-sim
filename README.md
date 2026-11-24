@@ -135,9 +135,9 @@ Orders can be given while paused. The battle waits while a dialog is open.
 
 Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
 hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it. **Settings** (the
-gear next to Help) sets how far out the detailed unit models take over: Close up, Medium, Far
-(the default) or Very far, each twice the distance it used to be. At Far and Very far the full
-models replace the boxes too, which costs frame rate in big battles. The choice is kept in the
+gear next to Help) sets how far out units are drawn in more detail: Close up, Medium, Far (the
+default) or Very far. Each step moves the whole ladder of detail levels further out (see
+Performance below); further out costs frame rate in big battles. The choice is kept in the
 browser.
 
 ### Performance
@@ -149,11 +149,22 @@ set of views and lists the same figures for each: the quickest way to see how mu
 machine has. GPU timings need a browser that exposes
 `EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
 
-Units are drawn at one of four levels of detail chosen from the zoom: dots when the whole field
-is in view, then boxes, then blocky stand-ins of about seventy triangles, and the full models
-(about a thousand triangles for a soldier, several thousand for a vehicle) only once a figure is
-tall enough on screen for them to show (how tall is the **Detailed models** setting). That keeps units and their shadows under roughly 2.5
-million triangles a frame at any zoom.
+Units are drawn at one of four levels of detail chosen from the zoom: dots, then boxes, then
+blocky stand-ins of about seventy triangles, and the full models (about a thousand triangles for
+a soldier, several thousand for a vehicle). The **Detailed models** setting places the ladder:
+full models take over at a zoom proportional to it, dots give way at its square root (so the
+whole valley stays cheap), and boxes give way to stand-ins midway between the two on a log
+scale. On high quality, in screen pixels per metre:
+
+| Setting | Dots below | Boxes below | Stand-ins below (full models from) |
+| --- | --- | --- | --- |
+| Close up | 1.4 | 2.8 | 5.5 |
+| Medium | 1.2 | 2.2 | 4.1 |
+| Far (default) | 1.1 | 1.9 | 3.3 |
+| Very far | 0.9 | 1.5 | 2.5 |
+
+Balanced and performance quality bring the full models (and so the boxes' upper limit) in
+closer.
 
 ## How it works
 

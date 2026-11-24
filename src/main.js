@@ -1193,6 +1193,8 @@ app.setSetting = (k, v) => {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(app.settings)); } catch { /* private mode */ }
 };
 renderer.heroScale = +app.settings.heroScale || HERO_SCALE_DEFAULT;
+/** The level-of-detail ladder a detail setting gives at the current rendering quality. */
+app.lodAt = (scale) => { const keep = renderer.heroScale; renderer.heroScale = scale; const L = renderer.lod(); renderer.heroScale = keep; return L; };
 
 // -------------------------------------------------------------------- boot
 if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
