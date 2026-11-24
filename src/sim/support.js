@@ -79,15 +79,15 @@ export const supportMethods = {
   },
 
   // ------------------------------------------------------ player orders
-  /** Can this kind of support be paid for (Command Points, or uses left in the sandbox)? */
-  affordSupport(kind) { const s = this.support[kind]; return !!s && (this.opt.sandbox ? s.left > 0 : this.cp >= s.cost); },
+  /** Are there uses of this kind of support left? */
+  affordSupport(kind) { const s = this.support[kind]; return !!s && s.left > 0; },
   canSupport(kind) { const s = this.support[kind]; return !!s && this.affordSupport(kind) && this.time >= s.ready && !this.result; },
 
   callSupport(kind, x, y, x2 = x, y2 = y) {
     if (!this.canSupport(kind)) return false;
     const s = this.support[kind];
-    if (this.opt.sandbox) s.left--; else { this.cp -= s.cost; this.cpStats.spent += s.cost; }
-    this.cpStats.calls++;
+    s.left--;
+    this.supportCalls++;
     s.ready = this.time + s.cd;
     const rnd = this.rand;
     if (kind === 'air') {

@@ -20,7 +20,7 @@ export const RING_TOP = 21;   // Hornburg curtain wall walkway
 export const STEP = 3.3;      // largest height change a unit can walk between neighbouring cells
 
 // obstacle flags per nav cell
-export const OB = { WIRE: 1, AV: 2, MOAT: 4 };
+export const OB = { WIRE: 1, AV: 2 };
 
 // armour classes
 export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5 };
@@ -105,8 +105,6 @@ export const UNITS = [
     desc: 'Slows infantry to a crawl until it is trampled flat or blown apart.' },
   { key: 'hedgehog', cost: 3, team: DEF, name: 'Anti-Vehicle Obstacle', cls: C.OBST, ob: 'av', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 15, spacing: 3,
     desc: 'Stops rams, catapults and siege towers. Gives whoever shelters behind it cover.' },
-  { key: 'moat', cost: 3, team: DEF, name: 'Moat', cls: C.OBST, ob: 'moat', hp: 1, speed: 0, rad: 2, size: 4.4, spr: 26, spacing: 3,
-    desc: 'A flooded ditch. Impassable to siege engines and vehicles, slow going on foot.' },
   { key: 'mine', cost: 4, team: DEF, name: 'Anti-Personnel Mine', cls: C.OBST, ob: 'mine', hp: 1, speed: 0, rad: 0.5, size: 2.4, spr: 27, spacing: 3,
     desc: 'Buried and invisible to the enemy. One blast, 5 m radius.' },
   { key: 'claymore', cost: 15, team: DEF, name: 'Claymore', cls: C.OBST, ob: 'claymore', hp: 1, speed: 0, rad: 0.5, size: 2.6, spr: 28, spacing: 7,
@@ -148,31 +146,22 @@ UNITS.forEach((u, i) => {
   u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (no stairs or ladders), 2 heavy (also stopped by obstacles)
 });
 
-// Player-called support. In a challenge battle every call is paid for from one shared pool of
-// Command Points (`cost`, with the short `cpCd` between calls of the same kind); in the sandbox
-// each kind has its own number of uses (`def`) and the longer `cd`.
+// Player-called support: each kind has a number of uses (`def`, or the scenario's own count) and a
+// cooldown (`cd`) between calls.
 export const SUPPORT = {
-  air:       { name: 'Air Strike',     key: '1', cd: 40, cpCd: 20, cost: 5, def: 4, drag: true,  desc: 'Two jets drop a stick of bombs along a line. Click a point, or drag to set the attack heading. Danger close: hits friendlies too.' },
-  gunship:   { name: 'Gunships',       key: '2', cd: 80, cpCd: 45, cost: 6, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
-  arty:      { name: 'Artillery',      key: '3', cd: 30, cpCd: 12, cost: 3, def: 5, desc: 'Off-map battery saturates a 45 m circle. Danger close: hits friendlies too.' },
-  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, cpCd: 15, cost: 4, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 60 m re-arm.' },
-  reinforce: { name: 'Air Assault',    key: '5', cd: 90, cpCd: 60, cost: 8, def: 2, desc: 'A transport helicopter inserts a fresh platoon at the marker.' },
+  air:       { name: 'Air Strike',     key: '1', cd: 40, def: 4, drag: true,  desc: 'Two jets drop a stick of bombs along a line. Click a point, or drag to set the attack heading. Danger close: hits friendlies too.' },
+  gunship:   { name: 'Gunships',       key: '2', cd: 80, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
+  arty:      { name: 'Artillery',      key: '3', cd: 30, def: 5, desc: 'Off-map battery saturates a 45 m circle. Danger close: hits friendlies too.' },
+  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, def: 4, desc: 'Parachutes two ammo crates onto the marker. Troops within 60 m re-arm.' },
+  reinforce: { name: 'Air Assault',    key: '5', cd: 90, def: 2, desc: 'A transport helicopter inserts a fresh platoon at the marker.' },
 };
-// Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
-// fixed pool shared over everything on this list in the attacker's order of battle.
-export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
-export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
 export const DEFAULT_OPTIONS = {
   ammoMult: 1,
-  sandbox: false, // free build: unlimited placement, support counted in uses rather than Command Points
-  cpStart: 6,     // Command Points in hand when the battle opens
-  cpRate: 0.025,  // Command Points gained per second
-  cpCap: 20,      // most that can be banked
+  sandbox: false, // free build: both armies, no budget, no waves or relief; the battle runs until one side is gone
   support: { air: 4, gunship: 2, arty: 5, supply: 4, reinforce: 2 },
   dawn: 1200, // seconds until relief arrives (0 = never)
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)
-  pacing: 'director', // how a generated horde's waves come on: 'director' | 'steady' | 'massed' (sandbox only)
   morale: true, // companies waver, break and rally
   seed: 1,
 };

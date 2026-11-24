@@ -7,7 +7,7 @@ import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, 
 import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { drawAtlas } from './render/atlas.js';
-import { Renderer } from './render/renderer.js';
+import { Renderer, HERO_SCALE_DEFAULT } from './render/renderer.js';
 import { Perf } from './render/perf.js';
 import { toScreen, toGround, pick, SIN_P, DEFAULT_YAW } from './render/camera.js';
 import { Fx } from './render/fx.js';
@@ -40,7 +40,7 @@ const MOOD = {
 };
 
 const app = {
-  mode: 'setup', map, setup: null, sim: null,
+  mode: 'setup', map, setup: null, sim: null, oobOpen: false, modeChosen: false,
   cam: { x: WORLD_W / 2, y: WORLD_H / 2, zoom: 0.6, yaw: DEFAULT_YAW },
   speed: 1, paused: false, tool: null, brushCount: 50,
   selGroup: null, hoverGroup: null, selection: [], markers: [],
@@ -106,36 +106,38 @@ function groupsChanged(roster = true) {
   if (roster) ui.refreshRoster();
   ui.refreshInspector();
 }
-app.loadPreset = (key) => {
-  app.setup = buildPreset(map, key);
+/** Sandbox or challenge, read off the setup being edited. */
+app.isSandbox = () => !!(app.setup && app.setup.options.sandbox);
+/**
+ * Load a scenario. In a challenge it is played as designed; in the sandbox it autofills the map with
+ * both armies (the whole horde on the field at once) for the player to change as they like.
+ */
+app.loadPreset = (key, sandbox = app.isSandbox(), quiet = false) => {
+  app.setup = buildPreset(map, key, sandbox);
   app.presetKey = key;
   app.selGroup = null; app.tool = null;
-  ui.setPreset(key); ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
+  ui.refreshPresetList(); ui.setPreset(key); ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
   rebuildPreview();
   const p = PRESETS.find((q) => q.key === key);
-  if (p) ui.toast(p.blurb);
+  if (p && !quiet) ui.toast(sandbox ? (key === 'empty' ? 'A blank map: build both armies from scratch, or pick a scenario to autofill it.' : `Autofilled from ${p.name}: both armies are yours to change.`) : p.blurb);
 };
-/** Challenge <-> sandbox. Going back to a challenge restores the scenario's enemy and options; the garrison is kept. */
-app.setSandbox = (on) => {
-  if (on) app.setup.options.sandbox = true;
-  else {
-    const fresh = buildPreset(map, app.presetKey);
-    if (fresh.options.sandbox) { ui.toast('A blank map has no scenario to be challenged on.', 'warn'); return; }
-    app.setup = { groups: [...app.setup.groups.filter((g) => g.team === DEF), ...fresh.groups.filter((g) => g.team === ORC)], options: fresh.options, budget: fresh.budget };
-  }
-  app.selGroup = null; app.tool = null;
-  ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
-  rebuildPreview();
-  ui.toast(on ? 'Sandbox: build both sides freely. Battles are not scored.' : 'Challenge: the scenario\'s enemy and options are restored.');
+/** Switch between the two ways to play. Each starts from its own default: a blank map, or the Hornburg Garrison. */
+app.enterMode = (mode) => {
+  const sb = mode === 'sandbox';
+  if (app.mode === 'battle') app.backToSetup();
+  const first = !app.modeChosen;
+  app.modeChosen = true;
+  if (first || sb !== app.isSandbox()) app.loadPreset(sb ? 'empty' : 'garrison', sb, true); else ui.refreshPresetList();
+  ui.toast(sb ? 'Sandbox: build both armies freely. The battle runs until one side is wiped out.' : 'Challenge: hold the Deep until dawn within your requisition. Battles are scored.');
+  ui.coach(sb ? 'sandbox' : 'challenge');
 };
 app.optionsChanged = () => { app.previewDirty = true; };
-/** Sandbox: replace the generated horde with a fresh one of n, in waves. Hand-placed attackers stay. */
+/** Sandbox: replace the generated horde with a fresh one of n, drawn up on the field. Hand-placed attackers stay. */
 app.raiseHorde = (n) => {
-  app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n));
+  app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n, { waves: 1 }));
   app.selGroup = null;
   groupsChanged(); ui.refreshPalette();
-  const w = new Set(app.setup.groups.filter((g) => g.phase != null).map((g) => g.phase)).size;
-  ui.toast(`A horde of ${fmt(n)} in ${w} waves: the vanguard is on the field, the rest wait beyond the valley mouth.`);
+  ui.toast(`A horde of ${fmt(n)} is drawn up in the valley, ready to advance.`);
 };
 const BEST_KEY = 'hd-best-v1';
 const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch { return {}; } };
@@ -165,7 +167,7 @@ app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !
 
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
-  const lockOrc = !app.setup.options.sandbox;
+  const lockOrc = !app.isSandbox();
   for (const g of app.setup.groups) {
     if (g.phase > 0 || (lockOrc && g.team === ORC)) continue; // later waves are beyond the valley mouth; a challenge's enemy is fixed
     const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
@@ -183,7 +185,7 @@ app.startBattle = () => {
   const real = (g, team) => g.team === team && UNITS[U[g.type]].cls !== C.OBST;
   if (!app.setup.groups.some((g) => real(g, DEF)) || !app.setup.groups.some((g) => real(g, ORC))) { ui.toast('Place at least one defender and one attacker first.', 'warn'); audio.play('deny'); return; }
   const spent = forceCost(app.setup.groups);
-  if (!app.setup.options.sandbox && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} over its requisition budget. Remove something, or switch to Sandbox.`, 'warn'); audio.play('deny'); return; }
+  if (!app.isSandbox() && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} requisition points over budget. Remove something first.`, 'warn'); audio.play('deny'); return; }
   app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
   app.sim = new Sim(map, app.setup, fx);
@@ -196,7 +198,7 @@ app.startBattle = () => {
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
   const wi0 = app.sim.waveInfo();
-  ui.toast(wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
+  ui.toast(app.sim.opt.sandbox ? 'The horde advances. The battle ends when one side is wiped out. Space pauses; number keys call support.' : wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
   app.skip = null;
   audio.horn();
   mmBase = null;
@@ -227,7 +229,7 @@ app.armSupport = (k) => {
   if (app.mode !== 'battle' || app.sim.result) return;
   const s = app.sim.support[k];
   if (app.tool && app.tool.kind === 'support' && app.tool.name === k) { app.tool = null; ui.hint(null); return; }
-  if (!app.sim.affordSupport(k)) { ui.toast(app.sim.opt.sandbox ? `No ${SUPPORT[k].name.toLowerCase()} left.` : `${SUPPORT[k].name} costs ${s.cost} Command Points — you have ${Math.floor(app.sim.cp)}.`, 'warn'); audio.play('deny'); return; }
+  if (!app.sim.affordSupport(k)) { ui.toast(`No ${SUPPORT[k].name.toLowerCase()} left.`, 'warn'); audio.play('deny'); return; }
   if (app.sim.time < s.ready) { ui.toast(`${SUPPORT[k].name} ready in ${Math.ceil(s.ready - app.sim.time)} s.`, 'warn'); audio.play('deny'); return; }
   app.tool = { kind: 'support', name: k };
   audio.play('click');
@@ -485,6 +487,7 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts alone (Ctrl+R must not sound the retreat)
   const k = e.key.toLowerCase();
   if (ui.modalOpen()) { if (k === 'escape') ui.hideModal(); return; }
+  if (k === 'escape' && ui.closePopups()) return;
   // control groups live on 6-0 (1-5 call support): Shift+digit assigns, digit recalls, tap twice to look
   if (app.mode === 'battle' && !app.sim.result && /^Digit[06-9]$/.test(e.code)) { const key = e.code.slice(5); if (e.shiftKey) app.assignGroup(key); else app.recallGroup(key); return; }
   app.keys.add(k);
@@ -758,10 +761,12 @@ function drawOverlay(dtReal) {
       rangeRings(c, def, g.x, g.y, 0.85);
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       c.fillStyle = n ? '#fff' : '#ff8b73';
-      const cost = def.cost && !app.setup.options.sandbox ? n * def.cost : 0;
+      // requisition points are only spelled out once the order of battle is opened up (Advanced)
+      const cost = def.cost && !app.isSandbox() ? n * def.cost : 0;
       const over = cost && forceCost(app.setup.groups) + cost > app.setup.budget;
       if (over) c.fillStyle = '#ff8b73';
-      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${cost ? `  ·  ${fmt(cost)} req${over ? ' — over budget' : ''}` : ''}` : 'Not here', m.sx + 16, m.sy - 12);
+      const pts = cost && app.oobOpen ? `  ·  ${fmt(cost)} pts` : '';
+      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${pts}${over ? '  —  over budget' : ''}` : 'Not here', m.sx + 16, m.sy - 12);
     }
     return;
   }
@@ -1114,7 +1119,6 @@ function frame(now) {
       if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
-      else if (e.type === 'cp' && e.amt >= 0.15) marker(e.x, e.y, 4, 3.5, '240,179,74', `+${e.amt.toFixed(1)} CP`);
       else if (e.type === 'end') {
         // score a challenge and remember the best result on each scenario
         const sc = sim.opt.sandbox ? null : scoreBattle(sim, { budget: app.setup.budget, spent: app.battleSpent });
@@ -1172,6 +1176,18 @@ function frame(now) {
   if (app.mode === 'battle' && (mmFrame++ & 3) === 0) drawMinimap();
 }
 
+// ---------------------------------------------------------------- settings
+const SETTINGS_KEY = 'hd-settings-v1';
+app.settings = { heroScale: HERO_SCALE_DEFAULT };
+try { Object.assign(app.settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch { /* private mode */ }
+/** Change a setting, apply it and remember it on this browser. */
+app.setSetting = (k, v) => {
+  app.settings[k] = v;
+  if (k === 'heroScale') renderer.heroScale = v;
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(app.settings)); } catch { /* private mode */ }
+};
+renderer.heroScale = +app.settings.heroScale || HERO_SCALE_DEFAULT;
+
 // -------------------------------------------------------------------- boot
 if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
 const perf = new Perf(app, renderer);
@@ -1180,10 +1196,10 @@ app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 ui = buildUI(app, atlas);
 ui.refreshPresets(loadBest());
 resize();
-app.loadPreset('garrison');
+app.loadPreset('garrison', false, true); // the field behind the welcome screen
 fitCamera();
 requestAnimationFrame((t) => { last = t; frame(t); $('loading').classList.add('done'); });
-if (!localStorage.getItem('hd-seen-help-3')) { localStorage.setItem('hd-seen-help-3', '1'); ui.showHelp(); }
+if (!params.has('bench')) ui.showWelcome();
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };

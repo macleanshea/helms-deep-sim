@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { KEEP, N_WALL } from '../map.js';
@@ -108,11 +108,8 @@ export class Sim {
     this.result = null; this.routing = false; this.routT = 0;
     this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0 };
     this.support = {};
-    const sb = !!this.opt.sandbox;
-    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
-    this.cp = sb ? 0 : this.opt.cpStart;
-    this.cpStats = { earned: this.cp, bounty: 0, spent: 0, calls: 0 };
-    this.bountyUnit = 0;
+    for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: SUPPORT[k].cd };
+    this.supportCalls = 0;
     this._cand = new Int32Array(24);
     this.defBox = [0, 0, 0, 0]; this.orcMaxX = 0;
     this.linkT = new Float32Array(N);
@@ -135,12 +132,6 @@ export class Sim {
     this._initDirector(setup.groups, reserve);
     this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
     this._findArtillery();
-    // what one bounty point is worth: the pool divided over every engine, troll and captain the horde has
-    if (!sb) {
-      let w = 0;
-      for (const k in BOUNTY) w += BOUNTY[k] * (this.stats.startOrc[k] || 0);
-      this.bountyUnit = w > 0 ? (BOUNTY_SHARE * this.opt.cpRate * (this.opt.dawn > 0 ? this.opt.dawn : 1200)) / w : 0;
-    }
     this._startMorale();
   }
 
@@ -247,11 +238,6 @@ export class Sim {
       if (!silent) {
         this.stats.kills[key] = (this.stats.kills[key] || 0) + 1;
         this.stats.lostOrc[d.key] = (this.stats.lostOrc[d.key] || 0) + 1;
-        if (this.bountyUnit && BOUNTY[d.key]) {
-          const amt = this.bountyUnit * BOUNTY[d.key];
-          this.cp = Math.min(this.opt.cpCap, this.cp + amt); this.cpStats.bounty += amt; this.cpStats.earned += amt;
-          this.events.push({ type: 'cp', amt, x, y });
-        }
       }
       if (d.role === R.LADDER || d.role === R.TOWER) {
         const k = this.aux2[i];
@@ -315,7 +301,7 @@ export class Sim {
       if (dz > STEP || dz < -STEP) return false;
       if (sz === 0) return true;
       if (mt === T.STAIR) return false;
-      if (sz === 2 && (dz > 1.6 || dz < -1.6 || (this.ob[ct] & (OB.AV | OB.MOAT)))) return false;
+      if (sz === 2 && (dz > 1.6 || dz < -1.6 || (this.ob[ct] & OB.AV))) return false;
       return true;
     }
     if (sz) return false;
@@ -329,7 +315,6 @@ export class Sim {
     const prop = { kind, x, y, ang, alive: 1 };
     if (kind === 'wire') { if (this.ob[c] & OB.WIRE) return; this.ob[c] |= OB.WIRE; this.wireHp[c] = 520; this.propAt[c] = this.props.length; }
     else if (kind === 'av') { if (this.ob[c] & OB.AV) return; this.ob[c] |= OB.AV; this.cover[c] = 1; this.propAt[c] = this.props.length; }
-    else if (kind === 'moat') { if (this.ob[c] & OB.MOAT) return; this.ob[c] |= OB.MOAT; prop.x = (c % GW) * CELL + 2; prop.y = ((c / GW) | 0) * CELL + 2; }
     else if (kind === 'mine') { if (this.mines[c] > 200) return; this.mines[c]++; }
     else if (kind === 'claymore') {
       // face the enemy: the perpendicular to the laid line that points down the valley
@@ -392,7 +377,6 @@ export class Sim {
           if ((this.wireHp[c0] -= sz === 2 ? 40 : sz ? 10 : 1) <= 0) this._clearOb(c0, OB.WIRE);
         }
       }
-      if (o & OB.MOAT) speed *= sz ? 0.5 : 0.35;
       if (o & OB.AV) { speed *= 0.8; if (!mode && sz === 1 && this.rand() < 0.04) this._clearOb(c0, OB.AV); }
     }
     const k = 1.7 * (speed > 1 ? speed : 1);
@@ -543,7 +527,7 @@ export class Sim {
       if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = 0; continue; }
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
-      if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.MOAT ? 30 : 0) + (o & OB.AV ? 6 : 0);
+      if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
       const k = cnt[c];
       cost[c] = v + (k > 8 ? 32 : k * 4);
     }
@@ -551,7 +535,7 @@ export class Sim {
     if (this.gateDirty) {
       this.gateDirty = false;
       const g = this.segs[this.map.GATE];
-      for (let c = 0, n = GW * GH; c < n; c++) cost[c] = mt[c] === T.CLIFF || mt[c] === T.STAIR || this.orcBlock[c] || elev[c] || (ob[c] & (OB.AV | OB.MOAT)) ? 0 : 10;
+      for (let c = 0, n = GW * GH; c < n; c++) cost[c] = mt[c] === T.CLIFF || mt[c] === T.STAIR || this.orcBlock[c] || elev[c] || (ob[c] & OB.AV) ? 0 : 10;
       src[0] = this.map.cellOf(g.ox, g.oy);
       this.solver.solve(cost, src, 1, this.gateDir, this.navHeavy);
     }
@@ -561,7 +545,6 @@ export class Sim {
   step() {
     if (this.result) return;
     this.tick++; this.time += DT;
-    if (!this.opt.sandbox && this.cp < this.opt.cpCap) { const inc = Math.min(this.opt.cpCap - this.cp, this.opt.cpRate * DT); this.cp += inc; this.cpStats.earned += inc; }
     if (this.tick % 5 === 1) this._buildAux();
     this._buildGrids();
     if ((this.navDirty && this.tick - this.lastNav >= 3) || this.tick - this.lastNav >= 20) this._nav();
@@ -1152,7 +1135,6 @@ export class Sim {
       if (td.sz === 0) {
         const c2 = (((yt - (dy / dist) * 4.5) / CELL) | 0) * GW + (((xt - (dx / dist) * 4.5) / CELL) | 0);
         if (this.cover[c2] | this.dyn[c2] | this.cover[tc]) acc *= el ? 0.7 : 0.5;
-        if (this.ob[tc] & OB.MOAT) acc *= el ? 1.15 : 0.45;
       }
     }
     if (w.sup) this.gSup[this.grp[t]] += w.sup; // near misses keep heads down too
@@ -1398,7 +1380,7 @@ export class Sim {
   /** Path field for an order. `x` may be a list of destination cells instead of a point. */
   _orderField(x, y, veh, r = 14) {
     const cost = new Uint16Array(GW * GH), mt = this.mtype;
-    for (let c = 0; c < cost.length; c++) cost[c] = mt[c] === T.CLIFF || (veh && (this.elevD[c] || mt[c] === T.STAIR || (this.ob[c] & (OB.AV | OB.MOAT)))) ? 0 : 10;
+    for (let c = 0; c < cost.length; c++) cost[c] = mt[c] === T.CLIFF || (veh && (this.elevD[c] || mt[c] === T.STAIR || (this.ob[c] & OB.AV))) ? 0 : 10;
     let ns = 1;
     if (Array.isArray(x)) { ns = Math.min(x.length, this.srcBuf.length); for (let k = 0; k < ns; k++) this.srcBuf[k] = x[k]; if (!ns) return -1; }
     else { const c = this.map.cellOf(x, y); if (!cost[c]) return -1; this.srcBuf[0] = c; }
@@ -1443,7 +1425,7 @@ export class Sim {
         if (px < 4 || py < 4 || px > WORLD_W - 4 || py > WORLD_H - 4) continue;
         const pc = this.map.cellOf(px, py);
         // keep the whole block on the level that was clicked (all on the wall walk, or all on the ground)
-        if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & (OB.AV | OB.MOAT))))) continue;
+        if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & OB.AV)))) continue;
         const i = list[k++];
         this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1;
         this.aux[i] = this.time + 30 + Math.hypot(px - this.x[i], py - this.y[i]) / UNITS[this.type[i]].speed * 4;
@@ -1594,6 +1576,7 @@ export class Sim {
     if (this.defCombat <= 0) return this._finish(false, 'The garrison has been wiped out.');
     if (this.count[ORC] <= 0) return this._finish(true, this.routing || this.stats.fled > this.initial[ORC] * 0.2 ? 'The horde has broken and fled the valley.' : 'The horde has been annihilated.');
     if (this.routing) { if (this.time > this.routT + 14) this._finish(true, 'The horde has broken and fled the valley.'); return; }
+    if (this.opt.sandbox) return; // a sandbox battle runs until one side is gone
     if (this.opt.rout > 0 && this.count[ORC] <= this.initial[ORC] * this.opt.rout) {
       this.routing = true; this.routT = this.time;
       this._dropReserves();

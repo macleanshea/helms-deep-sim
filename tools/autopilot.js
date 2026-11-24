@@ -1,9 +1,9 @@
 // Stand-ins for a player in headless runs. They only use the sim's public order API.
 //
 //   auto    a reasonably careful commander: keeps the line in ammunition, spends on siege engines
-//           before they reach the wall, shells the thickest of the press, holds a reserve for resupply
+//           before they reach the wall, shells the thickest of the press
 //   dump    the old crude one: whatever is available goes on the densest cell
-import { UNITS, U, DEF, SUPPORT } from '../src/config.js';
+import { UNITS, U, DEF } from '../src/config.js';
 import { KEEP } from '../src/map.js';
 
 const OCS = 16, OW = 90, OH = 60;
@@ -73,10 +73,7 @@ export function autopilot(sim, policy = 'auto') {
   let lastSupply = -99, lastSiege = -99;
   function careful() {
     if (sim.tick % 20) return;
-    const cpMode = !sim.opt.sandbox;
-    // keep a resupply in hand whenever the garrison's pouches are getting light
-    const hold = cpMode && sim.ammoLevel() < 0.6 ? SUPPORT.supply.cost : 0;
-    const can = (k) => sim.canSupport(k) && (!cpMode || k === 'supply' || sim.cp - SUPPORT[k].cost >= hold);
+    const can = (k) => sim.canSupport(k);
     if (sim.time - lastSupply > 20 && sim.canSupport('supply')) {
       const d = dryKnot(Math.max(3, Math.round(sim.defCombat * 0.06)), 0.25);
       if (d && call('supply', d.x, d.y)) { lastSupply = sim.time; return; }
