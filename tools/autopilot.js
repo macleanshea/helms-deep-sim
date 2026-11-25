@@ -83,7 +83,7 @@ export function autopilot(sim, policy = 'auto') {
     }
     if (sim.time - lastSiege > 12) {
       const s = siegeTarget();
-      if (s) { for (const k of ['air', 'arty']) if (can(k) && call(k, s.x, s.y)) { lastSiege = sim.time; return; } }
+      if (s) { for (const k of ['air', 'gunship']) if (can(k) && call(k, s.x, s.y)) { lastSiege = sim.time; return; } }
     }
     if (sim.defCombat < sim.initial[0] * 0.55 && can('reinforce') && call('reinforce', KEEP.cx - 24, KEEP.cy - 34)) return;
     const b = densestBlock();
@@ -91,14 +91,13 @@ export function autopilot(sim, policy = 'auto') {
     const thresh = Math.max(60, sim.onField() * 0.03);
     if (b.n < thresh) return;
     if (can('gunship') && massNear(b.x, b.y, 150) > thresh * 4 && call('gunship', b.x, b.y)) return;
-    if (can('arty') && call('arty', b.x, b.y)) return;
     if (b.n > thresh * 1.6 && can('air')) call('air', b.x, b.y);
   }
 
   function dump() {
     if (sim.tick % 50) return;
     const t = densest(40);
-    if (t) for (const k of ['arty', 'air', 'gunship']) if (call(k, t.x, t.y)) break;
+    if (t) for (const k of ['air', 'gunship']) if (call(k, t.x, t.y)) break;
     if (sim.ammoLevel() < 0.5) { const d = dryKnot(8, 0); if (d) call('supply', d.x, d.y); }
   }
 

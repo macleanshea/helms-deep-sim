@@ -292,15 +292,3 @@ export function drawAtlas() {
   cell(ctx, S.splinter, (c) => { poly(c, [-50, -6, 40, -10, 54, 0, 38, 9, -48, 7], '#6b5035', '#1a120a', 4); });
   return cv;
 }
-
-/** Small icon canvas for UI use. */
-export function makeIcon(atlas, spr, px = 44, turret = -1) {
-  const cv = document.createElement('canvas');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = cv.height = px * dpr;
-  cv.style.width = cv.style.height = px + 'px';
-  const c = cv.getContext('2d');
-  c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2); c.translate(-cv.width / 2, -cv.height / 2);
-  for (const s of [spr, turret]) if (s >= 0) c.drawImage(atlas, (s % COLS) * CELLPX, Math.floor(s / COLS) * CELLPX, CELLPX, CELLPX, 0, 0, cv.width, cv.height);
-  return cv;
-}
