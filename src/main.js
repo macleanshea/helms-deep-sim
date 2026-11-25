@@ -1212,7 +1212,7 @@ app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 ui = buildUI(app, renderer.unitIcons(128));
 ui.refreshPresets(loadBest());
 resize();
-app.loadPreset('garrison', false, true); // the field behind the welcome screen
+app.loadPreset('empty', true, true); // an empty field behind the welcome screen, until a mode is chosen
 fitCamera();
 requestAnimationFrame((t) => { last = t; frame(t); $('loading').classList.add('done'); });
 if (!params.has('bench')) ui.showWelcome();
