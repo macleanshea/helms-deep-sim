@@ -23,7 +23,6 @@ const I = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICONS = {
   air: I('<path d="M12 2.5l1.6 6.5 7.9 4.2v1.8l-7.9-2.2-.5 5 2.4 1.8v1.4L12 20l-3.500 1v-1.400l2.400-1.800-.5-5-7.900 2.200v-1.800L10.400 9z" fill="currentColor" stroke="none"/>'),
   gunship: I('<path d="M3 5.500h16M11 5.500v3"/><path d="M5 12.500c0-2.200 2.300-4 6-4s7.500 1.600 9 5l-2.200 1.800H9l-2-2.800z" fill="currentColor" stroke="none"/><path d="M7 13H2.500l-.5-3M9 18.500h9M11 15.300v3.200M15 15.300v3.200"/>'),
-  arty: I('<circle cx="12" cy="12" r="7.500"/><path d="M12 1.500v6M12 16.500v6M1.500 12h6M16.500 12h6"/><circle cx="12" cy="12" r="1.600" fill="currentColor"/>'),
   supply: I('<path d="M4 8.500a8 8 0 0116 0z" fill="currentColor" stroke="none"/><path d="M4 8.500l6 7M20 8.500l-6 7M12 8.500v7"/><rect x="8.500" y="15.500" width="7" height="6" rx="1" fill="currentColor" stroke="none"/>'),
   reinforce: I('<circle cx="6" cy="8" r="2.200" fill="currentColor" stroke="none"/><circle cx="12" cy="6.500" r="2.400" fill="currentColor" stroke="none"/><circle cx="18" cy="8" r="2.200" fill="currentColor" stroke="none"/><path d="M2.500 19c0-4 1.500-6.500 3.500-6.500s2.300 1.200 2.800 2.500M21.500 19c0-4-1.500-6.500-3.500-6.500s-2.300 1.200-2.800 2.500M7.500 20.500c0-5.500 2-8.500 4.500-8.500s4.500 3 4.500 8.500"/>'),
   focus: I('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><circle cx="12" cy="12" r="3.200"/><circle cx="12" cy="12" r=".9" fill="currentColor"/>'),
@@ -253,7 +252,6 @@ export function buildUI(app, portraits) {
     // battle options
     sel(options, 'Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. Out of rounds, they fight hand to hand.');
     sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses quickly breaks and runs. Commanders steady the troops around them.');
-    if (sb) num(options, 'Random seed', o.seed, 1, 9999, (v) => { o.seed = v; }, 'The same setup, seed and orders replay the same battle. Change it for a different roll of the dice.');
     // support: Command Points in a challenge, a number of calls per kind in the sandbox
     if (sb) for (const k in SUPPORT) num(supportOpts, SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
     else {
@@ -291,10 +289,11 @@ export function buildUI(app, portraits) {
   bindTip(cpBox, 'Command Points', 'Pays for every support call. It refills slowly; killing captains, trolls and siege engines pays a bounty.');
   cmdbar.append(cpBox);
   const supTip = (k) => () => `${SUPPORT[k].desc} <i class="cost">${app.sim && app.sim.opt.sandbox ? 'The corner number is how many calls are left.' : `Costs ${SUPPORT[k].cost} Command Points.`}</i>`;
-  const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
+  // a soft hyphen lets the one long word break cleanly on a narrow button
+  const sup = (k) => addCmd(k, SUPPORT[k].name.replace('Reinforcement', 'Reinforce&shy;ment'), SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
   addGroup('Strike');
-  sup('air'); sup('gunship'); sup('arty');
-  addCmd('fire', 'Fire Mission', 'T', ICONS.fire, 'Fire Mission', 'Direct your mortars and howitzers. Opens the artillery panel: click the map to fire every section in range, or task each one.', () => app.toggleFireMission());
+  sup('air'); sup('gunship');
+  addCmd('fire', 'Focus Artillery', 'T', ICONS.fire, 'Focus Artillery', 'Direct your own mortars and howitzers. Opens the artillery panel: click the map to fire every section in range, or task each one. Free, as often as you like.', () => app.toggleFireMission());
   addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map: every weapon in range concentrates on it for 30 s. Press again to cancel.', () => app.armFocus());
   addGroup('Resupply &amp; Reinforce');
   sup('supply'); sup('reinforce');
@@ -458,7 +457,6 @@ export function buildUI(app, portraits) {
     cmds.fire.b.classList.toggle('armed', !!app.tool && app.tool.kind === 'fire');
     cmds.fire.b.classList.toggle('on', missions && !(app.tool && app.tool.kind === 'fire'));
     cmds.fire.b.classList.toggle('spent', !sim.arty.some((a) => a.n));
-    cmds.fire.uses.textContent = sim.arty.filter((a) => a.n).length || '';
     cmds.losses.b.classList.toggle('armed', !!app.showLosses);
     cmds.zones.b.classList.toggle('armed', !!app.overlay.zones);
     cmds.ranges.b.classList.toggle('armed', !!app.overlay.ranges);
@@ -521,8 +519,8 @@ export function buildUI(app, portraits) {
         [`${k('Shift+6')}…${k('0')}`, 'Make a control group; tap the number to recall it, twice to look at it'],
       ])}
       <h4>Support</h4>${rows([
-        [`${k('1')}–${k('5')}`, 'Call support, then click the target (drag to aim an air strike)'],
-        [k('T'), 'Fire mission: aim your own mortars and howitzers'],
+        [`${k('1')}–${k('4')}`, 'Call support, then click the target (drag to aim an air strike)'],
+        [k('T'), 'Focus artillery: aim your own mortars and howitzers'],
         [k('F'), 'Focus fire: drag a circle; every weapon in range concentrates there'],
         [`${k('Z')} · ${k('V')} · ${k('L')}`, 'Overlays: fire zones · weapon ranges · losses'],
       ])}
@@ -626,6 +624,12 @@ export function buildUI(app, portraits) {
       seg.append(b);
     }
     r.append(lab, seg); menu.append(r);
+    // the sandbox's dice; a challenge always plays with its own
+    const r2 = el('div', 'set-row set-inline'), inp = el('input');
+    inp.type = 'number'; inp.min = 1; inp.max = 9999; inp.value = app.settings.seed;
+    inp.addEventListener('change', () => { const v = Math.max(1, Math.min(9999, +inp.value | 0 || 1)); inp.value = v; app.setSetting('seed', v); });
+    r2.append(el('div', null, '<b>Random seed</b><span>Sandbox battles: the same setup, seed and orders replay the same battle.</span>'), inp);
+    menu.append(r2);
   };
   ui.toggleSettings = (on = menu.hidden) => {
     if (!on) { menu.hidden = true; btnSettings.classList.remove('open'); return; }

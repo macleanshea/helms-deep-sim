@@ -1,5 +1,5 @@
-// Logistics and player-called support: resupply, air strikes, gunships, artillery,
-// air assault. Mixed into Sim.prototype.
+// Logistics and player-called support: resupply, air strikes, gunships and
+// air reinforcement. Mixed into Sim.prototype.
 
 import { WORLD_W, WORLD_H, DT, DEF, UNITS, U, WEAPONS, TR, C } from '../config.js';
 import { canPlace } from '../scenarios.js';
@@ -109,17 +109,11 @@ export const supportMethods = {
       }
       this.timed.push({ t: this.time + (sd - 500) / speed, f: () => this.fx.sound('jet', cx, cy, 1) });
       this.events.push({ type: 'log', text: 'Fast air inbound — bombs in 5 seconds', cls: 'good', x: cx, y: cy });
-    } else if (kind === 'arty') {
-      for (let k = 0; k < 20; k++) {
-        const a = rnd() * 6.2832, rr = 45 * Math.sqrt(rnd());
-        const tx = x + Math.cos(a) * rr, ty = y + Math.sin(a) * rr;
-        this.timed.push({ t: this.time + 4.5 + k * 0.45 + rnd() * 0.3, f: () => { this._launch(tx - 70, ty + 30, 300, tx, ty, this.map.groundZ(tx, ty), W.arty, DEF, 0, 0.6); this.fx.sound('incoming', tx, ty, 0.6); } });
-      }
-      this.events.push({ type: 'log', text: 'Fire mission — shot, over', cls: 'good', x, y });
     } else if (kind === 'gunship') {
-      for (let j = 0; j < 2; j++) {
-        const sx = WORLD_W + 150 + j * 90, sy = y - 120 + j * 240;
-        this.aircraft.push({ kind: 'helo', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, phase: j * Math.PI, rot: Math.PI, t: 0, st: 0, until: 0, gcd: 0, rcd: 1 + j });
+      // three helicopters, spaced evenly around the orbit
+      for (let j = 0; j < 3; j++) {
+        const sx = WORLD_W + 150 + j * 90, sy = y - 120 + j * 120;
+        this.aircraft.push({ kind: 'helo', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, phase: (j * 2 * Math.PI) / 3, rot: Math.PI, t: 0, st: 0, until: 0, gcd: j * 0.07, rcd: 1 + j * 0.7 });
       }
       this.fx.sound('helo', x, y, 1);
       this.events.push({ type: 'log', text: 'Gunships on station in moments', cls: 'good', x, y });
@@ -133,7 +127,7 @@ export const supportMethods = {
       const sx = WORLD_W + 200, sy = y + 50;
       this.aircraft.push({ kind: 'transport', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, rot: Math.PI, t: 0, st: 0, until: 0, dropped: 0, grp: this.newGroup(DEF) });
       this.fx.sound('helo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Air assault platoon inbound', cls: 'good', x, y });
+      this.events.push({ type: 'log', text: 'Reinforcements inbound', cls: 'good', x, y });
     }
     return true;
   },

@@ -56,7 +56,6 @@ export const WEAPONS = {
   coax:       { name: 'Coaxial MG', sup: 1,       range: 320, min: 0,   reload: 0.25, dmg: 45,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG, flash: 1.2, snd: 'mg', multi: 0.4 },
   // player-called support
   bomb:       { name: 'Air strike', sup: 1.5,       dmg: 1000, aoe: 16, kind: K.HE, fxk: 1, ff: true },
-  arty:       { name: 'Artillery barrage', sup: 1, dmg: 800, aoe: 12, kind: K.HE, fxk: 1, ff: true },
   heli_gun:   { name: 'Gunship cannon', sup: 0.6,   dmg: 130, aoe: 3,  kind: K.HEAVY, fxk: 3 },
   heli_rkt:   { name: 'Gunship rockets', sup: 1,  dmg: 420, aoe: 7,  kind: K.HE, fxk: 0 },
   bayonet:    { name: 'Close combat',     dmg: 30, kind: K.BULLET },
@@ -150,11 +149,10 @@ UNITS.forEach((u, i) => {
 // Command Points (`cost`, with the short `cpCd` between calls of the same kind); in the sandbox
 // each kind has its own number of uses (`def`) and the longer `cd`.
 export const SUPPORT = {
-  air:       { name: 'Air Strike',     key: '1', cd: 40, cpCd: 20, cost: 5, def: 4, drag: true,  desc: 'Two jets bomb along a line. Click a point, or drag to set the heading. Hits friendlies too.' },
-  gunship:   { name: 'Gunships',       key: '2', cd: 80, cpCd: 45, cost: 6, def: 2, desc: 'A pair of attack helicopters orbits the target for 40 s.' },
-  arty:      { name: 'Artillery',      key: '3', cd: 30, cpCd: 12, cost: 3, def: 5, desc: 'An off-map battery saturates a 45 m circle. Hits friendlies too.' },
-  supply:    { name: 'Resupply Drop',  key: '4', cd: 35, cpCd: 15, cost: 4, def: 4, desc: 'Parachutes two ammo crates. Troops within 60 m re-arm.' },
-  reinforce: { name: 'Air Assault',    key: '5', cd: 90, cpCd: 60, cost: 8, def: 2, desc: 'A transport helicopter lands a fresh platoon at the marker.' },
+  air:       { name: 'Air Strike',     key: '1', cd: 40, cpCd: 20, cost: 4, def: 4, drag: true,  desc: 'Two jets bomb along a line. Click a point, or drag to set the heading. Hits friendlies too.' },
+  gunship:   { name: 'Gunships',       key: '2', cd: 80, cpCd: 45, cost: 6, def: 4, desc: 'Three attack helicopters orbit the target for 40 s.' },
+  supply:    { name: 'Resupply Drop',  key: '3', cd: 35, cpCd: 15, cost: 4, def: 4, desc: 'Parachutes two ammo crates. Troops within 60 m re-arm.' },
+  reinforce: { name: 'Air Reinforcement', key: '4', cd: 90, cpCd: 60, cost: 4, def: 4, desc: 'A transport helicopter lands a fresh platoon at the marker.' },
 };
 // Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
 // fixed pool shared over everything on this list in the attacker's order of battle.
@@ -167,7 +165,7 @@ export const DEFAULT_OPTIONS = {
   cpStart: 6,     // Command Points in hand when the battle opens (challenge)
   cpRate: 0.025,  // Command Points gained per second
   cpCap: 20,      // most that can be banked
-  support: { air: 4, gunship: 2, arty: 5, supply: 4, reinforce: 2 },
+  support: { air: 4, gunship: 4, supply: 4, reinforce: 4 },
   dawn: 1200, // seconds until relief arrives (0 = never)
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)
   morale: true, // companies waver, break and rally

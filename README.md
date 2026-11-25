@@ -52,7 +52,8 @@ A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded fi
 
 The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
 autofill both armies, then change anything. Every option can be edited, and support has a
-fixed number of calls per kind instead of Command Points. There are no waves and no relief at
+fixed number of calls per kind (four of each to start) instead of Command Points; the random
+seed for sandbox battles is in **Settings**. There are no waves and no relief at
 dawn by default: the whole horde is on the field from the start, and the defenders win when the
 horde gives up with only a remnant left, or lose if the garrison is wiped out. Both win
 conditions (relief at dawn, and when the attackers give up) can be changed. **Raise a horde**
@@ -92,14 +93,13 @@ too, and hand-placed attacker formations take an "advance after" delay.
 | --- | --- |
 | `Space`, `-`, `+`, `N` | Pause / resume, slower, faster (1× to 8×), fast-forward to the next contact |
 | **Strike** | |
-| `1` Air Strike (5 CP) | Click a target, or drag to set the run-in heading |
-| `2` Gunships (6 CP) | Two helicopters orbit the target for 40 s |
-| `3` Artillery (3 CP) | Off-map battery covers a 45 m circle |
-| `T` Fire Mission | Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
+| `1` Air Strike (4 CP) | Click a target, or drag to set the run-in heading |
+| `2` Gunships (6 CP) | Three helicopters orbit the target for 40 s |
+| `T` Focus Artillery | Free and unlimited. Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
 | `F` Focus Fire | Drag a circle; every weapon in range concentrates on it, and marksmen pick out any captain inside |
 | **Resupply & reinforce** | |
-| `4` Resupply Drop (4 CP) | Parachuted crates; troops within 60 m re-arm |
-| `5` Air Assault (8 CP) | A helicopter inserts a fresh platoon |
+| `3` Resupply Drop (4 CP) | Parachuted crates; troops within 60 m re-arm |
+| `4` Air Reinforcement (4 CP) | A helicopter lands a fresh platoon |
 | `R` / `Shift+R` | Selected troops fall back to the keep / general retreat |
 | **Overlays** | |
 | `Z` Fire Zones | Where each mortar and howitzer section can land rounds (between minimum and maximum range) |

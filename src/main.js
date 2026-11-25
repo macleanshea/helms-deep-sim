@@ -196,10 +196,11 @@ app.startBattle = () => {
   if (!app.isSandbox() && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} requisition points over budget.`, 'warn'); audio.play('deny'); return; }
   app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
-  app.sim = new Sim(map, app.setup, fx);
+  // the sandbox rolls its dice from the seed in Settings; a challenge keeps its own
+  app.sim = new Sim(map, app.isSandbox() ? { ...app.setup, options: { ...app.setup.options, seed: Math.max(1, +app.settings.seed | 0 || 1) } } : app.setup, fx);
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
-  app.overlay.zones = false; app.overlay.ranges = false; app.artyPanel = false; rangeCache.t = -1; ui.setOverlayKey(null);
+  app.overlay.zones = false; app.overlay.ranges = false; app.artyPanel = false; rangeCache.t = -1; rangeCache.keyStr = ''; ui.setOverlayKey(null);
   app.tool = null; app.selGroup = null; app.selection = []; app.markers = []; app.drag = null; app.bolt = -1; app.nextBolt = 10;
   app.alerts = []; app.alertIdx = 0; app.groups = {};
   ui.setMode('battle'); ui.clearFeed(); ui.hint(null); ui.hideModal();
@@ -214,7 +215,7 @@ app.startBattle = () => {
 };
 app.backToSetup = () => {
   app.mode = 'setup'; app.tool = null; app.selection = []; app.markers = []; app.drag = null; app.showLosses = false;
-  app.artyPanel = false; ui.setOverlayKey(null); ui.refreshArty();
+  app.artyPanel = false; rangeCache.keyStr = ''; ui.setOverlayKey(null); ui.refreshArty();
   fx.reset(); renderer.clearDecals(); audio.setRoar(0);
   ui.setMode('setup'); ui.clearFeed(); ui.hint(null); ui.hideModal();
   rebuildPreview(); fitCamera();
@@ -263,7 +264,7 @@ app.armFireMission = (groups = null) => {
   app.tool = { kind: 'fire', groups };
   audio.play('click');
   const one = groups && groups.length === 1 ? app.sim.arty.find((a) => a.g === groups[0]) : null;
-  ui.hint(`<b>Fire Mission</b>${one ? ` · ${one.label}` : ' · all sections'} — click the target · right-click to cancel`);
+  ui.hint(`<b>Focus Artillery</b>${one ? ` · ${one.label}` : ' · all sections'} — click the target · right-click to cancel`);
   ui.updateHud();
 };
 app.toggleFireMission = () => {
@@ -357,7 +358,7 @@ function fireTool(x0, y0, x1, y1) {
     const n = sim.setArtyTarget(t.groups, x0, y0, 24);
     if (!n) { ui.toast('Out of range — no section can reach that point.', 'warn'); audio.play('deny'); return; }
     const total = (t.groups ? sim.arty.filter((a) => t.groups.includes(a.g)) : sim.arty).filter((a) => a.n).length;
-    ui.toast(`Fire mission: ${n} section${n > 1 ? 's' : ''} firing${n < total ? ` (${total - n} out of range)` : ''}.`, 'good');
+    ui.toast(`Focus artillery: ${n} section${n > 1 ? 's' : ''} firing${n < total ? ` (${total - n} out of range)` : ''}.`, 'good');
     audio.play('confirm');
     sim.updateArtillery(); rangeCache.t = -1;
   } else if (t.kind === 'focus') {
@@ -369,10 +370,9 @@ function fireTool(x0, y0, x1, y1) {
     if (!sim.callSupport(k, x0, y0, x1, y1)) { audio.play('deny'); return; }
     audio.play('confirm');
     if (k === 'air') { const L = Math.hypot(x1 - x0, y1 - y0); if (L < 20) marker(x0, y0, 20, 7, '240,179,74', 'AIR STRIKE', x0, y0 - 115); else marker((x0 + x1) / 2, (y0 + y1) / 2, 20, 7, '240,179,74', 'AIR STRIKE', x1, y1); }
-    else if (k === 'arty') marker(x0, y0, 45, 14, '240,179,74', 'FIRE MISSION');
     else if (k === 'gunship') marker(x0, y0, 150, 48, '111,220,154', 'GUNSHIPS');
     else if (k === 'supply') marker(x0, y0, SUPPLY_R, 12, '111,220,154', 'RESUPPLY');
-    else marker(x0, y0, 14, 22, '94,200,242', 'AIR ASSAULT');
+    else marker(x0, y0, 14, 22, '94,200,242', 'REINFORCEMENTS');
   }
   app.tool = null; ui.hint(null);
 }
@@ -519,7 +519,7 @@ window.addEventListener('keydown', (e) => {
   if (k === ' ') { e.preventDefault(); app.setSpeed(0); }
   else if (k === '=' || k === '+') app.setSpeed(Math.min(8, app.speed * 2));
   else if (k === '-' || k === '_') app.setSpeed(Math.max(1, app.speed / 2));
-  else if (k >= '1' && k <= '5') { const name = Object.keys(SUPPORT)[+k - 1]; if (name) app.armSupport(name); }
+  else if (k >= '1' && k <= '4') { const name = Object.keys(SUPPORT)[+k - 1]; if (name) app.armSupport(name); }
   else if (k === 'f') app.armFocus();
   else if (k === 't') app.toggleFireMission();
   else if (k === 'z') app.toggleOverlay('zones');
@@ -642,7 +642,7 @@ function drawMissionMarks(c, zones, groups) {
   const z = app.cam.zoom;
   for (const list of seen.values()) {
     const a = list[0], p = S(a.x, a.y, heightAt(a.x, a.y) + 0.3);
-    tag(c, p[0], p[1] - a.r * z * SIN_P - 14, list.length > 1 ? `FIRE MISSION · ${list.length} sections` : `${a.label} · FIRE MISSION`, list.length > 1 ? '240,179,74' : app.artyColor(zones.findIndex((q) => q.a === a)));
+    tag(c, p[0], p[1] - a.r * z * SIN_P - 14, list.length > 1 ? `ARTILLERY · ${list.length} sections` : `${a.label} · TARGET`, list.length > 1 ? '240,179,74' : app.artyColor(zones.findIndex((q) => q.a === a)));
   }
 }
 function drawMissionMark(c, a, col, first) {
@@ -836,6 +836,7 @@ function drawOverlay(dtReal) {
     c.fillStyle = '#5ec8f2'; c.fillText(`● defenders fallen  ${fmt(sim.initial[0] - sim.defCombat < 0 ? 0 : Object.values(sim.stats.lostDef).reduce((a, b) => a + b, 0))}`, vw - 234, 96);
   }
   if (app.overlay.ranges) drawRanges(c);
+  else if (rangeCache.keyStr) { rangeCache.keyStr = ''; ui.setOverlayKey(null); }
   const firing = app.tool && app.tool.kind === 'fire';
   if (app.overlay.zones || firing) drawZones(c, firing ? app.tool.groups : null);
   else drawMissions(c);
@@ -985,7 +986,6 @@ function drawOverlay(dtReal) {
       c.font = `700 11px ${FONT}`; c.textAlign = 'center'; c.fillStyle = ok ? '#f0b34a' : '#ff8b73';
       c.fillText(ok ? `${ok} section${ok > 1 ? 's' : ''} in range` : 'Out of range', p[0], p[1] - 24 * z * SIN_P - 12);
     } else if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
-    else if (k === 'arty') circle(45, true);
     else if (k === 'gunship') { circle(150, true); c.beginPath(); ring(c, ax, ay, az, 85); c.stroke(); }
     else if (k === 'supply') circle(SUPPLY_R, true);
     else if (k === 'reinforce') circle(14, false);
@@ -1204,7 +1204,7 @@ function frame(now) {
 
 // ---------------------------------------------------------------- settings
 const SETTINGS_KEY = 'hd-settings-v2';
-app.settings = { heroScale: HERO_SCALE_DEFAULT };
+app.settings = { heroScale: HERO_SCALE_DEFAULT, seed: 1 };
 try {
   const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
   // v1 stored the detail step before every step's distance was doubled: keep the same step

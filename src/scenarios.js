@@ -241,7 +241,7 @@ export const PRESETS = [
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(8000, { waves: sb ? 1 : 4 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 3 }, dawn: 900, cpStart: 8, cpRate: 0.035 },
+      options: { dawn: 900, cpStart: 8, cpRate: 0.035 },
     }),
   },
   {
@@ -255,7 +255,7 @@ export const PRESETS = [
         makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
         ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
-      options: { support: { air: 6, gunship: 3, arty: 8, supply: 6, reinforce: 2 }, dawn: 1200, cpStart: 10, cpRate: 0.045 },
+      options: { dawn: 1200, cpStart: 10, cpRate: 0.045 },
     }),
   },
   {
@@ -269,7 +269,7 @@ export const PRESETS = [
         ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
         ...horde(2200, { waves: sb ? 1 : 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
       ],
-      options: { support: { air: 2, gunship: 1, arty: 3, supply: 3, reinforce: 1 }, dawn: 600, cpStart: 10, cpRate: 0.045 },
+      options: { dawn: 600, cpStart: 10, cpRate: 0.045 },
     }),
   },
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
