@@ -680,7 +680,7 @@ export class Sim {
     }
     let speed = d.speed;
     const pin = this.gPin[g];
-    if (pin) speed *= pin === 2 ? 0.3 : 0.65; // heads down under fire
+    if (pin) speed *= d.cav ? (pin === 2 ? 0.6 : 0.85) : pin === 2 ? 0.3 : 0.65; // heads down under fire; cavalry keeps more of its pace
     if (this.gConf[g] > this.time) { if (((this.tick + i) & 7) < 5) { this.vx[i] *= 0.6; this.vy[i] *= 0.6; return; } speed *= 0.5; }
     switch (d.role) {
       case R.ARCHER: {

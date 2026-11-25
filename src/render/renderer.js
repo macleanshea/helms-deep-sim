@@ -8,7 +8,7 @@
 //  - corpses, craters and scorch marks are stamped into a persistent decal texture
 //  - optional post-processing: MSAA resolve, bloom, vignette
 
-import { WORLD_W, WORLD_H, UNITS, DEF, U, R } from '../config.js';
+import { WORLD_W, WORLD_H, UNITS, DEF, U, R, C } from '../config.js';
 import { HM_W, HM_H, MARGIN, GZ_W, HM_RES } from '../map.js';
 import { COLS, SPR } from './atlas.js';
 import { buildModels } from './models/index.js';
@@ -764,5 +764,125 @@ export class Renderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.deleteFramebuffer(fbo); gl.deleteTexture(tex); gl.deleteRenderbuffer(depth);
     return px;
+  }
+
+  /**
+   * Portraits of every unit type, drawn from its full model in a three-quarter view from the front
+   * and lit from over the viewer's shoulder, for the setup panels. Returns { key: canvas } of `px`
+   * square, transparent around the model. Rendered once, multisampled, then read back.
+   */
+  unitIcons(px = 128) {
+    const gl = this.gl, S = px;
+    const samples = Math.min(4, gl.getParameter(gl.MAX_SAMPLES));
+    const ms = gl.createFramebuffer(), msColor = gl.createRenderbuffer(), msDepth = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, msColor); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.RGBA8, S, S);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, msDepth); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.DEPTH_COMPONENT24, S, S);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ms);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, msColor);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, msDepth);
+    const rs = gl.createFramebuffer(), rsColor = gl.createRenderbuffer();
+    gl.bindRenderbuffer(gl.RENDERBUFFER, rsColor); gl.renderbufferStorage(gl.RENDERBUFFER, gl.RGBA8, S, S);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, rs);
+    gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, rsColor);
+
+    // one instance at the origin, facing +x, standing still
+    const inst = new ArrayBuffer(ISTRIDE), f = new Float32Array(inst), u8 = new Uint8Array(inst);
+    f[4] = 1; u8[24] = u8[25] = u8[26] = 255;
+    const yaw = -0.85, sinP = Math.sin(0.5), cosP = Math.cos(0.5), c = Math.cos(yaw), s = Math.sin(yaw);
+    const sun = (() => { const v = [0.15, 0.85, 1], l = Math.hypot(...v); return v.map((q) => q / l); })();
+    const env = { amb: [0.8, 0.82, 0.86], sun: [1.08, 1.03, 0.95], fog: [0, 0, 0], shadows: false, lift: 0, wet: 0 };
+    this.lpos.fill(0); this.lcol.fill(0);
+    this.view[0] = -s * cosP; this.view[1] = c * cosP; this.view[2] = sinP;
+    const p = this.pUnit, out = {}, buf = new Uint8Array(S * S * 4);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
+    // render the models with the view fitted to a box in screen units (m), then read the frame back
+    const shoot = (models, x0, x1, y0, y1, fill) => {
+      const zoom = (S * fill) / Math.max(x1 - x0, y1 - y0), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      viewMatrix({ x: 0, y: 0, zoom, yaw }, S, S, sinP, cosP, this.vp);
+      this.vp[12] -= cx * ((2 * zoom) / S);
+      this.vp[13] += cy * ((2 * zoom) / S);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, ms);
+      gl.viewport(0, 0, S, S);
+      gl.clearColor(0, 0, 0, 0); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.useProgram(p.p); this._common(p.u, env);
+      gl.uniform3fv(p.u.uSun, sun);
+      gl.uniform1f(p.u.uTime, 0); gl.uniform1f(p.u.uShadowPass, 0); gl.uniform1f(p.u.uLift, 0); gl.uniform1f(p.u.uMatOn, 1);
+      for (const m of models) {
+        const geo = m.full, a = m.anim;
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf); gl.bufferData(gl.ARRAY_BUFFER, inst, gl.DYNAMIC_DRAW);
+        gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]); gl.uniform1f(p.u.uLegX, a[9]);
+        gl.bindVertexArray(geo.vao);
+        if (geo.itype) gl.drawElementsInstanced(gl.TRIANGLES, geo.n, geo.itype, 0, 1); else gl.drawArraysInstanced(gl.TRIANGLES, 0, geo.n, 1);
+      }
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, ms); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, rs);
+      gl.blitFramebuffer(0, 0, S, S, 0, 0, S, S, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, rs);
+      gl.readPixels(0, 0, S, S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      return { zoom, cx, cy };
+    };
+    // where the bulk of the picture lies along one axis: thin poles, blades and banners are left out
+    const span = (sums, total) => {
+      let acc = 0, lo = 0, hi = sums.length - 1;
+      for (let k = 0; k < sums.length; k++) { acc += sums[k]; if (acc < total * 0.02) lo = k + 1; if (acc <= total * 0.985) hi = k + 1; }
+      return [lo, Math.min(sums.length - 1, hi)];
+    };
+    // the read-back as a canvas: rows come back bottom-up, and the colour is premultiplied by alpha
+    const toCanvas = () => {
+      const cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const img = new ImageData(S, S), o = img.data;
+      for (let y = 0; y < S; y++) {
+        const src = (S - 1 - y) * S * 4, dst = y * S * 4;
+        for (let k = 0; k < S * 4; k += 4) {
+          const al = buf[src + k + 3], q = al ? 255 / al : 0;
+          o[dst + k] = Math.min(255, buf[src + k] * q); o[dst + k + 1] = Math.min(255, buf[src + k + 1] * q); o[dst + k + 2] = Math.min(255, buf[src + k + 2] * q); o[dst + k + 3] = al;
+        }
+      }
+      cv.getContext('2d').putImageData(img, 0, 0);
+      return cv;
+    };
+    const rows = new Float64Array(S), cols = new Float64Array(S);
+    for (const d of UNITS) {
+      const um = this.unitMesh[d.id], prop = PROP_MESH[d.ob];
+      const models = um ? [um.variants[0], um.turret].filter(Boolean) : prop ? [this.meshes[prop]] : [];
+      if (!models.length) continue;
+      // first pass: the whole model box, as seen from this angle
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const m of models) {
+        const b = m.full.bbox;
+        for (const bx of [b[0], b[1]]) for (const by of [b[2], b[3]]) for (const bz of [0, b[4]]) {
+          const rx = c * bx + s * by, ry = (-s * bx + c * by) * sinP - bz * cosP;
+          x0 = Math.min(x0, rx); x1 = Math.max(x1, rx); y0 = Math.min(y0, ry); y1 = Math.max(y1, ry);
+        }
+      }
+      // people share one frame, from the thighs up, so they read at the same scale whatever they carry
+      if ((d.cls === C.INF && d.key !== 'mortar') || ((d.role === R.MELEE || d.role === R.ARCHER || d.role === R.SAPPER) && !d.cav)) {
+        x0 = 1e9; x1 = -1e9; y0 = 1e9; y1 = -1e9;
+        for (const bx of [-0.25, 0.4]) for (const by of [-0.3, 0.3]) for (const bz of [0.8, 1.9]) {
+          const rx = c * bx + s * by, ry = (-s * bx + c * by) * sinP - bz * cosP;
+          x0 = Math.min(x0, rx); x1 = Math.max(x1, rx); y0 = Math.min(y0, ry); y1 = Math.max(y1, ry);
+        }
+        shoot(models, x0, x1, y0, y1, 1);
+        out[d.key] = toCanvas();
+        continue;
+      }
+      const v = shoot(models, x0, x1, y0, y1, 0.98);
+      // second pass: framed on where the picture's weight is (rows of the read-back run bottom-up)
+      rows.fill(0); cols.fill(0); let total = 0;
+      for (let r = 0; r < S; r++) for (let q = 0; q < S; q++) { const al = buf[(r * S + q) * 4 + 3]; rows[S - 1 - r] += al; cols[q] += al; total += al; }
+      if (total > 0) {
+        const [c0, c1] = span(cols, total), [r0, r1] = span(rows, total);
+        x0 = v.cx + (c0 - S / 2) / v.zoom; x1 = v.cx + (c1 + 1 - S / 2) / v.zoom;
+        y0 = v.cy + (r0 - S / 2) / v.zoom; y1 = v.cy + (r1 + 1 - S / 2) / v.zoom;
+        // a standing figure is framed from the thighs up, so it is not lost in a sliver of the frame
+        if (y1 - y0 > 1.5 * (x1 - x0)) y1 = y0 + (y1 - y0) * 0.7;
+        shoot(models, x0, x1, y0, y1, 0.86);
+      }
+      out[d.key] = toCanvas();
+    }
+    gl.bindVertexArray(null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    for (const fb of [ms, rs]) gl.deleteFramebuffer(fb);
+    for (const rb of [msColor, msDepth, rsColor]) gl.deleteRenderbuffer(rb);
+    return out;
   }
 }

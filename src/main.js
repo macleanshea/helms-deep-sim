@@ -120,7 +120,7 @@ app.loadPreset = (key, sandbox = app.isSandbox(), quiet = false) => {
   ui.refreshPresetList(); ui.setPreset(key); ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
   rebuildPreview();
   const p = PRESETS.find((q) => q.key === key);
-  if (p && !quiet) ui.toast(sandbox ? (key === 'empty' ? 'A blank map: build both armies from scratch, or pick a scenario to autofill it.' : `Autofilled from ${p.name}: both armies are yours to change.`) : p.blurb);
+  if (p && !quiet) ui.toast(sandbox ? (key === 'empty' ? 'A blank map: build both armies, or pick a scenario to autofill it.' : `Autofilled from ${p.name}: both armies are yours to change.`) : p.blurb);
 };
 /** Switch between the two ways to play. Each starts from its own default: a blank map, or the Hornburg Garrison. */
 app.enterMode = (mode) => {
@@ -129,7 +129,7 @@ app.enterMode = (mode) => {
   const first = !app.modeChosen;
   app.modeChosen = true;
   if (first || sb !== app.isSandbox()) app.loadPreset(sb ? 'empty' : 'garrison', sb, true); else ui.refreshPresetList();
-  ui.toast(sb ? 'Sandbox: build both armies freely and set your own win conditions. Battles are not scored.' : 'Challenge: hold the Deep until dawn within your requisition. Battles are scored.');
+  ui.toast(sb ? 'Sandbox: build both armies and set your own win conditions. Not scored.' : 'Challenge: hold the Deep until dawn within your requisition. Scored.');
   ui.coach(sb ? 'sandbox' : 'challenge');
 };
 app.optionsChanged = () => { app.previewDirty = true; };
@@ -138,7 +138,7 @@ app.raiseHorde = (n) => {
   app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n, { waves: 1 }));
   app.selGroup = null;
   groupsChanged(); ui.refreshPalette();
-  ui.toast(`A horde of ${fmt(n)} is drawn up in the valley, ready to advance.`);
+  ui.toast(`A horde of ${fmt(n)} is drawn up in the valley.`);
 };
 const BEST_KEY = 'hd-best-v1';
 /** Best score per scenario. Only well-formed entries are trusted; anything else in storage is ignored. */
@@ -193,7 +193,7 @@ app.startBattle = () => {
   const real = (g, team) => g.team === team && UNITS[U[g.type]].cls !== C.OBST;
   if (!app.setup.groups.some((g) => real(g, DEF)) || !app.setup.groups.some((g) => real(g, ORC))) { ui.toast('Place at least one defender and one attacker first.', 'warn'); audio.play('deny'); return; }
   const spent = forceCost(app.setup.groups);
-  if (!app.isSandbox() && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} requisition points over budget. Remove something first.`, 'warn'); audio.play('deny'); return; }
+  if (!app.isSandbox() && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} requisition points over budget.`, 'warn'); audio.play('deny'); return; }
   app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
   app.sim = new Sim(map, app.setup, fx);
@@ -206,7 +206,7 @@ app.startBattle = () => {
   fitCamera();
   ui.banner('Hold the Deep', 'warn');
   const wi0 = app.sim.waveInfo();
-  ui.toast(app.sim.opt.sandbox ? `The horde advances.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''} Space pauses; number keys call support.` : wi0 ? `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}` : 'The horde advances. Space pauses; number keys call support.');
+  ui.toast(app.sim.opt.sandbox || !wi0 ? `The attackers advance.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''} Space pauses; number keys call support.` : `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}`);
   app.skip = null;
   audio.horn();
   mmBase = null;
@@ -543,17 +543,29 @@ function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.
 
 /** Reach of a unit's weapon from a spot: the outer ring, and the inner one it cannot fire inside. Walls add reach. */
 function rangeRings(c, def, x, y, alpha) {
-  const w = def.wdef || (def.ob === 'claymore' ? { range: 42 } : def.pool ? { range: SUPPLY_R, supply: true } : null);
+  const z0 = heightAt(x, y) + 0.3;
+  const label = (p, r, txt, col) => { c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`; c.fillText(txt, p[0], p[1] - r * app.cam.zoom * SIN_P - 5); };
+  // commanders and captains: how far their steadying presence carries
+  if (def.aura) {
+    const col = '240,179,74';
+    c.strokeStyle = `rgba(${col},${alpha * 0.8})`; c.lineWidth = 1.2; c.setLineDash([2, 5]);
+    c.beginPath(); const p = ring(c, x, y, z0, def.aura); c.stroke(); c.setLineDash([]);
+    label(p, def.aura, `${def.team === DEF ? 'steadies' : 'drives on'} ${def.aura} m`, col);
+  }
+  const w = def.wdef || (def.ob === 'claymore' ? WEAPONS.claymore : def.pool ? { range: SUPPLY_R, supply: true } : null);
   if (!w || !w.range) return;
   const k = def.team === DEF && def.cls === C.INF && map.seg[map.cellOf(x, y)] >= 0 ? (heightAt(x, y) > 15 ? 1.2 : 1.12) : 1;
-  const z0 = heightAt(x, y) + 0.3, col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
+  const col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
   if (w.range * k < 1500) {
     c.strokeStyle = `rgba(${col},${alpha})`; c.lineWidth = 1.4; c.setLineDash([9, 6]);
     c.beginPath(); const p = ring(c, x, y, z0, w.range * k); c.stroke(); c.setLineDash([]);
-    c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`;
-    c.fillText(w.supply ? `re-arms ${SUPPLY_R} m` : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, p[0], p[1] - w.range * k * app.cam.zoom * SIN_P - 5);
+    label(p, w.range * k, w.supply ? `re-arms ${SUPPLY_R} m` : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, col);
   }
-  if (w.min > 0) { c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); ring(c, x, y, z0, w.min); c.stroke(); }
+  if (w.min > 0) {
+    c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); const p = ring(c, x, y, z0, w.min); c.stroke();
+    // a gun whose reach covers the whole map has only its minimum ring to show
+    if (w.range * k >= 1500) label(p, w.min, `map-wide · ${w.min} m minimum`, col);
+  }
 }
 // ---- range overlays: unions of many circles, drawn through an offscreen layer so overlaps don't stack up
 const rl = document.createElement('canvas'), rctx = rl.getContext('2d');
@@ -1214,7 +1226,7 @@ if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(para
 const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
-ui = buildUI(app, atlas);
+ui = buildUI(app, renderer.unitIcons(128));
 ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('garrison', false, true); // the field behind the welcome screen
@@ -1224,6 +1236,6 @@ if (!params.has('bench')) ui.showWelcome();
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };
-window.__app = app; window.__renderer = renderer; window.__fx = fx; window.__perf = perf;
+window.__app = app; window.__ui = ui; window.__renderer = renderer; window.__fx = fx; window.__perf = perf;
 if (params.has('perf')) perf.toggle(true);
 if (params.has('bench')) setTimeout(() => perf.bench(), 500);

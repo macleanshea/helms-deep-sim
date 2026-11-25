@@ -55,7 +55,7 @@ autofill both armies, then change anything. Every option can be edited, and supp
 fixed number of calls per kind instead of Command Points. There are no waves and no relief at
 dawn by default: the whole horde is on the field from the start, and the defenders win when the
 horde gives up with only a remnant left, or lose if the garrison is wiped out. Both win
-conditions (relief at dawn, and when the horde gives up) can be changed. **Raise a horde**
+conditions (relief at dawn, and when the attackers give up) can be changed. **Raise a horde**
 (Attackers tab) draws up a whole host of any size with its ladders, engines and captains;
 formations you place yourself take an "advance after" delay. Sandbox battles are not scored.
 
@@ -75,9 +75,10 @@ mark on its bar).
 to pan, middle-drag or `Q`/`E` to rotate, `Home` to reset the view. `G` jumps to the latest
 alert; clicking an alert in the feed or a point on the minimap looks there too.
 
-**Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left, set how many per
-placement, then click the map to drop a block or drag to draw a line; the dashed ring shows the
-weapon's reach from that spot. Dragging along a wall top mans the battlements. Under **Field
+**Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left (each card shows the unit's
+range), set how many per placement, then click the map to drop a block or drag to draw a line;
+the dashed ring shows the weapon's reach from that spot, and a dotted one how far a commander
+or captain steadies the troops around them. Dragging along a wall top mans the battlements. Under **Field
 works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
 move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle
@@ -122,7 +123,8 @@ Orders can be given while paused. The battle waits while a dialog is open.
 - Ammunition is the garrison's real limit. Shots at close range hit far more often than at long
   range, so holding fire (`H`) stretches it; an amber pip marks a soldier who is out.
 - Machine guns and shellfire **suppress**: a pinned company (▼) slows to a crawl, its archers
-  stop shooting and its morale wears away. Berserkers cannot be pinned.
+  stop shooting and its morale wears away. Berserkers cannot be pinned, and warg riders keep most
+  of their pace under fire.
 - Both sides have command units (★). Lose one and nearby companies are briefly disorganised
   and lose morale. Uruk captains march at the rear of their wave and are not shot on sight —
   mark one with focus fire. Any company that takes heavy losses in a short time may break and

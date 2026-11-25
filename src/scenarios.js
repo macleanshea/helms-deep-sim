@@ -144,6 +144,8 @@ export function horde(total, mix = {}) {
       return d;
     };
     const next = (d) => { if (d > 0) x -= d + 6; };
+    // cavalry leads: warg riders put behind the infantry would be stuck at its pace
+    next(column('warg', [lanes[1], lanes[4]], 70));
     next(column('berserker'));
     next(column('ladder'));
     next(column('tower', [lanes[2], lanes[1], lanes[3]], 40));
@@ -151,7 +153,7 @@ export function horde(total, mix = {}) {
     next(column('archer'));
     // the siege train follows the infantry; the captains drive each wave on from its rear
     next(Math.max(column('troll', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('sapper', [443], 36), column('ram', [gaps[3] - 4], 30)));
-    next(Math.max(column('catapult', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('warg', [lanes[1], lanes[4]], 70), column('chief', [gaps[0], gaps[2], gaps[4]], 20)));
+    next(Math.max(column('catapult', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('chief', [gaps[0], gaps[2], gaps[4]], 20)));
     if (w === 0) {
       // the vanguard stands on the field with its rear rank just inside the valley mouth
       const shift = Math.min(600, Math.max(380, 24 - x));
