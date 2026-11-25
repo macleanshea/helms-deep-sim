@@ -67,7 +67,7 @@ train and a final assault, which wait beyond the valley mouth and march on in tu
 are paced so the last and heaviest wave lands shortly before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to the
 next wave, and an alert names the stretch of wall it is aimed at — the middle waves go for
-whichever sector looks weakest. `N` fast-forwards through a quiet spell.
+whichever sector looks weakest.
 
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
@@ -91,7 +91,7 @@ too, and hand-placed attacker formations take an "advance after" delay.
 
 | Input | Action |
 | --- | --- |
-| `Space`, `-`, `+`, `N` | Pause / resume, slower, faster (1× to 8×), fast-forward to the next contact |
+| `Space`, `-`, `+` | Pause / resume, slower, faster (1× to 8×) |
 | **Strike** | |
 | `1` Air Strike (4 CP) | Click a target, or drag to set the run-in heading |
 | `2` Gunships (6 CP) | Three helicopters orbit the target for 40 s |

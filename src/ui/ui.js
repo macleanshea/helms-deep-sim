@@ -521,7 +521,6 @@ export function buildUI(app, portraits) {
       ])}
       <h4>Time and camera</h4>${rows([
         [`${k('Space')} ${k('−')} ${k('+')}`, 'Pause · slower · faster'],
-        [k('N'), 'Fast-forward through a quiet spell to the next contact'],
         [k('Scroll'), 'Zoom toward the cursor'],
         [`${k('Right-drag')} ${k('W A S D')}`, 'Pan'],
         [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Rotate the view'],

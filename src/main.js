@@ -208,7 +208,6 @@ app.startBattle = () => {
   ui.banner('Hold the Deep', 'warn');
   const wi0 = app.sim.waveInfo();
   ui.toast(app.sim.opt.sandbox || !wi0 ? `The attackers advance.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''} Space pauses; number keys call support.` : `The vanguard is on the field; ${wi0.W - 1} more wave${wi0.W > 2 ? 's' : ''} will follow.${app.sim.opt.dawn > 0 ? ' Hold until dawn.' : ''}`);
-  app.skip = null;
   audio.horn();
   mmBase = null;
   ui.updateHud();
@@ -221,17 +220,7 @@ app.backToSetup = () => {
   rebuildPreview(); fitCamera();
   ui.refreshRoster(); ui.refreshPalette(); ui.refreshInspector();
 };
-app.setSpeed = (s) => { app.skip = null; if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
-/** Run at full speed through a quiet spell, back to the old pace when the next wave makes contact. */
-app.skipAhead = () => {
-  if (app.mode !== 'battle' || app.sim.result) return;
-  if (app.skip) { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); return; }
-  const wi = app.sim.waveInfo();
-  if (!wi || (wi.phase !== 'lull' && wi.phase !== 'approach')) { ui.toast('Nothing to skip: the enemy is at the wall.', 'warn'); return; }
-  app.skip = { speed: app.speed, alerts: app.alerts.length }; app.speed = 8; app.paused = false;
-  ui.toast('Fast-forwarding to the next contact — any key or alarm stops it.');
-  ui.updateHud();
-};
+app.setSpeed = (s) => { if (s === 0) app.paused = !app.paused; else { app.speed = s; app.paused = false; } ui.updateHud(); };
 app.toggleMute = () => { audio.unlock(); audio.setMuted(!audio.muted); return audio.muted; };
 app.toggleLosses = () => { app.showLosses = !app.showLosses; ui.updateHud(); };
 app.armSupport = (k) => {
@@ -528,7 +517,6 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'r') app.retreat(!e.shiftKey);
   else if (k === 'l') app.toggleLosses();
   else if (k === 'g') app.jumpAlert();
-  else if (k === 'n') app.skipAhead();
   else if (k === 'x' && app.selection.length) app.sim.stop(app.selection);
   ui.updateHud();
 });
@@ -1140,7 +1128,6 @@ function frame(now) {
     for (const e of sim.events) {
       const loc = e.x != null ? { x: e.x, y: e.y } : null;
       if (loc && (e.cls === 'bad' || e.cls === 'warn') && (e.type === 'banner' || e.type === 'log')) noteAlert(e); // good news does not need a ping
-      if (app.skip && e.cls === 'bad' && !/sighted/.test(e.text)) { app.speed = app.skip.speed; app.skip = null; }
       if (e.type === 'banner') { ui.banner(e.text, e.cls); ui.toast(e.text, e.cls, loc); if (e.big && app.speed <= 2) app.slowT = 2.2; }
       else if (e.type === 'log') ui.toast(e.text, e.cls, loc);
       else if (e.type === 'cp' && e.amt >= 0.15) marker(e.x, e.y, 4, 3.5, '240,179,74', `+${e.amt.toFixed(1)} CP`);
@@ -1157,10 +1144,6 @@ function frame(now) {
       }
     }
     sim.events.length = 0;
-    if (app.skip) {
-      const wi = sim.waveInfo();
-      if (sim.result || !wi || wi.phase === 'engaged' || wi.phase === 'last') { app.speed = app.skip.speed; app.skip = null; ui.updateHud(); }
-    }
   }
 
   // light: a stormy night that greys toward dawn, with the odd flash of lightning
