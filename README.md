@@ -211,7 +211,7 @@ plays out the same way:
 node tools/headless.js garrison                       # preset, nobody giving orders
 node tools/headless.js --preset recon --policy auto   # with a stand-in commander
 node tools/headless.js --preset garrison --seed 3 --opt cpRate=0.05 --json --verify
-npm run matrix                                        # every preset x policy x seed, as a table
+npm run matrix                                        # every challenge preset x policy x seed, as a table
 ```
 
 Presets are `garrison`, `three-hundred`, `combined`, `recon` and `empty`. `--policy auto` plays

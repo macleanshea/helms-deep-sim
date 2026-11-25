@@ -610,8 +610,6 @@ export function buildUI(app, atlas) {
     document.getElementById('app').className = mode === 'setup' ? 'mode-setup' : 'mode-battle';
     tip.hidden = true;
   };
-  ui.setTab = (t) => { tab = t; for (const q of document.querySelectorAll('#teamTabs .tab')) q.classList.toggle('active', +q.dataset.team === t); renderPalette(); };
-  ui.getTab = () => tab;
 
   renderPalette(); setBrush(50);
   return ui;

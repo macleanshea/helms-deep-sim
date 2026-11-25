@@ -117,30 +117,39 @@ export class Fx {
 
   /** Write live particles into the instance buffer: alpha-blended first, additive on top. */
   fill(F, U, max) {
-    let k = 0;
-    const v = this.view, R2 = (v.rad + 60) * (v.rad + 60);
-    for (let pass = 0; pass < 2; pass++) {
-      for (let i = 0; i < MAXP && k < max; i++) {
-        if (this.life[i] <= 0 || this.del[i] > 0 || this.add[i] !== pass) continue;
-        const x = this.px[i], y = this.py[i], dx = x - v.x, dy = y - v.y;
-        if (dx * dx + dy * dy > R2) continue;
-        const t = 1 - this.life[i] / this.max[i];
-        let a = this.a[i];
-        const fd = this.fade[i];
-        if (fd === 0) a *= 1 - t; else if (fd === 1) a *= Math.min(1, t * 7) * (1 - t) * (1 - t); else if (fd === 2) a *= t < 0.8 ? 1 : (1 - t) * 5;
-        const o = k * 13, md = this.mode[i];
-        F[o] = x; F[o + 1] = y; F[o + 2] = this.pz[i]; F[o + 3] = this.w[i]; F[o + 4] = this.h[i]; F[o + 5] = this.rot[i]; F[o + 6] = this.spr[i];
-        U[o + 7] = (((a > 1 ? 1 : a) * 255) << 24 | (this.b[i] << 16) | (this.g[i] << 8) | this.r[i]) >>> 0;
-        F[o + 8] = pass; F[o + 9] = md;
-        if (md === 1) {
-          const s = this.str[i];
-          if (s) { F[o + 10] = this.vx[i] * s; F[o + 11] = this.vy[i] * s; F[o + 12] = this.vz[i] * s; }
-          else { F[o + 10] = this.ax[i]; F[o + 11] = this.ay[i]; F[o + 12] = this.az[i]; }
-        } else { F[o + 10] = 0; F[o + 11] = 0; F[o + 12] = 0; }
-        k++;
-      }
+    // one sweep of the pool: alpha-blended particles are written as found, additive ones are
+    // listed and written after them (same order as two separate passes, half the scanning)
+    let k = 0, na = 0;
+    const v = this.view, R2 = (v.rad + 60) * (v.rad + 60), life = this.life, del = this.del, add = this.add, px = this.px, py = this.py;
+    const later = this._addIdx || (this._addIdx = new Int32Array(MAXP));
+    for (let i = 0; i < MAXP; i++) {
+      if (life[i] <= 0 || del[i] > 0) continue;
+      const ad = add[i];
+      if (ad !== 0 && ad !== 1) continue;
+      const dx = px[i] - v.x, dy = py[i] - v.y;
+      if (dx * dx + dy * dy > R2) continue;
+      if (ad === 1) later[na++] = i; else if (k < max) k = this._write(F, U, k, i, 0);
     }
+    for (let j = 0; j < na && k < max; j++) k = this._write(F, U, k, later[j], 1);
     return k;
+  }
+
+  /** One particle into instance slot k; returns the next slot. */
+  _write(F, U, k, i, pass) {
+    const t = 1 - this.life[i] / this.max[i];
+    let a = this.a[i];
+    const fd = this.fade[i];
+    if (fd === 0) a *= 1 - t; else if (fd === 1) a *= Math.min(1, t * 7) * (1 - t) * (1 - t); else if (fd === 2) a *= t < 0.8 ? 1 : (1 - t) * 5;
+    const o = k * 13, md = this.mode[i];
+    F[o] = this.px[i]; F[o + 1] = this.py[i]; F[o + 2] = this.pz[i]; F[o + 3] = this.w[i]; F[o + 4] = this.h[i]; F[o + 5] = this.rot[i]; F[o + 6] = this.spr[i];
+    U[o + 7] = (((a > 1 ? 1 : a) * 255) << 24 | (this.b[i] << 16) | (this.g[i] << 8) | this.r[i]) >>> 0;
+    F[o + 8] = pass; F[o + 9] = md;
+    if (md === 1) {
+      const s = this.str[i];
+      if (s) { F[o + 10] = this.vx[i] * s; F[o + 11] = this.vy[i] * s; F[o + 12] = this.vz[i] * s; }
+      else { F[o + 10] = this.ax[i]; F[o + 11] = this.ay[i]; F[o + 12] = this.az[i]; }
+    } else { F[o + 10] = 0; F[o + 11] = 0; F[o + 12] = 0; }
+    return k + 1;
   }
 
   // ----------------------------------------------------- sim-facing API

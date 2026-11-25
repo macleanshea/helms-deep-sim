@@ -2,15 +2,11 @@
 
 import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS } from './config.js';
 import { KEEP, N_WALL } from './map.js';
+import { mulberry } from './rng.js';
 
 let nextId = 1;
 export function makeGroup(type, count, x, y, ang = Math.PI / 2, w = 0, extra = {}) {
   return { id: nextId++, type, team: UNITS[U[type]].team, count, x, y, ang, w, delay: 0, ...extra };
-}
-
-function rnd(seed) {
-  let a = seed >>> 0;
-  return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 }
 
 /** Can a unit of this type stand at x,y?  onWall: true/false to require, null for either. */
@@ -37,7 +33,7 @@ export function groupPositions(map, g) {
   const px = -uy, py = ux;
   const cols = colsFor(g, sp);
   const maxRows = Math.ceil(g.count / cols) * 4 + 10;
-  const r = rnd(g.id * 7919 + 13);
+  const r = mulberry(g.id * 7919 + 13);
   const jit = def.cls === C.OBST ? (def.ob === 'mine' ? 0.8 : 0) : def.team === ORC ? 0.3 : 0.12;
   for (let ri = 0; ri < maxRows && out.length < g.count * 2; ri++) {
     const off = (ri & 1 ? 1 : -1) * Math.ceil(ri / 2);

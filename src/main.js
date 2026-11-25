@@ -6,6 +6,7 @@ import { buildMap, KEEP } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
 import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
+import { SUPPLY_R } from './sim/support.js';
 import { drawAtlas } from './render/atlas.js';
 import { Renderer, HERO_SCALE_DEFAULT } from './render/renderer.js';
 import { Perf } from './render/perf.js';
@@ -140,7 +141,14 @@ app.raiseHorde = (n) => {
   ui.toast(`A horde of ${fmt(n)} is drawn up in the valley, ready to advance.`);
 };
 const BEST_KEY = 'hd-best-v1';
-const loadBest = () => { try { return JSON.parse(localStorage.getItem(BEST_KEY)) || {}; } catch { return {}; } };
+/** Best score per scenario. Only well-formed entries are trusted; anything else in storage is ignored. */
+const loadBest = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BEST_KEY)), out = {};
+    if (raw && typeof raw === 'object') for (const p of PRESETS) { const b = raw[p.key]; if (b && Number.isFinite(b.score)) out[p.key] = { score: b.score, medal: typeof b.medal === 'string' ? b.medal : null }; }
+    return out;
+  } catch { return {}; }
+};
 app.selectPlaceTool = (type) => {
   app.tool = type ? { kind: 'place', type } : null;
   app.selGroup = null;
@@ -363,7 +371,7 @@ function fireTool(x0, y0, x1, y1) {
     if (k === 'air') { const L = Math.hypot(x1 - x0, y1 - y0); if (L < 20) marker(x0, y0, 20, 7, '240,179,74', 'AIR STRIKE', x0, y0 - 115); else marker((x0 + x1) / 2, (y0 + y1) / 2, 20, 7, '240,179,74', 'AIR STRIKE', x1, y1); }
     else if (k === 'arty') marker(x0, y0, 45, 14, '240,179,74', 'FIRE MISSION');
     else if (k === 'gunship') marker(x0, y0, 150, 48, '111,220,154', 'GUNSHIPS');
-    else if (k === 'supply') marker(x0, y0, 60, 12, '111,220,154', 'RESUPPLY');
+    else if (k === 'supply') marker(x0, y0, SUPPLY_R, 12, '111,220,154', 'RESUPPLY');
     else marker(x0, y0, 14, 22, '94,200,242', 'AIR ASSAULT');
   }
   app.tool = null; ui.hint(null);
@@ -530,11 +538,12 @@ window.addEventListener('resize', resize);
 
 // ----------------------------------------------------------------- overlay
 const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
+let selSetSrc = null, selSetVal = null; // the selection as a Set, rebuilt only when the selection array changes
 function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.max(2, r * app.cam.zoom), Math.max(1.4, r * app.cam.zoom * SIN_P), 0, 0, 6.2832); return p; }
 
 /** Reach of a unit's weapon from a spot: the outer ring, and the inner one it cannot fire inside. Walls add reach. */
 function rangeRings(c, def, x, y, alpha) {
-  const w = def.wdef || (def.ob === 'claymore' ? { range: 42 } : def.pool ? { range: 60, supply: true } : null);
+  const w = def.wdef || (def.ob === 'claymore' ? { range: 42 } : def.pool ? { range: SUPPLY_R, supply: true } : null);
   if (!w || !w.range) return;
   const k = def.team === DEF && def.cls === C.INF && map.seg[map.cellOf(x, y)] >= 0 ? (heightAt(x, y) > 15 ? 1.2 : 1.12) : 1;
   const z0 = heightAt(x, y) + 0.3, col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
@@ -542,7 +551,7 @@ function rangeRings(c, def, x, y, alpha) {
     c.strokeStyle = `rgba(${col},${alpha})`; c.lineWidth = 1.4; c.setLineDash([9, 6]);
     c.beginPath(); const p = ring(c, x, y, z0, w.range * k); c.stroke(); c.setLineDash([]);
     c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`;
-    c.fillText(w.supply ? 're-arms 60 m' : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, p[0], p[1] - w.range * k * app.cam.zoom * SIN_P - 5);
+    c.fillText(w.supply ? `re-arms ${SUPPLY_R} m` : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, p[0], p[1] - w.range * k * app.cam.zoom * SIN_P - 5);
   }
   if (w.min > 0) { c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); ring(c, x, y, z0, w.min); c.stroke(); }
 }
@@ -578,8 +587,8 @@ function refreshRangeCache() {
   const arty = sim.updateArtillery();
   rangeCache.zones = arty.map((a, k) => ({ a, k, pts: a.n ? sim.groupUnits(a.g, 18).map((i) => [sim.x[i], sim.y[i], sim.unitZ(i) + 0.3, a.w.range, a.w.min]) : [] }));
   const by = {}, sel = app.selection.length ? app.selection : null;
-  const list = sel || Array.from({ length: sim.n }, (_, i) => i);
-  for (const i of list) {
+  for (let q = 0, n = sel ? sel.length : sim.n; q < n; q++) {
+    const i = sel ? sel[q] : q;
     if (!sim.alive[i] || sim.team[i] !== DEF) continue;
     const w = UNITS[sim.type[i]].wdef;
     if (!w || w.arc || !w.range) continue;
@@ -878,7 +887,8 @@ function drawOverlay(dtReal) {
     c.font = `700 13px ${FONT}`; c.strokeText('★', p[0], p[1]); c.fillText('★', p[0], p[1]);
   }
   // selection rings, bars
-  const selSet = app.selection.length ? new Set(app.selection) : null;
+  if (selSetSrc !== app.selection) { selSetSrc = app.selection; selSetVal = app.selection.length ? new Set(app.selection) : null; }
+  const selSet = selSetVal;
   if (selSet) {
     c.strokeStyle = 'rgba(120,225,255,0.95)'; c.lineWidth = 1.3;
     c.beginPath();
@@ -965,7 +975,7 @@ function drawOverlay(dtReal) {
     } else if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
     else if (k === 'arty') circle(45, true);
     else if (k === 'gunship') { circle(150, true); c.beginPath(); ring(c, ax, ay, az, 85); c.stroke(); }
-    else if (k === 'supply') circle(60, true);
+    else if (k === 'supply') circle(SUPPLY_R, true);
     else if (k === 'reinforce') circle(14, false);
     else if (k === 'air') {
       let dx = 0, dy = -1, L = 230, cx = ax, cy = ay;
@@ -1004,15 +1014,17 @@ function drawOverlay(dtReal) {
 }
 
 // ----------------------------------------------------------------- minimap
-let mmBase = null, mmVersion = -1, mmFrame = 0;
+let mmBase = null, mmImg = null, mmVersion = -1, mmFrame = 0;
 function drawMinimap() {
   const sim = app.sim, W = mm.width, H = mm.height;
   if (!mmBase || mmVersion !== sim.structVersion) {
     const px = renderer.terrainThumb(W, H, sim);
-    mmBase = new ImageData(W, H); mmVersion = sim.structVersion;
+    mmBase = new ImageData(W, H); mmImg = new ImageData(W, H); mmVersion = sim.structVersion;
     for (let k = 0; k < W * H; k++) { mmBase.data[k * 4] = px[k * 4] * 0.85; mmBase.data[k * 4 + 1] = px[k * 4 + 1] * 0.85; mmBase.data[k * 4 + 2] = px[k * 4 + 2] * 0.85; mmBase.data[k * 4 + 3] = 255; }
   }
-  const img = new ImageData(new Uint8ClampedArray(mmBase.data), W, H), dta = img.data;
+  // one reusable image: start from the terrain each time, then dot the units on top
+  const img = mmImg, dta = img.data;
+  dta.set(mmBase.data);
   const kx = W / WORLD_W, ky = H / WORLD_H;
   for (let i = 0; i < sim.n; i++) {
     if (!sim.alive[i]) continue;
@@ -1164,7 +1176,8 @@ function frame(now) {
   const sh = fx.shake, shk = sh ? (sh * 2.2) / Math.max(0.6, cam.zoom * 0.5) : 0;
   const rcam = { x: cam.x + Math.sin(app.clock * 71) * shk, y: cam.y + Math.cos(app.clock * 83) * shk, zoom: cam.zoom * dpr, yaw: cam.yaw, dpr };
   renderer.render(rcam, sim, app.mode === 'battle' ? fx : null, alpha, env, app.clock);
-  if (app.selection.length) app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);
+  // drop the fallen from the selection (a fresh array only when someone actually fell)
+  if (app.selection.length && app.selection.some((i) => !sim.alive[i] || sim.team[i] !== DEF)) app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);
   drawOverlay(rdt);
   perf.frame(rdt, simMs);
 

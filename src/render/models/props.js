@@ -4,7 +4,7 @@ import { MAT } from '../materials.js';
 import { dim } from './figure.js';
 import { C } from './legacy.js';
 
-const BLACK = [0.07, 0.07, 0.07], STEEL = [0.3, 0.31, 0.33];
+const STEEL = [0.3, 0.31, 0.33];
 
 export const props = {
   // ---- ordnance, drawn along +x
