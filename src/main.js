@@ -264,7 +264,7 @@ app.armFireMission = (groups = null) => {
   app.tool = { kind: 'fire', groups };
   audio.play('click');
   const one = groups && groups.length === 1 ? app.sim.arty.find((a) => a.g === groups[0]) : null;
-  ui.hint(`<b>Focus Artillery</b>${one ? ` · ${one.label}` : ' · all sections'} — click the target · right-click to cancel`);
+  ui.hint(`<b>Target Artillery</b>${one ? ` · ${one.label}` : ' · all sections'} — click the target · right-click to cancel`);
   ui.updateHud();
 };
 app.toggleFireMission = () => {
@@ -358,7 +358,7 @@ function fireTool(x0, y0, x1, y1) {
     const n = sim.setArtyTarget(t.groups, x0, y0, 24);
     if (!n) { ui.toast('Out of range — no section can reach that point.', 'warn'); audio.play('deny'); return; }
     const total = (t.groups ? sim.arty.filter((a) => t.groups.includes(a.g)) : sim.arty).filter((a) => a.n).length;
-    ui.toast(`Focus artillery: ${n} section${n > 1 ? 's' : ''} firing${n < total ? ` (${total - n} out of range)` : ''}.`, 'good');
+    ui.toast(`Artillery: ${n} section${n > 1 ? 's' : ''} firing${n < total ? ` (${total - n} out of range)` : ''}.`, 'good');
     audio.play('confirm');
     sim.updateArtillery(); rangeCache.t = -1;
   } else if (t.kind === 'focus') {
@@ -372,7 +372,7 @@ function fireTool(x0, y0, x1, y1) {
     if (k === 'air') { const L = Math.hypot(x1 - x0, y1 - y0); if (L < 20) marker(x0, y0, 20, 7, '240,179,74', 'AIR STRIKE', x0, y0 - 115); else marker((x0 + x1) / 2, (y0 + y1) / 2, 20, 7, '240,179,74', 'AIR STRIKE', x1, y1); }
     else if (k === 'gunship') marker(x0, y0, 150, 48, '111,220,154', 'GUNSHIPS');
     else if (k === 'supply') marker(x0, y0, SUPPLY_R, 12, '111,220,154', 'RESUPPLY');
-    else marker(x0, y0, 14, 22, '94,200,242', 'REINFORCEMENTS');
+    else marker(x0, y0, 14, 22, '94,200,242', 'AIR DROP');
   }
   app.tool = null; ui.hint(null);
 }

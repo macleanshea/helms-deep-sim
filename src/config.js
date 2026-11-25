@@ -152,7 +152,7 @@ export const SUPPORT = {
   air:       { name: 'Air Strike',     key: '1', cd: 40, cpCd: 20, cost: 4, def: 4, drag: true,  desc: 'Two jets bomb along a line. Click a point, or drag to set the heading. Hits friendlies too.' },
   gunship:   { name: 'Gunships',       key: '2', cd: 80, cpCd: 45, cost: 6, def: 4, desc: 'Three attack helicopters orbit the target for 40 s.' },
   supply:    { name: 'Resupply Drop',  key: '3', cd: 35, cpCd: 15, cost: 4, def: 4, desc: 'Parachutes two ammo crates. Troops within 60 m re-arm.' },
-  reinforce: { name: 'Air Reinforcement', key: '4', cd: 90, cpCd: 60, cost: 4, def: 4, desc: 'A transport helicopter lands a fresh platoon at the marker.' },
+  reinforce: { name: 'Air Drop Troops', key: '4', cd: 90, cpCd: 60, cost: 4, def: 4, desc: 'A transport helicopter lands a fresh platoon at the marker.' },
 };
 // Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
 // fixed pool shared over everything on this list in the attacker's order of battle.
@@ -163,7 +163,7 @@ export const DEFAULT_OPTIONS = {
   ammoMult: 1,
   sandbox: false, // free build: both armies, no budget, no waves, support by uses, win conditions of the player's choosing
   cpStart: 6,     // Command Points in hand when the battle opens (challenge)
-  cpRate: 0.025,  // Command Points gained per second
+  cpRate: 2 / 60, // Command Points gained per second (a whole number a minute)
   cpCap: 20,      // most that can be banked
   support: { air: 4, gunship: 4, supply: 4, reinforce: 4 },
   dawn: 1200, // seconds until relief arrives (0 = never)
