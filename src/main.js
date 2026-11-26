@@ -14,6 +14,7 @@ import { toScreen, toGround, pick, SIN_P, DEFAULT_YAW } from './render/camera.js
 import { Fx } from './render/fx.js';
 import { Audio } from './audio.js';
 import { buildUI, fmt } from './ui/ui.js';
+import { loadPortraits } from './ui/portraits.js';
 
 const $ = (id) => document.getElementById(id);
 const glCanvas = $('gl'), overlay = $('overlay'), octx = overlay.getContext('2d');
@@ -22,6 +23,7 @@ const params = new URLSearchParams(location.search);
 
 // Start-up runs in stages with a pause between them (top-level await), so the loading screen can repaint and show progress.
 // The percentages are each stage's share of a measured start-up; see src/loading.js.
+const portraitsReady = loadPortraits(); // fetched while the rest of start-up runs
 const loading = window.__loading || { set: async () => {}, done: () => $('loading').classList.add('done') };
 await loading.set(5);
 const map = buildMap();
@@ -1218,7 +1220,9 @@ const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 await loading.set(85);
-ui = buildUI(app, renderer.unitIcons(128));
+// the menus use the painted portraits; any unit they lack (all of them, if the atlas did not load) gets one rendered from its model
+const painted = await portraitsReady;
+ui = buildUI(app, UNITS.every((d) => d.hidden || painted[d.key]) ? painted : { ...renderer.unitIcons(128), ...painted });
 ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('empty', true, true); // an empty field behind the welcome screen, until a mode is chosen

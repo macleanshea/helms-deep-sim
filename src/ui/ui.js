@@ -33,13 +33,19 @@ const ICONS = {
   losses: I('<path d="M12 3v18M7 8h10" /><circle cx="6" cy="17" r="1.300" fill="currentColor"/><circle cx="18" cy="16" r="1.300" fill="currentColor"/><circle cx="16.500" cy="20" r="1.300" fill="currentColor"/><circle cx="8" cy="20.500" r="1.300" fill="currentColor"/>'),
 };
 
-/** `portraits`: { unit key: canvas } rendered from the 3D models (Renderer.unitIcons). */
+/**
+ * `portraits`: { unit key: portrait }. A portrait is either a tile of the painted atlas, { img, x, y, size } (see
+ * portraits.js), or a canvas rendered from the 3D models (Renderer.unitIcons), the fallback when the atlas is missing.
+ */
 export function buildUI(app, portraits) {
   const ui = {};
   const icon = (d, px) => {
     const cv = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), src = portraits[d.key];
     cv.width = cv.height = Math.round(px * dpr); cv.style.width = cv.style.height = px + 'px';
-    if (src) { const c = cv.getContext('2d'); c.imageSmoothingQuality = 'high'; c.drawImage(src, 0, 0, cv.width, cv.height); }
+    if (!src) return cv;
+    const c = cv.getContext('2d'); c.imageSmoothingQuality = 'high';
+    if (src.img) c.drawImage(src.img, src.x, src.y, src.size, src.size, 0, 0, cv.width, cv.height);
+    else c.drawImage(src, 0, 0, cv.width, cv.height);
     return cv;
   };
   let tab = DEF;
