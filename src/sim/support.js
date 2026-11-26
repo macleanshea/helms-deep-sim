@@ -1,5 +1,5 @@
 // Logistics and player-called support: resupply, air strikes, gunships and
-// air reinforcement. Mixed into Sim.prototype.
+// troops dropped by air. Mixed into Sim.prototype.
 
 import { WORLD_W, WORLD_H, DT, DEF, UNITS, U, WEAPONS, TR, C } from '../config.js';
 import { canPlace } from '../scenarios.js';
@@ -127,7 +127,7 @@ export const supportMethods = {
       const sx = WORLD_W + 200, sy = y + 50;
       this.aircraft.push({ kind: 'transport', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, rot: Math.PI, t: 0, st: 0, until: 0, dropped: 0, grp: this.newGroup(DEF) });
       this.fx.sound('helo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Reinforcements inbound', cls: 'good', x, y });
+      this.events.push({ type: 'log', text: 'Troops inbound by air', cls: 'good', x, y });
     }
     return true;
   },

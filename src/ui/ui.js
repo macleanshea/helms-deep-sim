@@ -1,6 +1,6 @@
 // DOM user interface: setup panels, battle HUD, toasts and dialogs.
 
-import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C } from '../config.js';
+import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C, R } from '../config.js';
 import { SUPPLY_R } from '../sim/support.js';
 import { PRESETS, waveSummary, forceCost } from '../scenarios.js';
 
@@ -103,7 +103,6 @@ export function buildUI(app, portraits) {
   $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); ui.toggleSettings(); $('btnSettings').blur(); });
   $('btnSound').addEventListener('click', () => { const m = app.toggleMute(); $('btnSound').classList.toggle('off', m); });
   for (const b of document.querySelectorAll('#speedCtl .seg')) b.addEventListener('click', () => { app.setSpeed(+b.dataset.speed); b.blur(); });
-  $('btnSkip').addEventListener('click', () => { app.skipAhead(); $('btnSkip').blur(); });
 
   // ---------------------------------------------------- palette & brush
   const palette = $('palette');
@@ -128,21 +127,23 @@ export function buildUI(app, portraits) {
       palette.append(b);
     };
     const mine = UNITS.filter((d) => d.team === tab && !d.hidden);
+    const section = (title, list) => { if (!list.length) return; palette.append(el('div', 'pal-head', title)); list.forEach(card); };
     if (tab === DEF) {
-      palette.append(el('div', 'pal-head', 'Troops &amp; vehicles'));
-      mine.filter((d) => d.cls !== C.OBST).forEach(card);
-      palette.append(el('div', 'pal-head', 'Field works'));
-      mine.filter((d) => d.cls === C.OBST).forEach(card);
+      section('Troops', mine.filter((d) => d.cls === C.INF));
+      section('Vehicles', mine.filter((d) => d.cls === C.VEH || d.cls === C.GUN));
+      section('Field works', mine.filter((d) => d.cls === C.OBST || d.cls === C.CACHE));
     } else {
       // a whole host in waves, without laying out each one by hand
       const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * (1 + (UNITS[U[g.type]].carry || 0)), 0);
-      const box = el('div', 'raise', `<b>Raise a horde</b><span>A whole host with ladders, engines and captains.${cur ? ` Replaces the ${fmt(cur)} raised now.` : ''}</span>`);
+      const box = el('div', 'raise', `<b>Automated placement</b><span>Raise a horde with troops, ladders, engines and captains.${cur ? ` Replaces the ${fmt(cur)} raised now.` : ''}</span>`);
       const row = el('div', 'row'), inp = el('input'), go = el('button', 'primary', cur ? 'Replace' : 'Raise');
       inp.type = 'number'; inp.min = 100; inp.max = 40000; inp.step = 500; inp.value = cur ? Math.round(cur / 500) * 500 || 500 : 8000;
       go.addEventListener('click', () => { app.raiseHorde(Math.max(100, Math.min(40000, +inp.value | 0))); go.blur(); });
       row.append(inp, go); box.append(row); palette.append(box);
-      palette.append(el('div', 'pal-head', 'Or place formations by hand'));
-      mine.forEach(card);
+      // siege engines are the attackers' vehicles; everything on foot (or paw) is troops
+      const engine = (d) => d.role === R.RAM || d.role === R.CATAPULT || d.role === R.TOWER;
+      section('Troops', mine.filter((d) => !engine(d)));
+      section('Vehicles', mine.filter(engine));
     }
   }
   for (const t of document.querySelectorAll('#teamTabs .tab')) t.addEventListener('click', () => {
@@ -251,20 +252,20 @@ export function buildUI(app, portraits) {
     };
     // battle options
     sel(options, 'Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. Out of rounds, they fight hand to hand.');
-    sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'Companies can break'], [0, 'Off — nobody runs']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses quickly breaks and runs. Commanders steady the troops around them.');
+    sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'On'], [0, 'Off']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses quickly breaks and runs. Commanders steady the troops around them.');
     // support: Command Points in a challenge, a number of calls per kind in the sandbox
     if (sb) for (const k in SUPPORT) num(supportOpts, SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
     else {
       // the same rows as the sandbox, read-only: the pool, then what each call costs from it
       const cpTip = 'One pool pays for every support call. It refills slowly; killing captains, trolls and siege engines pays a bounty.';
       num(supportOpts, 'Command Points at start', o.cpStart, 0, 99, () => {}, cpTip);
-      num(supportOpts, 'Command Points per min', +(o.cpRate * 60).toFixed(1), 0, 99, () => {}, cpTip);
+      num(supportOpts, 'Command Points per min', Math.round(o.cpRate * 60), 0, 99, () => {}, cpTip);
       for (const k in SUPPORT) num(supportOpts, `${SUPPORT[k].name} cost`, SUPPORT[k].cost, 0, 99, () => {}, `${SUPPORT[k].desc} Costs ${SUPPORT[k].cost} Command Points a call.`);
     }
     // win conditions: the defenders win if either is met; they lose if the garrison is wiped out
     sel(winOpts, 'Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; },
       `Hold out this long and the relief column arrives: you win.${sb ? '' : ' The last and heaviest wave lands shortly before dawn.'}`);
-    sel(winOpts, 'Attackers give up at', o.rout, [[0, 'Never — to the last'], [0.01, '1% remaining'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The attackers break and flee when this little of them is left: you win. The white mark on their bar shows the point.');
+    sel(winOpts, 'Attackers flee at', o.rout, [[0, 'Never — to the last'], [0.01, '1% remaining'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The attackers break and flee when this little of them is left: you win. The white mark on their bar shows the point.');
   };
 
   // --------------------------------------------------------- command bar
@@ -289,11 +290,10 @@ export function buildUI(app, portraits) {
   bindTip(cpBox, 'Command Points', 'Pays for every support call. It refills slowly; killing captains, trolls and siege engines pays a bounty.');
   cmdbar.append(cpBox);
   const supTip = (k) => () => `${SUPPORT[k].desc} <i class="cost">${app.sim && app.sim.opt.sandbox ? 'The corner number is how many calls are left.' : `Costs ${SUPPORT[k].cost} Command Points.`}</i>`;
-  // a soft hyphen lets the one long word break cleanly on a narrow button
-  const sup = (k) => addCmd(k, SUPPORT[k].name.replace('Reinforcement', 'Reinforce&shy;ment'), SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
+  const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
   addGroup('Strike');
   sup('air'); sup('gunship');
-  addCmd('fire', 'Focus Artillery', 'T', ICONS.fire, 'Focus Artillery', 'Direct your own mortars and howitzers. Opens the artillery panel: click the map to fire every section in range, or task each one. Free, as often as you like.', () => app.toggleFireMission());
+  addCmd('fire', 'Target Artillery', 'T', ICONS.fire, 'Target Artillery', 'Direct your own mortars and howitzers. Opens the artillery panel: click the map to fire every section in range, or task each one. Free, as often as you like.', () => app.toggleFireMission());
   addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map: every weapon in range concentrates on it for 30 s. Press again to cancel.', () => app.armFocus());
   addGroup('Resupply &amp; Reinforce');
   sup('supply'); sup('reinforce');
@@ -338,17 +338,20 @@ export function buildUI(app, portraits) {
     if (key !== artyKey || !artyRows) { artyKey = key; buildArty(list); }
     artyPanel.hidden = false;
     const armed = app.tool && app.tool.kind === 'fire' ? app.tool.groups : undefined;
+    // what each section is doing, as one choice: a section armed to fire counts as Target
+    const modeOf = (a) => (armed !== undefined && (armed === null || armed.includes(a.g)) ? 'target' : a.mode);
     for (const r of artyRows) {
       const a = r.a, dead = !a.n;
       r.row.classList.toggle('dead', dead);
       r.info.textContent = dead ? 'destroyed' : `${a.n} ${a.key === 'howitzer' ? 'guns' : 'tubes'} · ${Math.round(a.ammo * 100)}% ammo · ${a.key === 'howitzer' ? 'map-wide' : a.w.range + ' m'}${a.mode === 'hold' ? ' · holding' : a.mode === 'target' ? ' · on target' : ''}`;
       for (const b of r.seg.children) {
         const m = b.dataset.mode;
-        b.classList.toggle('active', m === 'target' ? a.mode === 'target' || (armed !== undefined && (armed === null || armed.includes(a.g))) : a.mode === m);
+        b.classList.toggle('active', !dead && modeOf(a) === m);
         b.disabled = dead;
       }
     }
-    artyPanel.querySelector('.ap-row.all').querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.mode === 'target' ? armed === null : list.length > 0 && list.every((a) => !a.n || a.mode === b.dataset.mode)));
+    const live = list.filter((a) => a.n);
+    artyPanel.querySelector('.ap-row.all').querySelectorAll('button').forEach((b) => b.classList.toggle('active', live.length > 0 && live.every((a) => modeOf(a) === b.dataset.mode)));
   };
   ui.setOverlayKey = (items) => {
     if (!items || !items.length) { overlayKey.hidden = true; return; }
@@ -382,7 +385,7 @@ export function buildUI(app, portraits) {
   const grpbar = $('grpbar'); let grpHtml = '';
   grpbar.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) app.recallGroup(b.dataset.g); });
   const orcRes = $('orcRes'), orcRout = $('orcRout'), orcLbl = $('orcLbl'), orcForce = $('orcForce');
-  const waveBox = $('waveBox'), wavePips = $('wavePips'), waveName = $('waveName'), waveNote = $('waveNote'), btnSkip = $('btnSkip');
+  const waveBox = $('waveBox'), wavePips = $('wavePips'), waveName = $('waveName'), waveNote = $('waveNote');
   ui.updateHud = () => {
     const sim = app.sim;
     if (!sim) return;
@@ -407,17 +410,9 @@ export function buildUI(app, portraits) {
       for (let k = 0; k < wi.W; k++) wavePips.children[k].className = k < wi.k ? 'done' : k === wi.k ? 'now' : k === wi.k + 1 && wi.next && wi.next.forming ? 'soon' : '';
       const nx = wi.next;
       waveName.textContent = `Wave ${wi.k + 1} of ${wi.W} · ${wi.name}`;
-      let note;
-      const at = (w) => (w && w.sector ? ` → ${w.sector.short}` : '');
-      if (wi.phase === 'approach') note = `contact in about ${mmss(wi.eta)}${at(wi)}`;
-      else if (nx && nx.forming) note = `${nx.name} steps off in ${mmss(nx.in)}${at(nx)}`;
-      else if (wi.phase === 'lull') note = `lull — ${nx.name} within ${mmss(nx.in)}`;
-      else if (nx) note = `engaged · next: ${nx.name} in ${mmss(nx.in)}`;
-      else note = sim.opt.dawn > 0 ? 'the last of them — hold until dawn' : 'the last of them';
-      waveNote.textContent = sim.result ? '' : note;
+      waveNote.textContent = sim.result ? '' : nx ? `next wave in ${mmss(nx.in)}` : 'final wave';
       waveBox.classList.toggle('lull', wi.phase === 'lull' && !(nx && nx.forming));
       waveBox.classList.toggle('hot', wi.phase === 'engaged');
-      btnSkip.hidden = !!sim.result || !(wi.phase === 'lull' || wi.phase === 'approach') || !!app.skip;
     }
     const am = sim.ammoLevel();
     ammoPct.textContent = sim.opt.ammoMult > 50 ? '∞' : Math.round(am * 100) + '%';
@@ -439,7 +434,7 @@ export function buildUI(app, portraits) {
     if (!sb) {
       cpVal.textContent = Math.floor(sim.cp + 1e-6);
       cpBar.style.width = (100 * (sim.cp - Math.floor(sim.cp + 1e-6))) + '%';
-      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'full' : `+${(sim.opt.cpRate * 60).toFixed(1)} / min`;
+      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'full' : `+${Math.round(sim.opt.cpRate * 60)} / min`;
     }
     for (const k in SUPPORT) {
       const s = sim.support[k], c = cmds[k], can = sim.affordSupport(k);
@@ -500,7 +495,7 @@ export function buildUI(app, portraits) {
         ['Defeat', 'The garrison is wiped out.'],
       ])}
       <h4>A challenge night</h4>${rows([
-        ['Waves', 'The vanguard starts on the field; escalades, the siege train and a final assault follow. The top bar counts down to each and names its target. Cut a wave down fast to earn a lull.'],
+        ['Waves', 'The vanguard starts on the field; escalades, the siege train and a final assault follow. The top bar counts down to the next one. Cut a wave down fast to earn a lull.'],
         ['Command Points', 'One pool pays for all support. It refills slowly; killing captains, trolls and siege engines pays a bounty.'],
         ['Score', 'The win, soldiers brought through, an intact gate and wall, and requisition left unspent.'],
       ])}`],
@@ -520,13 +515,12 @@ export function buildUI(app, portraits) {
       ])}
       <h4>Support</h4>${rows([
         [`${k('1')}–${k('4')}`, 'Call support, then click the target (drag to aim an air strike)'],
-        [k('T'), 'Focus artillery: aim your own mortars and howitzers'],
+        [k('T'), 'Target artillery: aim your own mortars and howitzers'],
         [k('F'), 'Focus fire: drag a circle; every weapon in range concentrates there'],
         [`${k('Z')} · ${k('V')} · ${k('L')}`, 'Overlays: fire zones · weapon ranges · losses'],
       ])}
       <h4>Time and camera</h4>${rows([
         [`${k('Space')} ${k('−')} ${k('+')}`, 'Pause · slower · faster'],
-        [k('N'), 'Fast-forward through a quiet spell to the next contact'],
         [k('Scroll'), 'Zoom toward the cursor'],
         [`${k('Right-drag')} ${k('W A S D')}`, 'Pan'],
         [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Rotate the view'],
@@ -683,6 +677,7 @@ export function buildUI(app, portraits) {
   ui.setMode = (mode) => {
     document.getElementById('app').className = mode === 'setup' ? 'mode-setup' : 'mode-battle';
     tip.hidden = true;
+    ui.hideCoach(); // it points at the scenario picker, which a battle hides
   };
 
   renderPalette(); setBrush(50);
