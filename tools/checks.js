@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { buildMap, KEEP } from '../src/map.js';
 import { buildPreset, horde, makeGroup, PRESETS } from '../src/scenarios.js';
 import { Sim, S_WAIT, S_MOVE, S_DONE } from '../src/sim/sim.js';
-import { DEF, ORC, UNITS, U, C, featureFlags } from '../src/config.js';
+import { DEF, ORC, UNITS, U, C, T, featureFlags } from '../src/config.js';
 import { autopilot } from './autopilot.js';
 
 const map = buildMap();
@@ -365,7 +365,8 @@ const CHECKS = {
         if (P.sim.result && P.sim.result.win) wins++;
         left.push(P.sim.defCombat / P.sim.initial[0]);
         const ps = P.sim.segs[map.POSTERN], gs = P.sim.segs[map.GATE];
-        doors.push({ deep, post: ps.breached ? 'broken' : ps.hp < ps.maxHp ? 'battered' : 'untouched', gate: gs.breached ? 'down' : `${pct(gs.hp / gs.maxHp)}` });
+        const dr = P.sim.segs[map.DOOR];
+        doors.push({ deep, post: ps.breached ? 'broken' : ps.hp < ps.maxHp ? 'battered' : 'untouched', gate: gs.breached ? 'down' : `${pct(gs.hp / gs.maxHp)}`, door: dr.breached ? 'broken' : dr.hp < dr.maxHp ? 'battered' : 'untouched' });
       }
       if (wins === 3 && median(left) > 0.5) free++;
       rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
@@ -373,7 +374,7 @@ const CHECKS = {
     keepDoors = doors;
     const ff = featureFlags(null);
     verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
-      ff.postern ? `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')}`
+      ff.postern ? `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')}${ff.door ? ` · door ${doors.map((d) => d.door).join(', ')}` : ''}`
         : 'the horde turns on the keep and sends its sappers at the gate, but cannot force the causeway before dawn', true);
   }],
   deep: ['Given an empty wall, the horde comes round through the Deep; while the wall is manned it does not', () => {
@@ -383,6 +384,32 @@ const CHECKS = {
     let wrong = 0; for (const { P } of battles()) wrong += P.postWrong || 0;
     verdict('deep', fell === keepDoors.length && wrong === 0, `fall-back battles in which twenty or more attackers reached the Deep and went for the postern: ${fell} of ${keepDoors.length}; looks at the stock battles that found a force sent for the postern while the wall was manned: ${wrong} (wanted none)`,
       keepDoors.map((d) => `${d.deep} in the Deep, postern ${d.post}`).join(' · '));
+  }],
+  door: ['Attackers on the keep end of the wall batter the door into the court, and nobody walks through it while it holds', () => {
+    if (!featureFlags(null).door) return;
+    // the garrison in the Hornburg, two hundred Uruk-hai already on the wall walk by the keep
+    // (fixed group ids: formation jitter is seeded by id, and the ids run on as other checks build scenarios)
+    const groups = [makeGroup('rifle', 120, KEEP.cx - 40, KEEP.cy - 10, Math.PI / 2, 40, { id: 1 }), makeGroup('rifle', 60, KEEP.cx - 20, KEEP.cy - 40, Math.PI / 2, 30, { id: 2 })];
+    const sim = new Sim(map, { groups, options: { sandbox: true, dawn: 0, rout: 0.01 } }, null);
+    const g = sim.newGroup(ORC); sim.gType[g] = U.uruk;
+    let placed = 0;
+    for (let k = 0; k < 400 && placed < 200; k++) {
+      const p = map.wallAt(0.03 + (k % 40) * 0.0015), off = ((k / 40) | 0) - 4.5;
+      const x = p.x + p.ty * off * 0.9, y = p.y - p.tx * off * 0.9;
+      if (map.seg[map.cellOf(x, y)] < 0) continue;
+      const i = sim.spawn(U.uruk, x, y, 0, g); if (i < 0) continue;
+      sim.el[i] = 1; sim.state[i] = S_MOVE; placed++;
+    }
+    const ds = sim.segs[map.DOOR];
+    let through = 0, hitT = -1;
+    while (!sim.result && sim.time < 240 && !ds.breached) {
+      sim.step(); sim.events.length = 0;
+      if (hitT < 0 && ds.hp < ds.maxHp) hitT = sim.time;
+      if (sim.tick % 5) continue;
+      for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === ORC && map.type[map.cellOf(sim.x[i], sim.y[i])] === T.DOOR) through++;
+    }
+    verdict('door', hitT >= 0 && through === 0, `${placed} Uruk-hai on the wall walk by the keep: the door first struck at ${hitT < 0 ? 'never' : Math.round(hitT) + ' s'}, ${ds.breached ? 'broken at ' + Math.round(sim.time) + ' s' : 'still holding at ' + Math.round(sim.time) + ' s (' + pct(ds.hp / ds.maxHp) + ' left)'}; attackers seen in the arch before it broke: ${through} (wanted none)`,
+      `${sim.count[ORC]} attackers left, ${sim.defCombat} defenders`);
   }],
   layout: ['A generated horde of any size fits on the field', () => {
     const rows = [];

@@ -168,6 +168,11 @@ Orders can be given while paused. The battle waits while a dialog is open.
   breaks. Give up the Deeping Wall and the horde comes round for it: ladders go up unopposed at
   the keep end of the empty wall, sappers blow the culvert, and the Deep fills while one force
   keeps the gate busy. Falling back means defending two short fronts, not one.
+- **The door from the wall.** Where the Deeping Wall meets the Hornburg, its walk runs through an
+  arch straight into the court. The garrison passes freely, but the door in it can be battered down
+  (a party of Uruk-hai breaks it in a minute or two). Attackers who hold the keep end of the wall
+  make for it, and after a fall-back the climbers on the empty wall go for whichever back door is
+  nearer. Men on the curtain wall above the junction, and in the court behind the arch, hold it.
 - **Siege engines are timber with a crew.** Small arms cannot hurt a ladder, ram, tower or
   catapult, only the Uruk-hai and trolls moving it. It slows as they fall and is set down when too
   few are left; others nearby step in, and a later wave can pick up an abandoned one. Marksmen pick
@@ -296,12 +301,12 @@ seeds:
 
 Hard is meant to need more than the stand-in gives.
 
-**A known hole, narrowed.** Ordering the whole garrison into the Hornburg in the first second still
-wins all three scenarios. The horde now comes round through the Deep and breaks the postern every
-time (and the gate on Medium), and lines of fire mean only so many can shoot from the curtain wall,
-but the court behind a broken door is a killing ground and the night ends first. In the check
-battles it wins Easy with the whole garrison alive, Medium with 57% and Hard with 45%. The
-difficulty ratings hold for a player who defends the wall. `npm run checks` reports this as OPEN.
+**Falling back at once.** Ordering the whole garrison into the Hornburg in the first second is no
+longer a free win on Medium or Hard: the horde comes round through the Deep and over the empty wall,
+breaks the postern and the door from the wall, and pours into the court from two sides. In the check
+battles it loses Medium two nights in three and wins Hard with only a twentieth of the garrison
+left. Easy is still won with nearly everyone alive (its horde is too small to force the doors in
+time), so `npm run checks` still reports this as OPEN.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
 pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left
@@ -310,7 +315,7 @@ the whole fight, captains who cannot be killed or who bunch together, warg rider
 leave the reserve, forces going back and forth, alert floods, surges at a sector that is still
 firing, an empty stretch of wall ignored, soldiers stuck for good, troops in front of the wall
 walked past, a horde that will not come round through the Deep for the postern (or does while the
-wall is manned), hordes too big to fit, shots fired through friends or along a wall, men left with no
+wall is manned), a door from the wall that is never battered or is walked through while it holds, hordes too big to fit, shots fired through friends or along a wall, men left with no
 line of fire or fidgeting between places, defenders packed into one spot, and the keep used as a
 free win.
 
@@ -318,7 +323,7 @@ free win.
 
 Every siege rule added on top of the original game sits behind a flag (`FEATURES` in
 `src/config.js`): `fixes`, `captains`, `warlord`, `clock`, `fields`, `physics`, `crews`,
-`throwdown`, `suppress`, `shields`, `tier2`, `intel`, `layout`, `lanes` and `postern`. All are on by default. With all
+`throwdown`, `suppress`, `shields`, `tier2`, `intel`, `layout`, `lanes`, `postern` and `door`. All are on by default. With all
 of them off the battle plays exactly as it did before they existed, to the same state hash
 (`node tools/headless.js --preset classic-garrison --policy auto --ff none` ends on `473e12de`).
 

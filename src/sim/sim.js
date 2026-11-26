@@ -20,7 +20,7 @@ const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of atta
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;    // coarse grid of defenders
 const BCS = 8, BW = WORLD_W / BCS, BH = WORLD_H / BCS;    // grid of big bodies (trolls, engines)
 const CAP = 4;            // most foot soldiers that fit in one fine cell (about one a square metre)
-const GATE_HP = 7800, POSTERN_HP = 1300; // the Hornburg's doors under the `postern` rule (otherwise 5200 and 2600, as in map.js)
+const GATE_HP = 7800, POSTERN_HP = 1300, DOOR_HP = 1300, DOOR_COST = 310; // the Hornburg's doors under the `postern` rule (otherwise 5200 and 2600, as in map.js)
 export const FINE_CELL = FINE, FINE_W = FW, FINE_H = FH;
 export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 
@@ -88,6 +88,8 @@ export class Sim {
     this.segs = map.segments.map((s) => ({ ...s, hp: s.maxHp, breached: false, ladders: 0, claimed: 0 }));
     // a gate built to face the valley, and a lighter door at the back that opens on the Deep
     if (this.ff.postern) { const gs = this.segs[map.GATE], ps = this.segs[map.POSTERN]; gs.maxHp = gs.hp = GATE_HP; ps.maxHp = ps.hp = POSTERN_HP; }
+    // (`door`) the arch from the Deeping Wall walk into the court gets leaves: the garrison passes, the horde has to break them
+    if (this.ff.door) { const ds = this.segs[map.DOOR]; ds.maxHp = ds.hp = DOOR_HP; ds.leaves = true; }
     this.segTop = new Float32Array(this.segs.map((s) => s.top));
     this.elev = new Uint8Array(NC);   // wall group + 1 where a wall (or a shut gate) still stands
     this.elevD = this.elev;           // the garrison keeps its gates barred, so both sides see the same walls
@@ -662,7 +664,7 @@ export class Sim {
     }
     for (let c = 0, n = GW * GH; c < n; c++) {
       const t = mt[c];
-      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = 0; continue; }
+      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR && this.ff.door ? DOOR_COST : 0; continue; } // (a door to batter down: a way through, at a price)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
       if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
@@ -922,6 +924,11 @@ export class Sim {
           const ps = this.segs[this.map.POSTERN];
           if (!ps.breached) { const px = ps.x - x, py = ps.y - y, pl = Math.sqrt(px * px + py * py); if (pl < 20 && pl > 0.1) { dirx = px / pl; diry = py / pl; direct = true; } }
         }
+        if (!direct && this.ff.door && (this._viaDeep(g) || el)) {
+          // on the wall walk by the keep: straight at the door from the wall into the court
+          const ds = this.segs[this.map.DOOR];
+          if (!ds.breached) { const px = ds.x - x, py = ds.y - y, pl = Math.sqrt(px * px + py * py); if (pl < 20 && pl > 0.1) { dirx = px / pl; diry = py / pl; direct = true; } }
+        }
         if (!direct && d.role === R.TROLL && !el && this.ff.warlord) {
           // trolls mass on the one stretch of wall the horde means to bring down
           const bs = this._trollSeg(g);
@@ -934,7 +941,13 @@ export class Sim {
           else if (fld !== this.orcDir && this.ff.fields && this._flow(x, y, this.orcDir, this.snagT[i] > this.time)) { dirx = this.fdx; diry = this.fdy; }
         }
         const blk = this._move(i, dirx, diry, speed, d.sz, 0);
-        if (blk >= 0 && !this.elev[blk] && this.ff.fields) this.snagT[i] = this.time + 2; // the ground refused him: see the path note in _flow
+        if (blk >= 0 && !this.elev[blk] && this.ff.fields && !this.orcBlock[blk]) this.snagT[i] = this.time + 2; // the ground refused him: see the path note in _flow
+        if (blk >= 0 && this.orcBlock[blk] && this.ff.door && this.mtype[blk] === T.DOOR && this.cd[i] <= 0 && !shut) {
+          // the door from the wall into the court
+          this.cd[i] = d.mreload * 1.2; this.fireT[i] = this.time;
+          this.fx.melee(x + dirx * 1.5, y + diry * 1.5, this.unitZ(i) + 1.2);
+          this.damageSeg(this.map.DOOR, d.sdmg || 8);
+        }
         if (blk >= 0 && this.elev[blk]) {
           if (this.lad[blk] && !d.sz && !el && !shut && !(d.cav && this.ff.fixes)) { this._startClimb(i, blk); return; }
           if (this.cd[i] <= 0) {
@@ -1229,16 +1242,18 @@ export class Sim {
     s.hp -= dmg;
     if (s.hp <= 0) {
       this.breachSeg(k);
-      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
+      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : s.kind === 'door' ? 'The door from the wall into the keep is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
       this._alert(null, 0, txt, 'bad', s.x, s.y, true, s.kind === 'gate');
       return;
     }
     // warn while there is still something to be done about it
     const now = s.hp / s.maxHp;
-    if (s.kind === 'gate' || s.kind === 'postern') {
-      const what = s.kind === 'gate' ? 'The gate' : 'The postern door';
-      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, true);
-      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, true);
+    if (s.kind === 'gate' || s.kind === 'postern' || s.kind === 'door') {
+      const what = s.kind === 'gate' ? 'The gate' : s.kind === 'postern' ? 'The postern door' : 'The door from the wall';
+      // (the light doors at the back go from splintering to broken in seconds: their warnings go to the log, not the banner)
+      const loud = s.kind === 'gate' || !(this.ff.postern || this.ff.door);
+      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, loud);
+      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, loud);
       else if (before >= 1) this._alert(null, 0, `${what} is under attack`, 'warn', s.x, s.y);
     } else if (before > 0.5 && now <= 0.5) this._alert('wallHp' + this.segSector(k), 30, `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is being battered down`, 'warn', s.x, s.y);
   }
@@ -1247,6 +1262,7 @@ export class Sim {
     const s = this.segs[k];
     if (s.breached) return;
     s.breached = true; s.hp = 0; s.ladders = 0;
+    if (s.kind === 'door') for (let c = 0, n = GW * GH; c < n; c++) if (this.mtype[c] === T.DOOR) this.orcBlock[c] = 0; // the arch stands open
     this._syncWalls();
     this.navDirty = true; this.gateDirty = true; this.structVersion++; this.stats.breaches++;
     this.fx.breach(s, quiet);

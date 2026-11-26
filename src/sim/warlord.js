@@ -459,7 +459,7 @@ export const warlordMethods = {
     if (fs >= 0 && wl.footN > 11) { wl.footSec = fs; if (this.stats.footholdT < 0) this.stats.footholdT = this.time; } else if (fs < 0) wl.footSec = -1;
     wl.footN = fs >= 0 ? fn : 0;
     // a way in: any breach in the Deeping Wall, or the gate or postern down
-    if (!wl.open) for (const s of this.segs) if (s.breached && (s.kind === 'wall' || s.kind === 'gate' || s.kind === 'postern')) { wl.open = true; break; }
+    if (!wl.open) for (const s of this.segs) if (s.breached && (s.kind === 'wall' || s.kind === 'gate' || s.kind === 'postern' || s.kind === 'door')) { wl.open = true; break; }
     // the garrison's fire by sector, for the horde's ears
     const heat = wl.heat, peak = wl.peak;
     for (let k = 0; k < 4; k++) { heat[k] *= 0.9; peak[k] = Math.max(peak[k] * 0.997, heat[k]); }
@@ -632,7 +632,7 @@ export const warlordMethods = {
 
   /** The path to the postern (null once it is down, close by, or not yet solved). `ground`: for those who cannot climb a ladder. */
   _posternField(c, ground = true) {
-    if (this.segs[this.map.POSTERN].breached) return null;
+    if (this.segs[this.map.POSTERN].breached || (this.ff.door && this.segs[this.map.DOOR].breached)) return null; // a back door is open: the fight leads in
     const fl = this.fields[ground ? F_POSTG : F_POST];
     fl.want = this.time;
     return fl.ready && !fl.close[c] ? fl.dir : null;
@@ -665,7 +665,7 @@ export const warlordMethods = {
     const NC = GW * GH, cost = this.fCost || (this.fCost = new Uint16Array(NC)), mt = this.mtype, ob = this.ob, elev = this.elev;
     for (let c = 0; c < NC; c++) {
       const t = mt[c];
-      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = 0; continue; }
+      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR && this.ff.door ? 310 : 0; continue; } // (as in _nav)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
       if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
@@ -688,6 +688,9 @@ export const warlordMethods = {
     } else if (k === F_POST || k === F_POSTG) {
       const q = this._postFoot();
       src[ns++] = this.map.cellOf(q.x, q.y);
+      // (`door`) for those on the wall, the door from its walk into the court is the other back door
+      const ds = this.segs[this.map.DOOR];
+      if (k === F_POST && this.ff.door && !ds.breached) src[ns++] = this.map.cellOf(ds.x, ds.y);
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];

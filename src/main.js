@@ -697,7 +697,7 @@ function drawBreaches(c) {
     const e = segs[k2], x = (s.x + e.x) / 2, y = (s.y + e.y) / 2;
     const p = S(x, y, s.top + 9);
     if (p[0] < -80 || p[1] < -40 || p[0] > vw + 80 || p[1] > vh + 40) continue;
-    const txt = s.kind === 'gate' ? '✕ GATE DESTROYED' : s.kind === 'postern' ? '✕ POSTERN BROKEN' : s.culvert || e.culvert || (k <= app.map.CULVERT && k2 >= app.map.CULVERT) ? '✕ CULVERT BLOWN' : `✕ WALL BREACHED${k2 > k ? ` · ${(k2 - k + 1) * Math.round(s.len)} m` : ''}`;
+    const txt = s.kind === 'gate' ? '✕ GATE DESTROYED' : s.kind === 'postern' ? '✕ POSTERN BROKEN' : s.kind === 'door' ? '✕ DOOR FORCED' : s.culvert || e.culvert || (k <= app.map.CULVERT && k2 >= app.map.CULVERT) ? '✕ CULVERT BLOWN' : `✕ WALL BREACHED${k2 > k ? ` · ${(k2 - k + 1) * Math.round(s.len)} m` : ''}`;
     c.strokeStyle = 'rgba(255,110,80,0.8)'; c.lineWidth = 1; c.beginPath(); const g = S(x, y, s.top * 0.3); c.moveTo(g[0], g[1]); c.lineTo(p[0], p[1] + 10); c.stroke();
     tag(c, p[0], p[1], txt, '255,139,115', 'rgba(40,10,6,0.88)');
   }
@@ -950,12 +950,12 @@ function drawOverlay(dtReal) {
     }
   }
   // gates
-  for (const k of [map.GATE, map.POSTERN]) {
+  for (const k of [map.GATE, map.POSTERN, map.DOOR]) {
     const s = sim.segs[k];
     if (s.breached || s.hp >= s.maxHp) continue;
     const p = S(s.x, s.y, s.top + 7);
     bar(p[0], p[1], 54, s.hp / s.maxHp, '#f0b34a');
-    c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : 'POSTERN', p[0], p[1] - 5);
+    c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : k === map.POSTERN ? 'POSTERN' : 'DOOR', p[0], p[1] - 5);
   }
   drawBreaches(c);
   // drag visuals

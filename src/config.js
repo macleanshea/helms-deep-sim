@@ -207,6 +207,7 @@ export const FEATURES = {
   intel:     { name: 'Honest intelligence', desc: 'The horde plans from what it has seen on the walls and what has fired, not from the true positions.' },
   lanes:     { name: 'Lines of fire', desc: 'Defenders cannot shoot through their own men: two ranks fire from a battlement, three on the flat (prone, kneeling, standing), and the rest find a place or wait. No firing along a wall. Standing men take up room.' },
   postern:   { name: 'The way in from the Deep', desc: 'The Hornburg gate is much stronger and the postern at its rear weaker. With the Deeping Wall given up, the horde comes round: over the empty wall or through the culvert into the Deep and up the rear ramp to the postern, while a force keeps the gate busy.' },
+  door:      { name: 'The door from the wall', desc: 'The arch from the Deeping Wall walk into the Hornburg court gets a door the horde can batter down. Attackers holding the keep end of the wall make for it; the garrison still passes through freely.' },
   layout:    { name: 'Task-force layout', desc: 'The generated horde is drawn up by task force: captains spread out, sappers dispersed, engines in front, wargs at the rear.', setup: true },
 };
 /** Resolve a partial flag set (or 'none' / 'all') into a full table of booleans. */
