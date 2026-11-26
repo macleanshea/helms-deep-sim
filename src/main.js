@@ -20,8 +20,14 @@ const glCanvas = $('gl'), overlay = $('overlay'), octx = overlay.getContext('2d'
 const mm = $('mm'), mctx = mm.getContext('2d');
 const params = new URLSearchParams(location.search);
 
+// Start-up runs in stages with a pause between them (top-level await), so the loading screen can repaint and show progress.
+// The percentages are each stage's share of a measured start-up; see src/loading.js.
+const loading = window.__loading || { set: async () => {}, done: () => $('loading').classList.add('done') };
+await loading.set(5);
 const map = buildMap();
+await loading.set(25);
 const atlas = drawAtlas();
+await loading.set(30);
 let renderer;
 try {
   renderer = new Renderer(glCanvas, map, atlas);
@@ -29,6 +35,7 @@ try {
   $('loading').innerHTML = '<span>This simulator needs WebGL2, which this browser or device did not provide.</span>';
   throw err;
 }
+await loading.set(60);
 const audio = new Audio();
 const fx = new Fx(audio);
 
@@ -480,6 +487,7 @@ mm.addEventListener('pointermove', (e) => { if (mmDown) mmJump(e); });
 mm.addEventListener('pointerup', () => { mmDown = false; });
 
 window.addEventListener('keydown', (e) => {
+  if (!ui) return; // still starting up
   if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey) return; // leave browser shortcuts alone (Ctrl+R must not sound the retreat)
   const k = e.key.toLowerCase();
@@ -1209,12 +1217,13 @@ if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(para
 const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
+await loading.set(85);
 ui = buildUI(app, renderer.unitIcons(128));
 ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('empty', true, true); // an empty field behind the welcome screen, until a mode is chosen
 fitCamera();
-requestAnimationFrame((t) => { last = t; frame(t); $('loading').classList.add('done'); });
+requestAnimationFrame((t) => { last = t; frame(t); loading.set(100); loading.done(params.has('bench') ? 0 : 800); });
 if (!params.has('bench')) ui.showWelcome();
 
 // handy for debugging and automated tests
