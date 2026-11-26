@@ -128,7 +128,7 @@ export const UNITS = [
     note: 'Follows his own companies from behind. Near him they almost never rout, and the broken rally to him. The troops around him take most shots aimed at him.', counter: 'Thin the company around him with high explosive, then mark him with focus fire.' },
   { key: 'troll', team: ORC, name: 'Siege Troll', role: R.TROLL, hp: 3600, speed: 3.6, rad: 1.8, size: 8.6, spr: 20, mdmg: 260, mreload: 1.8, reach: 2.6, maoe: 3.5, sdmg: 240, spacing: 7, armor: A.HEAVY, big: true, hvt: 2,
     desc: 'Shrugs off rifle fire. Smashes gates, walls and vehicles.',
-    note: 'Pushes the heavy engines, or masses on the one stretch of wall the catapults are battering.', counter: 'Rockets and tank guns. A troll pushing an engine is not fighting.' },
+    note: 'Pushes the siege towers, or masses on the one stretch of wall the catapults are battering.', counter: 'Rockets and tank guns. A troll pushing a tower is not fighting.' },
   { key: 'ladder', team: ORC, name: 'Ladder Crew', role: R.LADDER, hp: 520, speed: 3.9, rad: 1.2, size: 13, spr: 21, spacing: 9, armor: A.FLESH, big: true, hvt: 1, pri: 1.2,
     crew: { need: 6, min: 2, troll: 0, hp: 900, box: [5.2, 0.4], slots: [[3.6, 0.7], [3.6, -0.7], [0, 0.7], [0, -0.7], [-3.6, 0.7], [-3.6, -0.7]] },
     desc: 'Raises a ladder so infantry can scale the Deeping Wall.',
@@ -141,7 +141,7 @@ export const UNITS = [
     desc: 'Carries a charge to the culvert to breach the wall.',
     note: 'Hides in the ranks and sprints for the culvert at the last moment.', counter: 'Marksmen on the sprint; mines and wire in front of the culvert.' },
   { key: 'catapult', team: ORC, name: 'Catapult', role: R.CATAPULT, hp: 1200, speed: 1.9, rad: 2.4, size: 11, spr: 25, w: 'rock', spacing: 12, armor: A.WOOD, big: true, heavy: true, hvt: 2,
-    crew: { need: 6, min: 2, troll: 3, box: [2.6, 2.0], slots: [[-3.4, 1.6], [-3.4, -1.6], [-1.2, 3.0], [-1.2, -3.0], [1.2, 3.0], [1.2, -3.0]] },
+    crew: { need: 6, min: 2, troll: 0, box: [2.6, 2.0], slots: [[-3.4, 1.6], [-3.4, -1.6], [-1.2, 3.0], [-1.2, -3.0], [1.2, 3.0], [1.2, -3.0]] },
     desc: 'Hurls rocks at defenders from a distance.',
     note: 'Each has a mission: hunt mortars that keep firing from one place, batter the stretch of wall the trolls are working on, or pin a sector. They stand off once rockets have found one.', counter: 'Howitzers, mortars and air strikes. Move or hold fire with mortars that are being ranged on.' },
   { key: 'tower', team: ORC, name: 'Siege Tower', role: R.TOWER, hp: 10000, speed: 2.5, rad: 3.6, size: 12, spr: 30, spacing: 18, armor: A.WOOD, big: true, heavy: true, hvt: 2, pri: 0.6, carry: 50,
@@ -172,6 +172,7 @@ export const SUPPORT = {
 // Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
 // fixed pool shared over everything on this list in the attacker's order of battle.
 export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
+export const CAPTAIN_REACH = 1.3; // with the captains rule on, an Uruk captain's presence carries this much further than his `aura`
 export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
 export const DEFAULT_OPTIONS = {

@@ -50,7 +50,7 @@ export const engineMethods = {
     const cr = d.crew, x = this.x[e], y = this.y[e];
     const cx = (x / OCS) | 0, cy = (y / OCS) | 0;
     const uruk = U.uruk, troll = U.troll;
-    let b1 = -1, s1 = 1e12, b2 = -1, s2 = 1e12;
+    let b1 = -1, s1 = 1e12, b2 = -1, s2 = 1e12, avail = 0;
     for (let yy = Math.max(0, cy - 1); yy <= Math.min(OH - 1, cy + 1); yy++) for (let xx = Math.max(0, cx - 1); xx <= Math.min(OW - 1, cx + 1); xx++) {
       for (let j = this.ocHead[yy * OW + xx]; j >= 0; j = this.cnext[j]) {
         const ty = this.type[j];
@@ -63,9 +63,12 @@ export const engineMethods = {
         const dx = this.x[j] - x, dy = this.y[j] - y, d2 = dx * dx + dy * dy;
         if (d2 > DRAFT_R2) continue;
         const sc = ty === troll ? d2 * 0.15 : d2; // a troll is worth several pairs of hands
+        avail += ty === troll ? cr.troll : 1;
         if (sc < s1) { b2 = b1; s2 = s1; b1 = j; s1 = sc; } else if (sc < s2) { b2 = j; s2 = sc; }
       }
     }
+    // nobody is called over unless there are hands enough in reach to shift it
+    if (this.crewHave[e] + avail < cr.min) return;
     let need = cr.need - this.crewHave[e];
     const ns = cr.slots.length;
     for (const j of [b1, b2]) {
@@ -77,6 +80,7 @@ export const engineMethods = {
       const pts = this.type[j] === troll ? cr.troll : 1;
       this.crewOf[j] = e; this.crewGen[j] = this.gen[e]; this.slot[j] = k;
       this.slotAcc[e] |= 1 << k; this.haveAcc[e] += pts; this.crewHave[e] += pts; need -= pts;
+      if (this.eIdle[e] > 0) this.eIdle[e] = this.time; // a fresh party gets its chance to take hold
       if (this.state[j] === S_WAIT) { this.state[j] = S_MOVE; this.linkT[j] = this.time; }
       // a replacement has to run in and take hold: the engine waits for him
       if (this.eEver[e] & 4) this.eHalt[e] = Math.max(this.eHalt[e], this.time + 2.5);
@@ -91,6 +95,8 @@ export const engineMethods = {
       return false;
     }
     const cr = UNITS[this.type[e]].crew;
+    // too few hands for too long: he gives it up and goes back to the fight
+    if (this.eIdle[e] > 0 && this.time - this.eIdle[e] > 20 && this.crewPts[e] < cr.min) { this.crewOf[i] = -1; return false; }
     const pts = d.role === R.TROLL ? cr.troll : 1;
     const k = this.slot[i];
     this.haveAcc[e] += pts; this.slotAcc[e] |= 1 << k;
@@ -167,7 +173,7 @@ export const engineMethods = {
       }
     }
     const loaded = this.time < this.linkT[L] - 0.75 + LADDER_TIME;
-    this.cd2[L] += 0.33 * Math.min(def, 3) * (loaded ? 0.4 : 1);
+    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? 0.35 : 1); // three men, six seconds; far longer with climbers' weight on it
     if (this.cd2[L] < 3) return;
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
     this.stats.thrown++;
@@ -175,7 +181,7 @@ export const engineMethods = {
     this._alert('ladDown' + this.segSector(k), 20, `A ladder is thrown down from ${this.sectors[this.segSector(k)].name}`, 'good', x, y);
     if (this.ff.crews) {
       s.ladders--; s.claimed++; this._unlink(L);
-      this.state[L] = S_MOVE; this.eHalt[L] = this.time + 6; this.cd2[L] = 0; this.eEver[L] = 0;
+      this.state[L] = S_MOVE; this.eHalt[L] = this.time + 6; this.cd2[L] = 0; this.eEver[L] = 0; this.eIdle[L] = this.time;
       this.x[L] = this.px[L] = s.ox; this.y[L] = this.py[L] = s.oy;
     } else this.kill(L, null);
   },

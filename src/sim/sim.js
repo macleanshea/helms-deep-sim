@@ -160,7 +160,7 @@ export class Sim {
 
   /** Put a formation on the field. `atX` overrides where (late arrivals); returns how many found room. */
   _spawnGroup(g, atX, marching) {
-    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX });
+    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX }, this.ff.fixes);
     const ti = U[g.type], d = UNITS[ti];
     const n = Math.min(g.count, pos.length / 2);
     if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
@@ -436,6 +436,11 @@ export class Sim {
     }
     const k = 1.7 * (speed > 1 ? speed : 1);
     let vx = this.vx[i], vy = this.vy[i];
+    if (phys && !mode && this.sepx[i] * dirx + this.sepy[i] * diry < -0.35) {
+      // somebody standing square in his way pushes back exactly as hard as he pushes on: step round
+      const sd = i & 1 ? 0.7 : -0.7, ox = dirx;
+      dirx -= diry * sd; diry += ox * sd;
+    }
     vx += (dirx * speed + this.sepx[i] * k - vx) * 0.42;
     vy += (diry * speed + this.sepy[i] * k - vy) * 0.42;
     const vm = vx * vx + vy * vy, lim = speed * 1.25 + 0.6;
@@ -494,7 +499,7 @@ export class Sim {
   /** Is there room for one more in fine cell f on level lv? A soldier stuck for some seconds may squeeze in. */
   _room(f, lv, i) {
     const b = this.blk[f];
-    if (b && b - 1 !== this.crewOf[i] && !lv) return false;
+    if (b && b - 1 !== this.crewOf[i] && !lv && this.stuck[i] <= 20) return false; // (after a couple of seconds he clambers past timber left lying)
     return this.occ[f * 2 + lv] < CAP + (this.stuck[i] > 30 ? 3 : 0);
   }
 
@@ -507,10 +512,22 @@ export class Sim {
     if (iy < 0) iy = 0; else if (iy > GH - 2) iy = GH - 2;
     const c = iy * GW + ix;
     let sx = 0, sy = 0, k;
+    if (this.ff.fields) {
+      // on the causeway, keep to the way the field gives for the very cell he stands on: a blend
+      // with its neighbours can point off the edge of the ramp, and there he would stand for good
+      const c0 = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
+      if (this.mtype[c0] === T.ROAD && (k = d[c0]) !== 255) { this.fdx = DXN[k]; this.fdy = DYN[k]; return true; }
+    }
     if ((k = d[c]) !== 255) { const w = (1 - fx) * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + 1]) !== 255) { const w = fx * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW]) !== 255) { const w = (1 - fx) * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW + 1]) !== 255) { const w = fx * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
+    if (sx * sx + sy * sy < 0.36 && this.ff.fields) {
+      // where the neighbouring cells pull against each other (beside a ramp, round a corner) the blend
+      // cancels out and he would dither on the spot: go by the cell he is standing on
+      const c0 = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
+      if ((k = d[c0]) !== 255) { sx = DXN[k]; sy = DYN[k]; }
+    }
     // far from the fight the host marches up the valley in its ranks; close in, it follows the flow
     const far = this.defBox[0] - 200 - x;
     if (far > 0) { const w = far > 120 ? 2.2 : (far / 120) * 2.2; sx += w; }
@@ -1036,7 +1053,7 @@ export class Sim {
           this.fx.sound('catapult', x, y, 0.7);
           // the alert points at the engine, not at where its rocks land: that is the thing to strike
           const sec = this.sectorAt(tx, ty);
-          this._alert('catFire' + sec, 75, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
+          this._alert('catFire' + sec, this.ff.suppress ? 240 : 75, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
           return;
         }
         if ((this.tick + i) % 10 === 0 && this._catTarget(i, w)) { this.state[i] = S_ACT; this.vx[i] = this.vy[i] = 0; this.cd[i] = 2 + this.rand() * 3; return; }
@@ -1139,7 +1156,7 @@ export class Sim {
       const dx = xx * DCS + 4 - x, dy = yy * DCS + 4 - y, d2 = dx * dx + dy * dy;
       if (d2 > r2 || d2 < m2) continue;
       let sc = (n + 1) * (0.4 + this.rand());
-      if (aimY >= 0 && Math.abs(yy * DCS + 4 - aimY) < 70) sc *= 1.6;
+      if (aimY >= 0 && Math.abs(yy * DCS + 4 - aimY) < 70) sc *= 1.25;
       if (sc > bs) { bs = sc; best = yy * DW + xx; }
     }
     if (best < 0) return false;
@@ -1479,6 +1496,7 @@ export class Sim {
       if (!(el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) continue;
       // prefer targets that are not tucked in under one's own wall
       if (eg && !w.speed && this.deadG[((this.y[j] / CELL) | 0) * GW + ((this.x[j] / CELL) | 0)] === eg && this.state[j] !== S_CLIMB) { fallback = j; continue; }
+      if (e2 > 22500 && !f && UNITS[this.type[j]].cmd && this.ff.captains) continue; // a captain is not picked out of the host at long range
       // and ones that are not behind locked shields: at long range rifles hold their fire rather than waste it on a
       // shield wall (machine guns keep it pinned, and a focus-fire order overrides this)
       if (!w.speed && this.gShield[this.grp[j]] && this.crewOf[j] < 0) { if (fallback < 0 && (e2 < 14400 || w.sup >= 1 || f)) fallback = j; continue; }
@@ -1497,6 +1515,16 @@ export class Sim {
         this.tx[i] = f.x + Math.cos(a) * rr; this.ty[i] = f.y + Math.sin(a) * rr;
         return true;
       }
+    }
+    if (this.ff.suppress && this.rand() < (w.aoe > 8 ? 0.6 : 0.2)) {
+      // counter-battery: the guns, and now and then the mortars, answer a catapult that has just loosed
+      let best = -1, bd = r2;
+      for (const e of this.engines) {
+        if (!this.alive[e] || this.type[e] !== U.catapult || this.time - this.fireT[e] > 25) continue;
+        const dx = this.x[e] - x, dy = this.y[e] - y, d2 = dx * dx + dy * dy;
+        if (d2 < bd && d2 >= m2) { bd = d2; best = e; }
+      }
+      if (best >= 0) { this.tx[i] = this.x[best]; this.ty[i] = this.y[best]; return true; }
     }
     const x0 = Math.max(0, ((x - w.range) / OCS) | 0), x1 = Math.min(OW - 1, ((x + w.range) / OCS) | 0);
     const y0 = Math.max(0, ((y - w.range) / OCS) | 0), y1 = Math.min(OH - 1, ((y + w.range) / OCS) | 0);

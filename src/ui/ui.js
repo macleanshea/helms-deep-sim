@@ -35,6 +35,8 @@ const ICONS = {
 
 /** `portraits`: { unit key: canvas } rendered from the 3D models (Renderer.unitIcons). */
 export function buildUI(app, portraits) {
+  /** What one unit counts for in its side's strength: with crewed engines on, an engine is timber, not troops. */
+  const strength = (d) => (app.flags && app.flags.crews && d.crew ? 0 : 1) + (d.carry || 0);
   const ui = {};
   const icon = (d, px) => {
     const cv = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), src = portraits[d.key];
@@ -136,7 +138,7 @@ export function buildUI(app, portraits) {
       section('Field works', mine.filter((d) => d.cls === C.OBST || d.cls === C.CACHE));
     } else {
       // a whole host in waves, without laying out each one by hand
-      const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * (1 + (UNITS[U[g.type]].carry || 0)), 0);
+      const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * strength(UNITS[U[g.type]]), 0);
       const box = el('div', 'raise', `<b>Automated placement</b><span>Raise a horde with troops, ladders, engines and captains.${cur ? ` Replaces the ${fmt(cur)} raised now.` : ''}</span>`);
       const row = el('div', 'row'), inp = el('input'), go = el('button', 'primary', cur ? 'Replace' : 'Raise');
       inp.type = 'number'; inp.min = 100; inp.max = 40000; inp.step = 500; inp.value = cur ? Math.round(cur / 500) * 500 || 500 : 8000;
@@ -168,7 +170,7 @@ export function buildUI(app, portraits) {
     const sandbox = app.isSandbox(), open = sandbox || app.oobOpen;
     ui.refreshBegin();
     // a challenge's order of attack: what comes when (below the order of battle)
-    const ws = sandbox ? [] : waveSummary(app.setup.groups).filter((w) => w.size > 0);
+    const ws = sandbox ? [] : waveSummary(app.setup.groups, !!(app.flags && app.flags.crews)).filter((w) => w.size > 0);
     attackSec.hidden = ws.length < 2;
     attackList.innerHTML = '';
     for (const w of ws) attackList.append(el('div', 'wrow', `<i>${w.k + 1}</i><div>${w.name}${w.k === 0 ? ' — on the field' : ''}<span>${w.note || 'infantry'}</span></div><b>${fmt(w.size)}</b>`));
@@ -184,7 +186,7 @@ export function buildUI(app, portraits) {
     for (const team of [DEF, ORC]) {
       const byType = new Map();
       for (const g of app.setup.groups) if (g.team === team) byType.set(g.type, (byType.get(g.type) || 0) + g.count);
-      let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * (1 + (UNITS[U[k]].carry || 0));
+      let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * strength(UNITS[U[k]]);
       const locked = team === ORC && !sandbox;
       const head = el('div', 'side-head ' + (team === DEF ? 'def' : 'orc'), `<div>${team === DEF ? 'DEFENDERS' : 'ATTACKERS'} <span>· ${fmt(total)}</span></div>`);
       const clr = el('button', null, 'Clear'); clr.addEventListener('click', () => app.clearTeam(team));

@@ -43,7 +43,7 @@ export const warlordMethods = {
       allIn: false, resOut: 0, huntT: -100, open: false,
       foot: [0, 0, 0, 0], footN: 0, footSec: -1, swungT: -100,
       near: [0, 0, 0], atFoot: [0, 0, 0], quiet: [0, 0, 0], wallTop: [0, 0, 0], seen: [-1, -1, -1], heat: new Float32Array(4), peak: new Float32Array(4),
-      exposed: 0, exCells: [], notedRes: false, shieldNoteT: -100, backNoteT: -100,
+      exposed: 0, exCells: [], exAll: [], notedRes: false, shieldNoteT: -100, backNoteT: -100,
     };
     this.catWary = false;
     this.fields = [];
@@ -167,10 +167,38 @@ export const warlordMethods = {
     });
     const wait = body.map((b, l) => Math.max(0, Math.min(90, slow[l] - b)));
     return items.map((it) => {
-      if (it.type === 'warg' || it.type === 'catapult' || it.type === 'tower' || it.type === 'ram') return 0;
-      if (it.type === 'troll') return crews && (has[it.lane].tower || has[it.lane].ram || has[it.lane].catapult) ? 0 : wait[it.lane];
+      if (it.esc || it.type === 'warg' || it.type === 'catapult' || it.type === 'tower' || it.type === 'ram') return 0;
+      if (it.type === 'troll') return crews && has[it.lane].tower ? 0 : wait[it.lane];
       return wait[it.lane];
     });
+  },
+
+  /**
+   * A wave about to come on: slow engines that the trolls of their lane cannot move are given hands
+   * of their own, a party of Uruk-hai told off from the lane's largest company to come on with them.
+   * Returns a new list of formations; the head-count is unchanged.
+   */
+  _wlEscorts(groups) {
+    if (!this.ff.crews) return groups;
+    const lane = (g) => (g.y < 344 ? 0 : g.y < 616 ? 1 : 2);
+    const out = groups.map((g) => ({ ...g }));
+    for (let l = 0; l < 3; l++) {
+      let trollPts = 0; // (only the towers are a troll's work: rams and catapults are crewed by Uruk-hai)
+      for (const g of out) if (g.type === 'troll' && lane(g) === l) trollPts += g.count * UNITS[U.tower].crew.troll;
+      for (const g of out.slice()) {
+        if (lane(g) !== l || g.count <= 0 || (g.type !== 'tower' && g.type !== 'ram' && g.type !== 'catapult')) continue;
+        const cr = UNITS[U[g.type]].crew;
+        let hands = g.count * cr.need;
+        if (cr.troll) { const use = Math.min(trollPts, hands); trollPts -= use; hands -= use; }
+        if (hands <= 0) continue;
+        let big = null;
+        for (const q of out) if (q.type === 'uruk' && !q.esc && lane(q) === l && (!big || q.count > big.count)) big = q;
+        if (!big || big.count < hands + 30) continue;
+        big.count -= hands;
+        out.push({ ...big, count: hands, x: g.x - 9, y: g.y, w: Math.max(12, g.w || 0), hd: g.hd, esc: true });
+      }
+    }
+    return out;
   },
 
   /** The battle opens: plan for the troops on the field and set their step-off times. */
@@ -296,8 +324,9 @@ export const warlordMethods = {
       for (const f of wl.forces) {
         if (f.reserve) continue;
         if (f.state === 0) {
-          if (more && f.n0 >= 40 && f.n >= 8 && f.n < 0.3 * f.n0 && f.far > 280 && f.far < 1e8 && this.time - f.t0 > 30) {
-            f.state = BACK; f.backT = this.time;
+          // (once only: a force that has already fallen back and come on again sees it through)
+          if (more && !f.backs && f.n0 >= 40 && f.n >= 8 && f.n < 0.3 * f.n0 && f.far > 280 && f.far < 1e8 && this.time - f.t0 > 30) {
+            f.state = BACK; f.backT = this.time; f.backs = 1;
             for (const gid of f.groups) if (!this.gExempt[gid]) { this.gOrder[gid] = BACK; this.gHoldX[gid] = RALLY_X; }
             if (this.time - wl.backNoteT > 150) { wl.backNoteT = this.time; this._alert(null, 0, 'The enemy pulls back to regroup', 'good', f.cx, f.cy, true); }
           }
@@ -314,26 +343,34 @@ export const warlordMethods = {
       }
     }
 
-    // --- a captain from the next force takes over companies that have lost theirs
+    // --- captains are shared out among the forces: one that has lost its only captain gets another after a
+    // pause, and a force with captains to spare lends one to a force with fewer
     if (ff.captains) {
+      const cnt = new Map();
+      for (const ci of this.cmds[ORC]) { if (!this.alive[ci]) continue; const q = wl.forces[this.gForce[this.grp[ci]]]; if (q) cnt.set(q.id, (cnt.get(q.id) || 0) + 1); }
+      let lo = null, lc = 1e9, hi = null, hc = -1;
       for (const f of wl.forces) {
-        if (f.chiefT < 0 || this.time - f.chiefT < 30 || f.n < 10) continue;
-        f.chiefT = -1; f.hadChief = false;
+        if (f.reserve) continue;
+        const c = cnt.get(f.id) || 0;
+        if (c > hc) { hc = c; hi = f; }
+        if (f.n < 30 || f.state) continue;
+        if (c === 0 && f.chiefT >= 0 && this.time - f.chiefT < 30) continue; // newly leaderless: nobody steps in at once
+        if (c < lc) { lc = c; lo = f; }
+      }
+      if (lo && hi && lo !== hi && hc - lc >= 2) {
         let best = -1, bd = 1e12;
         for (const ci of this.cmds[ORC]) {
-          const q = wl.forces[this.gForce[this.grp[ci]]];
-          if (!q || q === f) continue;
-          let others = 0;
-          for (const gid of q.groups) if (UNITS[this.gType[gid]].cmd) others += this.gAlive[gid];
-          if (others < 2) continue; // he is all his own force has
-          const d = Math.hypot(this.x[ci] - f.cx, this.y[ci] - f.cy);
+          if (!this.alive[ci] || this.gForce[this.grp[ci]] !== hi.id) continue;
+          const d = Math.hypot(this.x[ci] - lo.cx, this.y[ci] - lo.cy);
           if (d < bd) { bd = d; best = ci; }
         }
-        if (best < 0) continue;
-        const gid = this.grp[best], q = wl.forces[this.gForce[gid]];
-        q.groups = q.groups.filter((h) => h !== gid);
-        f.groups.push(gid); this.gForce[gid] = f.id; f.hadChief = true;
-        this._alert('capOver', 60, 'A captain takes over the leaderless companies', 'warn', f.cx, f.cy);
+        if (best >= 0) {
+          const gid = this.grp[best];
+          hi.groups = hi.groups.filter((h) => h !== gid);
+          lo.groups.push(gid); this.gForce[gid] = lo.id; this._wlField(gid, lo);
+          if (lc === 0 && lo.chiefT >= 0) this._alert('capOver', 60, 'A captain takes over the leaderless companies', 'warn', lo.cx, lo.cy);
+          lo.chiefT = -1; lo.hadChief = true;
+        }
       }
     }
 
@@ -346,7 +383,7 @@ export const warlordMethods = {
     const atFoot = wl.atFoot;
     foot[0] = foot[1] = foot[2] = foot[3] = 0; near[0] = near[1] = near[2] = 0; top[0] = top[1] = top[2] = 0; atFoot[0] = atFoot[1] = atFoot[2] = 0;
     let ex = 0, exX = 0, exY = 0;
-    const exCells = wl.exCells; exCells.length = 0;
+    const exCells = wl.exCells, exAll = wl.exAll; exCells.length = 0; exAll.length = 0;
     const S = this.sectors, obs2 = OBSERVE * OBSERVE, kr2 = (KEEP.r + 14) * (KEEP.r + 14);
     for (let i = 0, n = this.n; i < n; i++) {
       if (!this.alive[i]) continue;
@@ -354,13 +391,22 @@ export const warlordMethods = {
       if (this.team[i] === ORC) {
         if (this.el[i]) { const s = this.mseg[((y / CELL) | 0) * GW + ((x / CELL) | 0)]; if (s >= 0 && this.state[i] !== S_DONE) foot[this.segSector(s)]++; continue; }
         if (x < 500) continue;
-        for (let k = 0; k < 3; k++) { const dx = S[k].x - x, dy = S[k].y - y, d2 = dx * dx + dy * dy; if (d2 < obs2) { near[k]++; if (d2 < 19600) atFoot[k]++; } }
+        // (at the foot: within 80 m of that sector's wall, where its rifles would be firing if they could)
+        for (let k = 0; k < 3; k++) { const dx = S[k].x - x, dy = S[k].y - y, d2 = dx * dx + dy * dy; if (d2 < obs2) { near[k]++; if (dx < 80 && dy < 64 && dy > -64) atFoot[k]++; } }
       } else {
         const d = UNITS[this.type[i]];
-        if (d.cls !== C.INF) continue;
-        if (this.el[i]) { const k = this.sectorAt(x, y); if (k < 3) top[k] += d.supply || 1; continue; }
-        // on the ground west of the wall and outside the Hornburg: in the open
-        if (x < 945) { const dx = x - KEEP.cx, dy = y - KEEP.cy; if (dx * dx + dy * dy > kr2) { ex++; exX += x; exY += y; if (exCells.length < 64) exCells.push(((y / CELL) | 0) * GW + ((x / CELL) | 0)); } }
+        if (d.cls === C.CACHE) continue;
+        if (this.el[i]) { if (d.cls === C.INF) { const k = this.sectorAt(x, y); if (k < 3) top[k] += d.supply || 1; } continue; }
+        // on the ground west of the wall and outside the Hornburg: in the open. Anything there is made for;
+        // infantry there is also what the warg riders are loosed at.
+        if (x < 945) {
+          const dx = x - KEEP.cx, dy = y - KEEP.cy;
+          if (dx * dx + dy * dy > kr2) {
+            const c = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
+            if (exAll.length < 96) exAll.push(c);
+            if (d.cls === C.INF) { ex++; exX += x; exY += y; if (exCells.length < 64) exCells.push(c); }
+          }
+        }
       }
     }
     wl.exposed = ex; if (ex) { wl.exX = exX / ex; wl.exY = exY / ex; }
@@ -419,8 +465,8 @@ export const warlordMethods = {
     if (this.time - wl.swungT > 90) {
       for (let k = 0; k < 3; k++) {
         // (troops at the foot of that wall, and next to nothing coming down at them, two looks running)
-        if (wl.atFoot[k] < 25 || wl.peak[k] < 40 || wl.heat[k] > 0.12 * wl.peak[k] || k === wl.footSec) { wl.quiet[k] = 0; continue; }
-        if (++wl.quiet[k] < 3) continue;
+        if (wl.atFoot[k] < 25 || wl.peak[k] < 40 || wl.heat[k] > 0.08 * wl.peak[k] || k === wl.footSec) { wl.quiet[k] = 0; continue; }
+        if (++wl.quiet[k] < 7) continue;
         let any = false;
         for (const f of wl.forces) {
           if (f.reserve || f.state || f.sector === k || f.sector > 2 || f.far < 120 || f.n < 10) continue;
@@ -501,20 +547,22 @@ export const warlordMethods = {
       }
       let tx = x, ty = y;
       if (n) { tx = sx / n - 80; ty = sy / n; }
-      // keep clear of the other captains
+      // the captains of one force space themselves along its front, forty metres or more apart
+      let rank = 0, mates = 1;
       for (const ci of this.cmds[ORC]) {
         if (ci === i || !this.alive[ci]) continue;
-        const dy = y - this.y[ci], dx = x - this.x[ci];
-        if (dx * dx + dy * dy < 2500) ty += (dy >= 0 ? 1 : -1) * (i > ci ? 26 : 14);
+        if (f ? this.gForce[this.grp[ci]] !== f.id : Math.abs(this.x[ci] - x) + Math.abs(this.y[ci] - y) > 200) continue;
+        mates++; if (ci < i) rank++;
       }
+      if (mates > 1) ty += (rank - (mates - 1) / 2) * 44;
       this.tx[i] = tx; this.ty[i] = Math.max(20, Math.min(940, ty));
     }
     const dx = this.tx[i] - x, dy = this.ty[i] - y, l = Math.sqrt(dx * dx + dy * dy);
     if (l < 6) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return true; }
     if (dx > 10 && this._flow(x, y, this.gField[g] && this.ff.fields ? this._fieldFor(g, ((y / CELL) | 0) * GW + ((x / CELL) | 0)) : this.orcDir)) {
       // going forward: follow the path his companies took, leaning toward his place
-      const mx = this.fdx * 0.7 + (dx / l) * 0.3, my = this.fdy * 0.7 + (dy / l) * 0.3, ml = Math.sqrt(mx * mx + my * my) || 1;
-      this._move(i, mx / ml, my / ml, speed, d.sz, 0, 1);
+      const mx = this.fdx * 0.5 + (dx / l) * 0.5, my = this.fdy * 0.5 + (dy / l) * 0.5, ml = Math.sqrt(mx * mx + my * my) || 1;
+      this._move(i, mx / ml, my / ml, l > 30 ? speed * 1.2 : speed, d.sz, 0, 1); // he hurries when he has fallen behind
     } else this._move(i, dx / l, dy / l, Math.min(speed, l * 2), d.sz, 0, 1);
     return true;
   },
@@ -575,6 +623,9 @@ export const warlordMethods = {
         if (s.kind !== 'wall' || !s.valid || this.segSector(q) !== k) continue;
         src[ns++] = s.breached ? this.map.cellOf(s.x, s.y) : this.map.cellOf(s.ox, s.oy);
       }
+      // whatever the garrison has standing in front of that stretch of wall is made for as well
+      const sy = this.sectors[k].y;
+      for (const c of this.wl.exAll) { const y = ((c / GW) | 0) * CELL; if (y > sy - 110 && y < sy + 110 && ns < src.length) src[ns++] = c; }
     } else if (k === F_CULVERT) {
       const s = this.segs[this.map.CULVERT];
       src[ns++] = s.breached ? this.map.cellOf(s.x, s.y) : this.map.cellOf(s.ox, s.oy);

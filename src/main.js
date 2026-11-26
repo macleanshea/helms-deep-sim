@@ -1,7 +1,7 @@
 // Application glue: state machine (setup -> battle -> debrief), isometric camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, FEATURES, featureFlags } from './config.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, FEATURES, featureFlags, CAPTAIN_REACH } from './config.js';
 import { buildMap, KEEP } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
 import { scoreBattle } from './score.js';
@@ -539,8 +539,9 @@ function rangeRings(c, def, x, y, alpha) {
   if (def.aura) {
     const col = '240,179,74';
     c.strokeStyle = `rgba(${col},${alpha * 0.8})`; c.lineWidth = 1.2; c.setLineDash([2, 5]);
-    c.beginPath(); const p = ring(c, x, y, z0, def.aura); c.stroke(); c.setLineDash([]);
-    label(p, def.aura, `${def.team === DEF ? 'steadies' : 'drives on'} ${def.aura} m`, col);
+    const reach = Math.round(def.aura * (def.team === ORC && app.flags.captains ? CAPTAIN_REACH : 1));
+    c.beginPath(); const p = ring(c, x, y, z0, reach); c.stroke(); c.setLineDash([]);
+    label(p, reach, `${def.team === DEF ? 'steadies' : 'drives on'} ${reach} m`, col);
   }
   const w = def.wdef || (def.ob === 'claymore' ? WEAPONS.claymore : def.pool ? { range: SUPPLY_R, supply: true } : null);
   if (!w || !w.range) return;

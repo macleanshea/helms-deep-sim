@@ -21,10 +21,36 @@ export function canPlace(map, def, x, y, onWall = null) {
   return onWall === null ? true : wall === onWall;
 }
 
+/**
+ * Ground a soldier on foot can walk out of: everything connected to the middle of the valley by
+ * steps no steeper than he can take. Shelves high on the valley sides fail it. Cached on the map.
+ */
+function walkable(map) {
+  if (map._walkable) return map._walkable;
+  const gw = WORLD_W / 4, gh = WORLD_H / 4, ok = new Uint8Array(gw * gh), q = new Int32Array(gw * gh);
+  let h = 0, t = 0;
+  const start = map.cellOf(300, 480);
+  ok[start] = 1; q[t++] = start;
+  while (h < t) {
+    const c = q[h++], cx = c % gw, cy = (c / gw) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if ((!dx && !dy) || x < 0 || y < 0 || x >= gw || y >= gh) continue;
+      const n = y * gw + x;
+      if (ok[n] || map.type[n] === T.CLIFF || map.seg[n] >= 0 || Math.abs(map.cz[n] - map.cz[c]) > 3.3) continue;
+      ok[n] = 1; q[t++] = n;
+    }
+  }
+  return (map._walkable = ok);
+}
+
 const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Math.max(1, Math.ceil(Math.sqrt(g.count * 1.8))));
 
-/** Positions for every unit of a group: rows of `spacing` laid along the group's line. */
-export function groupPositions(map, g) {
+/**
+ * Positions for every unit of a group: rows of `spacing` laid along the group's line.
+ * `strict`: attackers are not stood on ground they could never walk off.
+ */
+export function groupPositions(map, g, strict = false) {
   const def = UNITS[U[g.type]];
   const sp = def.spacing * (g.spread || 1);
   const out = [];
@@ -35,13 +61,14 @@ export function groupPositions(map, g) {
   const maxRows = Math.ceil(g.count / cols) * 4 + 10;
   const r = mulberry(g.id * 7919 + 13);
   const jit = def.cls === C.OBST ? (def.ob === 'mine' ? 0.8 : 0) : def.team === ORC ? 0.3 : 0.12;
+  const open = strict && def.team === ORC ? walkable(map) : null;
   for (let ri = 0; ri < maxRows && out.length < g.count * 2; ri++) {
     const off = (ri & 1 ? 1 : -1) * Math.ceil(ri / 2);
     for (let c = 0; c < cols && out.length < g.count * 2; c++) {
       const a = (c - (cols - 1) / 2) * sp;
       const x = g.x + ux * a + px * off * sp + (r() - 0.5) * sp * jit;
       const y = g.y + uy * a + py * off * sp + (r() - 0.5) * sp * jit;
-      if (canPlace(map, def, x, y, onWall)) out.push(x, y);
+      if (canPlace(map, def, x, y, onWall) && !(open && !open[map.cellOf(x, y)])) out.push(x, y);
     }
   }
   return out;
@@ -195,13 +222,13 @@ export function horde(total, mix = {}) {
 }
 
 const NOTABLE = [['tower', 'siege tower'], ['ram', 'ram'], ['troll', 'troll'], ['catapult', 'catapult'], ['sapper', 'sapper'], ['ladder', 'ladder crew'], ['warg', 'warg rider'], ['berserker', 'berserker']];
-/** Per-wave strength and what to expect from it, read off the wave tags on attacker groups. */
-export function waveSummary(groups) {
+/** Per-wave strength and what to expect from it, read off the wave tags on attacker groups. `crews`: count as the crewed-engines rule does. */
+export function waveSummary(groups, crews = false) {
   const waves = [];
   for (const g of groups) {
     if (g.team !== ORC || g.phase == null) continue;
     const w = waves[g.phase] || (waves[g.phase] = { k: g.phase, kind: g.kind, name: (WAVE_KINDS[g.kind] || WAVE_KINDS.assault).name, size: 0, by: {} });
-    w.size += g.count * (1 + (UNITS[U[g.type]].carry || 0));
+    w.size += g.count * ((crews && UNITS[U[g.type]].crew ? 0 : 1) + (UNITS[U[g.type]].carry || 0)); // (crews: an engine is timber, not troops)
     w.by[g.type] = (w.by[g.type] || 0) + g.count;
   }
   for (let k = 0; k < waves.length; k++) {

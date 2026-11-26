@@ -7,7 +7,7 @@
 // abandon their post for the Hornburg. Killing a commander shocks and confuses every
 // company around him.
 
-import { ORC, UNITS, C } from '../config.js';
+import { ORC, UNITS, C, CAPTAIN_REACH } from '../config.js';
 import { KEEP } from '../map.js';
 
 const MAXG = 4096;
@@ -31,7 +31,7 @@ export const moraleMethods = {
     this.gType = new Uint8Array(MAXG); this.gWave = new Uint8Array(MAXG);
     this.gForce = new Int16Array(MAXG).fill(-1); this.gOrder = new Uint8Array(MAXG); this.gHoldX = new Float32Array(MAXG);
     this.gField = new Uint8Array(MAXG);
-    this.gShield = new Uint8Array(MAXG); this.gShieldT = new Float32Array(MAXG); this.gOpen = new Uint8Array(MAXG); this.gCapX = new Float32Array(MAXG).fill(1e9);
+    this.gShield = new Uint8Array(MAXG); this.gShieldT = new Float32Array(MAXG); this.gOpen = new Uint8Array(MAXG); this.gPinRun = new Uint16Array(MAXG); this.gCapX = new Float32Array(MAXG).fill(1e9);
     this.gRallyX = new Float32Array(MAXG).fill(-1); this.gRallyY = new Float32Array(MAXG);
   },
 
@@ -73,7 +73,9 @@ export const moraleMethods = {
         // volleys and rocks pin the platoons they land on: a slower, wilder fire, but never a loss of nerve
         let lvl = (this.gSup[g] *= SUP_FADE) / Math.max(6, cnt);
         if (lvl > 0.3) for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { lvl *= 0.6; break; } }
-        const pin = lvl >= 1.0 ? 2 : lvl >= 0.4 ? 1 : 0;
+        let pin = lvl >= 1.0 ? 2 : lvl >= 0.4 ? 1 : 0;
+        // men pinned flat for the best part of a minute get their heads up again for a while, whatever is coming over
+        if (pin === 2) { if (++this.gPinRun[g] > 90) { pin = 1; if (this.gPinRun[g] > 140) this.gPinRun[g] = 0; } } else if (this.gPinRun[g] > 0) this.gPinRun[g]--;
         if (pin === 2) { this.stats.pinnedDef += cnt * 0.5; if (this.gPin[g] < 2) this._alert('pinD' + this.sectorAt(cx, cy), 60, `Platoons on ${this.sectors[this.sectorAt(cx, cy)].name} are pinned down by volleys`, 'warn', cx, cy); }
         this.gPin[g] = pin;
         if (this.gSup[g] > 9 * Math.max(6, cnt)) this.gSup[g] = 9 * Math.max(6, cnt);
@@ -84,7 +86,7 @@ export const moraleMethods = {
         // the nearest living captain: he steadies the company, and it is to him that it falls back if it breaks
         let bd = 1e12, bi = -1;
         for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const dx = this.x[ci] - cx, dy = this.y[ci] - cy, d2 = dx * dx + dy * dy; if (d2 < bd) { bd = d2; bi = ci; } }
-        if (bi >= 0) { const r = UNITS[this.type[bi]].aura * 1.3; insp = bd < r * r ? 1 : 0; this.gRallyX[g] = this.x[bi]; this.gRallyY[g] = this.y[bi]; } else this.gRallyX[g] = -1;
+        if (bi >= 0) { const r = UNITS[this.type[bi]].aura * CAPTAIN_REACH; insp = bd < r * r ? 1 : 0; this.gRallyX[g] = this.x[bi]; this.gRallyY[g] = this.y[bi]; } else this.gRallyX[g] = -1;
       } else for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { insp = 1; break; } }
       this.gInsp[g] = insp;
       const st = this.gState[g];

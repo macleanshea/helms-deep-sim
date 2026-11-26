@@ -100,11 +100,11 @@ export const directorMethods = {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
       d.aimY = next.sector >= 0 ? this.sectors[next.sector].y : -1;
       d.lossMark = this.loss[ORC].slice();
-      const groups = this._aimWave(next);
+      const groups = wlOn ? this._wlEscorts(this._aimWave(next)) : this._aimWave(next);
       // each rank comes over the edge when it would have marched that far; the warlord also holds the
       // quicker formations back so that the wave reaches the wall together
       let hold = null;
-      if (wlOn && !allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < 344 ? 0 : g.y < 616 ? 1 : 2 })), this.wl.plans[next.k]);
+      if (wlOn && !allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < 344 ? 0 : g.y < 616 ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
       next.pend = groups.map((g, k) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH + (hold ? hold[k] : 0) })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (hold ? hold.slice().sort((a, b) => a - b)[hold.length >> 1] : 0);
       this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
