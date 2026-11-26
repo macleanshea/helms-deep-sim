@@ -45,7 +45,7 @@ three, one to a difficulty:
 | --- | --- | --- |
 | Easy | **First Night** | A company on the centre of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
 | Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
-| Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,500 in three waves. Fifteen minutes. |
+| Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
 
 In each the first wave is a real assault, not a probe, so the fight reaches the wall early, and a
 platoon is kept below the wall where the enemy cannot count it. Difficulty is measured, not
@@ -162,6 +162,12 @@ Orders can be given while paused. The battle waits while a dialog is open.
   a parapet or lying prone, a man is about half as easy for a crossbow to hit. So firepower follows
   frontage: a wall manned ten deep fires no harder than one manned two deep. The defenders take up
   room as the attackers do.
+- **The Hornburg's back door.** The gate facing the valley is built to take a long battering
+  (it takes six sappers' charges); the postern at the rear, at the top of the ramp up from the
+  Deep, is a lighter door that a party of Uruk-hai can hack down in under a minute and one charge
+  breaks. Give up the Deeping Wall and the horde comes round for it: ladders go up unopposed at
+  the keep end of the empty wall, sappers blow the culvert, and the Deep fills while one force
+  keeps the gate busy. Falling back means defending two short fronts, not one.
 - **Siege engines are timber with a crew.** Small arms cannot hurt a ladder, ram, tower or
   catapult, only the Uruk-hai and trolls moving it. It slows as they fall and is set down when too
   few are left; others nearby step in, and a later wave can pick up an abandoned one. Marksmen pick
@@ -290,13 +296,12 @@ seeds:
 
 Hard is meant to need more than the stand-in gives.
 
-**A known hole.** Ordering the whole garrison into the Hornburg in the first second still wins all
-three scenarios. Lines of fire took some of the sting out of it (only so many men can fire from the
-curtain wall, and the rest wait in the court), so on Hard it now wins with about a quarter of the
-garrison left rather than half; on Easy and Medium it still wins with most of the garrison alive.
-The horde does turn on the keep when the Deeping Wall is left empty, and sends its sappers at the
-gate, but it cannot force the causeway before dawn. The difficulty ratings hold for a player who
-defends the wall. `npm run checks` reports this as OPEN.
+**A known hole, narrowed.** Ordering the whole garrison into the Hornburg in the first second still
+wins all three scenarios. The horde now comes round through the Deep and breaks the postern every
+time (and the gate on Medium), and lines of fire mean only so many can shoot from the curtain wall,
+but the court behind a broken door is a killing ground and the night ends first. In the check
+battles it wins Easy with the whole garrison alive, Medium with 57% and Hard with 45%. The
+difficulty ratings hold for a player who defends the wall. `npm run checks` reports this as OPEN.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
 pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left
@@ -304,7 +309,8 @@ crewless, ladders thrown down the instant they go up, riflemen who never fire, p
 the whole fight, captains who cannot be killed or who bunch together, warg riders who never
 leave the reserve, forces going back and forth, alert floods, surges at a sector that is still
 firing, an empty stretch of wall ignored, soldiers stuck for good, troops in front of the wall
-walked past, hordes too big to fit, shots fired through friends or along a wall, men left with no
+walked past, a horde that will not come round through the Deep for the postern (or does while the
+wall is manned), hordes too big to fit, shots fired through friends or along a wall, men left with no
 line of fire or fidgeting between places, defenders packed into one spot, and the keep used as a
 free win.
 
@@ -312,7 +318,7 @@ free win.
 
 Every siege rule added on top of the original game sits behind a flag (`FEATURES` in
 `src/config.js`): `fixes`, `captains`, `warlord`, `clock`, `fields`, `physics`, `crews`,
-`throwdown`, `suppress`, `shields`, `tier2`, `intel`, `layout` and `lanes`. All are on by default. With all
+`throwdown`, `suppress`, `shields`, `tier2`, `intel`, `layout`, `lanes` and `postern`. All are on by default. With all
 of them off the battle plays exactly as it did before they existed, to the same state hash
 (`node tools/headless.js --preset classic-garrison --policy auto --ff none` ends on `473e12de`).
 

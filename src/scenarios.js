@@ -334,7 +334,7 @@ export const PRESETS = [
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles', level: 'Hard',
-    blurb: 'A lone rifle company with few heavy weapons, and ten thousand and more at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
+    blurb: 'A lone rifle company with few heavy weapons, and ten thousand at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
     build: (map, sb, lay) => ({
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
@@ -342,7 +342,7 @@ export const PRESETS = [
         makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(10500, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
+        ...fieldWorks(map, 0.6), ...horde(10000, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
       ],
       options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
     }),

@@ -8,7 +8,7 @@
 // numbers behind the verdict. It exits 1 if anything fails. Thresholds are judgement calls about
 // what would look broken to a player, not laws; they sit beside each verdict so they can be argued with.
 import { pathToFileURL } from 'node:url';
-import { buildMap } from '../src/map.js';
+import { buildMap, KEEP } from '../src/map.js';
 import { buildPreset, horde, makeGroup, PRESETS } from '../src/scenarios.js';
 import { Sim, S_WAIT, S_MOVE, S_DONE } from '../src/sim/sim.js';
 import { DEF, ORC, UNITS, U, C, featureFlags } from '../src/config.js';
@@ -89,6 +89,8 @@ function play(setup, opts = {}) {
     if (sim.tick % 10) continue;
     const t = sim.time;
     P.shotLog.push(P.sectorShots.slice());
+    // forces sent round to the postern while the Deeping Wall is still manned (there should be none)
+    if (!sim.wl.abandoned && sim.wl.forces.some((f) => f.sector === 4)) P.postWrong = (P.postWrong || 0) + 1;
     // --- engines and their crews
     for (const e of sim.engines) {
       if (!sim.alive[e]) continue;
@@ -173,6 +175,7 @@ function verdict(name, ok, what, detail, open = false) { results.push({ name, ok
 
 // The three or four full battles most checks read from, played once and shared.
 let shared = null;
+let keepDoors = null; // what the keep check saw of the doors, for the deep check
 function battles() {
   if (shared) return shared;
   shared = [];
@@ -345,20 +348,41 @@ const CHECKS = {
   }],
   keep: ['Abandoning the wall for the Hornburg at once is not a free win (a known, open problem)', () => {
     // the stand-in commander, who also orders everyone into the keep in the first second
-    const rows = [];
+    const rows = [], doors = [];
     let free = 0;
     for (const p of PRESETS.filter((q) => q.key !== 'empty' && !q.hidden)) {
       let wins = 0; const left = [];
       for (const seed of [1, 2, 3]) {
-        const P = play(preset(p.key, seed), { policy: 'auto', tick: (sim) => { if (sim.time > 1 && !sim.retreated) sim.orderRetreat(); } });
+        let deep = 0;
+        const P = play(preset(p.key, seed), { policy: 'auto', tick: (sim) => {
+          if (sim.time > 1 && !sim.retreated) sim.orderRetreat();
+          if (sim.tick % 50) return;
+          // attackers in the Deep: on the ground behind the Deeping Wall, outside the Hornburg
+          let n = 0;
+          for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === ORC && !sim.el[i] && sim.x[i] > 1012 && Math.hypot(sim.x[i] - KEEP.cx, sim.y[i] - KEEP.cy) > KEEP.r + 8) n++;
+          if (n > deep) deep = n;
+        } });
         if (P.sim.result && P.sim.result.win) wins++;
         left.push(P.sim.defCombat / P.sim.initial[0]);
+        const ps = P.sim.segs[map.POSTERN], gs = P.sim.segs[map.GATE];
+        doors.push({ deep, post: ps.breached ? 'broken' : ps.hp < ps.maxHp ? 'battered' : 'untouched', gate: gs.breached ? 'down' : `${pct(gs.hp / gs.maxHp)}` });
       }
       if (wins === 3 && median(left) > 0.5) free++;
       rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
     }
+    keepDoors = doors;
+    const ff = featureFlags(null);
     verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
-      'the horde turns on the keep and sends its sappers at the gate, but cannot force the causeway before dawn', true);
+      ff.postern ? `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')}`
+        : 'the horde turns on the keep and sends its sappers at the gate, but cannot force the causeway before dawn', true);
+  }],
+  deep: ['Given an empty wall, the horde comes round through the Deep; while the wall is manned it does not', () => {
+    if (!featureFlags(null).postern) return;
+    if (!keepDoors) CHECKS.keep[1]();
+    const fell = keepDoors.filter((d) => d.deep >= 20 && d.post !== 'untouched').length;
+    let wrong = 0; for (const { P } of battles()) wrong += P.postWrong || 0;
+    verdict('deep', fell === keepDoors.length && wrong === 0, `fall-back battles in which twenty or more attackers reached the Deep and went for the postern: ${fell} of ${keepDoors.length}; looks at the stock battles that found a force sent for the postern while the wall was manned: ${wrong} (wanted none)`,
+      keepDoors.map((d) => `${d.deep} in the Deep, postern ${d.post}`).join(' · '));
   }],
   layout: ['A generated horde of any size fits on the field', () => {
     const rows = [];

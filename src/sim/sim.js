@@ -20,6 +20,7 @@ const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of atta
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;    // coarse grid of defenders
 const BCS = 8, BW = WORLD_W / BCS, BH = WORLD_H / BCS;    // grid of big bodies (trolls, engines)
 const CAP = 4;            // most foot soldiers that fit in one fine cell (about one a square metre)
+const GATE_HP = 7800, POSTERN_HP = 1300; // the Hornburg's doors under the `postern` rule (otherwise 5200 and 2600, as in map.js)
 export const FINE_CELL = FINE, FINE_W = FW, FINE_H = FH;
 export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 
@@ -85,6 +86,8 @@ export class Sim {
     // fortification state
     const NC = GW * GH;
     this.segs = map.segments.map((s) => ({ ...s, hp: s.maxHp, breached: false, ladders: 0, claimed: 0 }));
+    // a gate built to face the valley, and a lighter door at the back that opens on the Deep
+    if (this.ff.postern) { const gs = this.segs[map.GATE], ps = this.segs[map.POSTERN]; gs.maxHp = gs.hp = GATE_HP; ps.maxHp = ps.hp = POSTERN_HP; }
     this.segTop = new Float32Array(this.segs.map((s) => s.top));
     this.elev = new Uint8Array(NC);   // wall group + 1 where a wall (or a shut gate) still stands
     this.elevD = this.elev;           // the garrison keeps its gates barred, so both sides see the same walls
@@ -840,7 +843,8 @@ export class Sim {
     if (this.gShield[g]) speed *= 0.7;
     else if (x > this.gCapX[g] && speed > 3.3) speed = 3.3; // keeping behind the shield wall
     if (d.cmd && this.ff.captains && !el && this._captain(i, d, g, x, y, speed)) return;
-    const fld = this.gField[g] && !el && this.ff.fields ? this._fieldFor(g, c) : this.orcDir;
+    // (on a wall walk the fight there leads, except for those coming round to the postern: they go down into the Deep)
+    const fld = this.gField[g] && (!el || this._viaDeep(g)) && this.ff.fields ? this._fieldFor(g, c, d.sz > 0) : this.orcDir;
     switch (d.role) {
       case R.ARCHER: {
         let t = this.target[i];
@@ -913,6 +917,11 @@ export class Sim {
           const o = this._objOf(g);
           if (o) { const wx = o.x - x, wy = o.y - y, wl = Math.sqrt(wx * wx + wy * wy); if (wl > 6) { dirx = wx / wl; diry = wy / wl; direct = true; } }
         }
+        if (!direct && !el && this.ff.postern && this._viaDeep(g)) {
+          // at the head of the ramp from the Deep: straight at the postern door, to batter it
+          const ps = this.segs[this.map.POSTERN];
+          if (!ps.breached) { const px = ps.x - x, py = ps.y - y, pl = Math.sqrt(px * px + py * py); if (pl < 20 && pl > 0.1) { dirx = px / pl; diry = py / pl; direct = true; } }
+        }
         if (!direct && d.role === R.TROLL && !el && this.ff.warlord) {
           // trolls mass on the one stretch of wall the horde means to bring down
           const bs = this._trollSeg(g);
@@ -931,7 +940,7 @@ export class Sim {
           if (this.cd[i] <= 0) {
             // hack at whatever masonry or timber bars the way
             const k = this.mseg[blk], s = this.segs[k];
-            const dmg = d.sdmg ? (s.maxHp > 1e8 ? 0 : d.sdmg) : (s.kind === 'gate' || s.kind === 'postern' ? 5 : 0);
+            const dmg = d.sdmg ? (s.maxHp > 1e8 ? 0 : d.sdmg) : (s.kind === 'gate' ? 5 : s.kind === 'postern' ? (this.ff.postern ? 8 : 5) : 0);
             if (dmg) {
               this.cd[i] = d.mreload * 1.2; this.fireT[i] = this.time;
               if (d.sdmg) { this.fx.dust(x + dirx * 3, y + diry * 3, this.unitZ(i) + 2, 4); this.fx.sound('thud', x, y, 0.7); } else this.fx.melee(x + dirx * 1.5, y + diry * 1.5, this.unitZ(i) + 1.2);
@@ -1046,21 +1055,26 @@ export class Sim {
           if (this.time >= this.aux[i]) this._detonate(i, k);
           return;
         }
-        // with the Deeping Wall given up there is nothing to gain by breaching it: the charge goes to the gate
-        const toGate = this.wl.abandoned && !this.segs[this.map.GATE].breached;
-        if (k < 0 || this.segs[k].breached || (toGate && k !== this.map.GATE)) {
-          const cu = this.segs[this.map.CULVERT];
-          k = toGate ? this.map.GATE : !cu.breached ? this.map.CULVERT : this._pickLadderSeg(y, true);
+        // with the Deeping Wall given up there is nothing to gain by breaching it: the charge goes to the keep,
+        // at the gate, or (`postern`) round through the Deep: the culvert first, then the postern
+        const cu = this.segs[this.map.CULVERT], G = this.map.GATE, P = this.map.POSTERN;
+        let keepK = -1;
+        if (this.wl.abandoned) {
+          if (this.ff.postern) keepK = !cu.breached ? this.map.CULVERT : !this.segs[P].breached ? P : !this.segs[G].breached ? G : -1;
+          else keepK = !this.segs[G].breached ? G : -1;
+        }
+        if (k < 0 || this.segs[k].breached || (keepK >= 0 && k !== keepK)) {
+          k = keepK >= 0 ? keepK : !cu.breached ? this.map.CULVERT : this._pickLadderSeg(y, true);
           this.aux2[i] = k;
         }
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, 0, 0); return; }
-        const s = this.segs[k];
-        const dx = s.ox - x, dy = s.oy - y, l = Math.sqrt(dx * dx + dy * dy);
-        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
+        const s = this.segs[k], at = k === P && this.ff.postern ? this._postFoot() : null; // (the postern is reached up the ramp from the Deep)
+        const dx = (at ? at.x : s.ox) - x, dy = (at ? at.y : s.oy) - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : k === this.map.POSTERN ? 'Sappers are running for the postern' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
         if (l < 3) { this.state[i] = S_ACT; this.aux[i] = this.time + 1.6; this.vx[i] = this.vy[i] = 0; this.fx.sound('fuse', x, y, 0.8); return; }
         if ((this.tick + i) % 6 === 0) this.fx.spark(x, y, this.unitZ(i) + 1.5);
         let mx = dx / l, my = dy / l;
-        if (l > 60 && this.ff.fields) { const fl = k === this.map.GATE ? this.gateDir : s.culvert ? this._culvertField() : this._sectorField(this.segSector(k), c); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
+        if (l > 60 && this.ff.fields) { const fl = k === this.map.GATE ? this.gateDir : k === this.map.POSTERN ? this._posternField(c) : s.culvert ? this._culvertField() : this._sectorField(this.segSector(k), c); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
         // he keeps to the pace of the ranks around him, then breaks from them and sprints
         if (this.ff.warlord) speed = l > 110 ? Math.min(speed, 4.8) : speed * 1.15;
         this._move(i, mx, my, speed, 0, 0, l <= 110);
@@ -1118,7 +1132,8 @@ export class Sim {
   }
 
   _pickLadderSeg(y, any) {
-    if (this.wl.abandoned && !any) return -1; // an empty wall is not worth a ladder: the crews go on with the host
+    if (this.wl.abandoned && !any && !this.ff.postern) return -1; // an empty wall is not worth a ladder: the crews go on with the host
+    // (`postern`: it is the quickest way into the Deep, and on to the back door of the keep)
     let best = -1, bs = 1e9;
     for (let tries = 0; tries < 6; tries++) {
       const k = (this.rand() * this.map.GATE) | 0;
@@ -1195,9 +1210,10 @@ export class Sim {
     this.kill(i, null, true);
     const s = this.segs[k];
     if (s.kind === 'gate' || s.kind === 'postern') {
-      // against the timber of a gate a charge does half the work: two bring it down
+      // against the timber of a gate a charge does half the work: two bring it down (`postern`: the gate
+      // facing the valley is built to take six, and the postern goes at the first)
       this.explode(s.ox, s.oy, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
-      this.damageSeg(k, 2600);
+      this.damageSeg(k, this.ff.postern && s.kind === 'gate' ? GATE_HP / 6 : 2600);
       return;
     }
     const fresh = !s.breached;

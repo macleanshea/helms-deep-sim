@@ -21,7 +21,8 @@ const RALLY_X = 430;             // where a force that has pulled back regroups
 const ALLIN = 240;               // the final effort begins this long before dawn (s)
 const NATURAL = [2, 1, 0];       // the sector each lane faces: low y is the cliff end
 const OBSERVE = 450;             // how far off the horde can count heads on a wall (m)
-const F_CULVERT = 3, F_HUNT = 4, F_GATE = 6; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
+const F_CULVERT = 3, F_HUNT = 4, F_GATE = 9; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
+const F_POST = 5, F_POSTG = 6; // to the postern: for those who can climb a ladder, and for those who cannot (`postern`)
 
 /** Seconds for a formation of this type to cover `dist` metres, allowing for the shield wall's pace. */
 function travel(type, dist, shields) {
@@ -47,7 +48,7 @@ export const warlordMethods = {
     };
     this.catWary = false;
     this.fields = [];
-    for (let k = 0; k < 5; k++) this.fields.push({ dir: new Uint8Array(NC).fill(255), close: new Uint8Array(NC), ready: false, t: -100, ver: -1, want: -100, queued: false });
+    for (let k = 0; k < 7; k++) this.fields.push({ dir: new Uint8Array(NC).fill(255), close: new Uint8Array(NC), ready: false, t: -100, ver: -1, want: -100, queued: false });
     this.fieldQ = []; this.fCost = null;
   },
 
@@ -79,11 +80,12 @@ export const warlordMethods = {
     for (const gid of f.groups) this._wlField(gid, f);
   },
 
-  _wlField(gid, f) { this.gField[gid] = f.reserve || f.sector < 0 ? 0 : f.sector < 3 ? f.sector + 1 : F_GATE; },
+  _wlField(gid, f) { this.gField[gid] = f.reserve || f.sector < 0 ? 0 : f.sector < 3 ? f.sector + 1 : f.sector === 4 ? F_POST + 1 : F_GATE; },
 
   /** Where a force is going. */
   _wlObj(f) {
     if (f.sector === 3) { const g = this.segs[this.map.GATE]; return g; }
+    if (f.sector === 4) return this._postFoot();
     return this.sectors[f.sector >= 0 ? f.sector : 1];
   },
 
@@ -102,10 +104,23 @@ export const warlordMethods = {
       sec[own === 1 ? (this.rand2() < 0.5 ? 0 : 2) : 1] = main;
       if (hasRam && !this.segs[this.map.GATE].breached && main !== 0) sec[2] = 3;
     }
-    if (wl.abandoned) { sec[0] = sec[1] = sec[2] = 3; main = -1; } // nobody on the wall: everything goes for the keep
+    if (wl.abandoned) { const ks = this._keepSecs(); sec[0] = ks[0]; sec[1] = ks[1]; sec[2] = ks[2]; main = -1; } // nobody on the wall: everything goes for the keep
     wl.plans[wave] = { main, sec, kind };
     if (main >= 0) this._wlMain(main);
     return wl.plans[wave];
+  },
+
+  /**
+   * Objectives by lane when the Deeping Wall has been given up. Without the `postern` rule everything goes for
+   * the gate. With it the two northern forces come round through the Deep to the postern while the southern one
+   * (with the ram) keeps the gate busy; once one door is down, everyone makes for it.
+   */
+  _keepSecs() {
+    if (!this.ff.postern) return [3, 3, 3];
+    const P = this.segs[this.map.POSTERN], G = this.segs[this.map.GATE];
+    if (G.breached) return [3, 3, 3];
+    if (P.breached) return [4, 4, 4];
+    return [4, 4, 3];
   },
 
   /** Make `main` the sector the catapults pin and the trolls batter. */
@@ -134,7 +149,7 @@ export const warlordMethods = {
     if (!this.ff.warlord) return -1;
     const f = this.wl.forces[this.gForce[g]];
     if (!f || f.sector < 0) return -1;
-    return this.sectors[f.sector === 3 ? 0 : f.sector].y;
+    return this.sectors[f.sector >= 3 ? 0 : f.sector].y;
   },
 
   /** The wall segment a troll of company g should batter, or -1. */
@@ -156,7 +171,7 @@ export const warlordMethods = {
     for (const it of items) has[it.lane][it.type] = true;
     const eta = items.map((it) => {
       if (it.type === 'warg' || it.type === 'catapult') return 0;
-      const sec = plan.sec[it.lane], o = it.type === 'ram' || sec === 3 ? gate : this.sectors[sec];
+      const sec = plan.sec[it.lane], o = it.type === 'ram' || sec === 3 ? gate : sec === 4 ? this._postFoot() : this.sectors[sec];
       let dist = Math.hypot(o.x - it.x, o.y - it.y) * 1.06;
       if (it.type === 'archer') dist = Math.max(0, dist - 100);
       // with crewed engines, the companies that carry the ladders keep the ladders' pace
@@ -427,8 +442,13 @@ export const warlordMethods = {
       wl.abandoned = gone;
       if (gone) {
         let any = false;
-        for (const f of wl.forces) { if (f.reserve || f.sector < 0 || f.sector === 3) continue; f.sector = 3; any = true; for (const gid of f.groups) this._wlField(gid, f); }
-        if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, 'The Deeping Wall stands empty — the host turns on the Hornburg', 'bad', this.segs[this.map.GATE].ox, this.segs[this.map.GATE].oy, true);
+        const ks = this._keepSecs();
+        for (const f of wl.forces) { if (f.reserve || f.sector < 0 || f.sector >= 3) continue; f.sector = ks[f.lane]; any = true; for (const gid of f.groups) this._wlField(gid, f); }
+        const round = ks[0] === 4, at = round ? this._postFoot() : { x: this.segs[this.map.GATE].ox, y: this.segs[this.map.GATE].oy };
+        if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, round ? 'The Deeping Wall stands empty — the host is coming round through the Deep for the postern' : 'The Deeping Wall stands empty — the host turns on the Hornburg', 'bad', at.x, at.y, true);
+      } else if (this.ff.postern) {
+        // men back on the wall: those coming round for the postern turn on the wall in front of them again
+        for (const f of wl.forces) { if (f.sector !== 4) continue; f.sector = NATURAL[f.lane]; for (const gid of f.groups) this._wlField(gid, f); }
       }
     }
     // what the horde has seen of each sector's wall: a head-count whenever enough of it is close enough to look
@@ -590,7 +610,7 @@ export const warlordMethods = {
 
   // ---------------------------------------------------------- objective paths
   /** The path field of company g, or the horde's own once it is close to the works. */
-  _fieldFor(g, c) {
+  _fieldFor(g, c, heavy = false) {
     const k = this.gField[g];
     if (k === F_GATE) {
       const gs = this.segs[this.map.GATE];
@@ -598,9 +618,24 @@ export const warlordMethods = {
       const dx = (c % GW) * CELL + 2 - gs.ox, dy = ((c / GW) | 0) * CELL + 2 - gs.oy;
       return dx * dx + dy * dy < 32400 ? this.orcDir : this.gateDir; // within 180 m the fight itself leads: the ram's own path does not suit men on foot round the causeway
     }
+    if (k === F_POST + 1) return this._posternField(c, heavy) || this.orcDir;
     const fl = this.fields[k - 1];
     fl.want = this.time;
     return fl.ready && !fl.close[c] ? fl.dir : this.orcDir;
+  },
+
+  /** Where the ramp up from the Deep meets the postern (straight out from the door is the rock face: the ramp comes in at an angle). */
+  _postFoot() { return this.map.rear[2]; },
+
+  /** Is company g coming round through the Deep to the postern? */
+  _viaDeep(g) { return this.gField[g] === F_POST + 1; },
+
+  /** The path to the postern (null once it is down, close by, or not yet solved). `ground`: for those who cannot climb a ladder. */
+  _posternField(c, ground = true) {
+    if (this.segs[this.map.POSTERN].breached) return null;
+    const fl = this.fields[ground ? F_POSTG : F_POST];
+    fl.want = this.time;
+    return fl.ready && !fl.close[c] ? fl.dir : null;
   },
 
   /** The path field to a sector's wall (null when close, or not yet solved). */
@@ -650,12 +685,17 @@ export const warlordMethods = {
     } else if (k === F_CULVERT) {
       const s = this.segs[this.map.CULVERT];
       src[ns++] = s.breached ? this.map.cellOf(s.x, s.y) : this.map.cellOf(s.ox, s.oy);
+    } else if (k === F_POST || k === F_POSTG) {
+      const q = this._postFoot();
+      src[ns++] = this.map.cellOf(q.x, q.y);
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];
     if (!ok) { fl.ready = false; fl.t = this.time; return; }
-    this.solver.solve(cost, src, ok, fl.dir, this.navOrc);
-    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT ? 0 : 150;
+    // (the ground path to the postern knows no ladders: it goes through a breach, the culvert first of all)
+    this.solver.solve(cost, src, ok, fl.dir, k === F_POSTG ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null })) : this.navOrc);
+    // close to the postern the fight itself leads, straight in at the door
+    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT ? 0 : k >= F_POST ? 40 : 150;
     for (let c = 0; c < NC; c++) close[c] = dist[c] < lim ? 1 : 0;
     fl.ready = true; fl.t = this.time; fl.ver = this.structVersion;
   },
