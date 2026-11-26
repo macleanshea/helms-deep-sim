@@ -23,7 +23,7 @@ const params = new URLSearchParams(location.search);
 
 // Start-up runs in stages with a pause between them (top-level await), so the loading screen can repaint and show progress.
 // The percentages are each stage's share of a measured start-up; see src/loading.js.
-const portraitsReady = loadPortraits(); // fetched while the rest of start-up runs
+const portraits = {}, portraitsReady = loadPortraits().then((tiles) => Object.assign(portraits, tiles)); // fetched while the rest of start-up runs
 const loading = window.__loading || { set: async () => {}, done: () => $('loading').classList.add('done') };
 await loading.set(5);
 const map = buildMap();
@@ -1220,9 +1220,10 @@ const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
 await loading.set(85);
-// the menus use the painted portraits; any unit they lack (all of them, if the atlas did not load) gets one rendered from its model
-const painted = await portraitsReady;
-ui = buildUI(app, UNITS.every((d) => d.hidden || painted[d.key]) ? painted : { ...renderer.unitIcons(128), ...painted });
+// the menus wait a few seconds for the painted portraits; without them they show placeholders, and fill in if the pictures turn up late
+const portraitsLate = await Promise.race([portraitsReady.then(() => false), new Promise((r) => setTimeout(r, 5000, true))]);
+ui = buildUI(app, portraits);
+if (portraitsLate) portraitsReady.then(() => { ui.refreshPalette(); ui.refreshRoster(); });
 ui.refreshPresets(loadBest());
 resize();
 app.loadPreset('empty', true, true); // an empty field behind the welcome screen, until a mode is chosen
