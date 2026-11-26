@@ -268,23 +268,28 @@ vec2 rot(vec2 v, float a){ float c=cos(a), s=sin(a); return vec2(v.x*c - v.y*s, 
 void main(){
   vec3 p = aPos; vec3 n = aNormal;
   float walk = iAnim.x, atk = iAnim.y, ph = iSP.y;
+  // posture (the fourth animation byte): 1 kneeling on the right knee, 2 lying prone
+  float pose = iAnim.w*255.; bool kneel = pose > 0.5 && pose < 1.5, prone = pose > 1.5;
   if (aPart > 0.5) {
     bool shin = aPart > 6.5 && aPart < 8.5;
     if (aPart < 2.5 || shin) {
       float lp = ph + ((aPart < 1.5 || (aPart > 6.5 && aPart < 7.5)) ? 0. : 3.1416);
-      if (shin) { float b = max(0., cos(lp))*0.95*walk; p.z -= uPivot2.x; p.xz = rot(p.xz, -b); n.xz = rot(n.xz, -b); p.z += uPivot2.x; }
-      float lx = uLegX*sign(aPos.x), a = sin(lp)*0.62*walk; p.x -= lx; p.z -= uPivot.x; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += lx; p.z += uPivot.x;
+      bool leftLeg = aPart < 1.5 || (aPart > 6.5 && aPart < 7.5);
+      if (shin) { float b = kneel ? 1.5 : max(0., cos(lp))*0.95*walk; p.z -= uPivot2.x; p.xz = rot(p.xz, -b); n.xz = rot(n.xz, -b); p.z += uPivot2.x; }
+      float lx = uLegX*sign(aPos.x), a = kneel ? (leftLeg ? 1.45 : 0.05) : sin(lp)*0.62*walk; p.x -= lx; p.z -= uPivot.x; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += lx; p.z += uPivot.x;
     }
     else if (aPart < 3.5 || aPart > 9.5) {
       if (aPart > 9.5) { float e = -atk*uPivot.w*0.45; p.x -= uPivot2.z; p.z -= uPivot2.w; p.xz = rot(p.xz, e); n.xz = rot(n.xz, e); p.x += uPivot2.z; p.z += uPivot2.w; }
-      float a = -atk*uPivot.w; p.x -= uPivot.y; p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += uPivot.y - atk*uRecoil; p.z += uPivot.z;
+      float a = -atk*uPivot.w + (prone ? 1.35 : 0.); p.x -= uPivot.y; p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.x += uPivot.y - atk*uRecoil; p.z += uPivot.z;
     }
-    else if (aPart < 4.5) { float a = -sin(ph)*0.5*walk; p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.z += uPivot.z; }
+    else if (aPart < 4.5) { float a = -sin(ph)*0.5*walk + (prone ? 1.35 : 0.); p.z -= uPivot.z; p.xz = rot(p.xz, a); n.xz = rot(n.xz, a); p.z += uPivot.z; }
     else if (aPart < 5.5) { p.y += sin(uTime*5. + p.x*3. + ph)*0.16*clamp(-p.x-0.2, 0., 1.); }
     else if (aPart < 6.5) { p.x -= uPivot2.y; p.xy = rot(p.xy, uTime*27.); n.xy = rot(n.xy, uTime*27.); p.x += uPivot2.y; }
     else { p.x -= uPivot2.z; p.z -= uPivot2.w; p.xz = rot(p.xz, uTime*41.); n.xz = rot(n.xz, uTime*41.); p.x += uPivot2.z; p.z += uPivot2.w; }
   }
   p.z += abs(sin(ph))*0.07*walk;
+  if (kneel) p.z -= uPivot2.x*0.9;
+  else if (prone) { p.xz = rot(p.xz, -1.5708); n.xz = rot(n.xz, -1.5708); p.x -= 0.75; p.z += 0.2; }
   float tilt = iAnim.z*6.2832;
   if (tilt > 0.001) { p.xz = rot(p.xz, tilt); n.xz = rot(n.xz, tilt); }
   p *= iSP.x;

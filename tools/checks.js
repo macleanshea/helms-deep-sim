@@ -32,8 +32,14 @@ function play(setup, opts = {}) {
     pin: { unitS: 0, pinnedS: 0, longest: 0, run: new Map() }, contactT: -1,
     capKilled: {}, wargs: { heldS: 0, looseS: 0, firstLoose: -1, why: '', engaged: 0 }, back: new Map(), surges: [],
     stuck: { n60: 0, worst: 0, run: new Map() }, routers: { n: 0, ratio: 0 }, fwd: [], past: 0, calls: pilot ? pilot.calls : {},
+    lanes: { shots: 0, noLane: 0, offArc: 0, inReach: 0, blocked: 0, maxCell: 0, wander: 0, def0: 0, firstContact: -1 },
   };
   const N = sim.x.length, px = new Float32Array(N), py = new Float32Array(N), pg = new Uint16Array(N);
+  // where each defender was posted, and whether anything but his own search for a firing place has moved him since
+  const x0 = Float32Array.from(sim.x), y0 = Float32Array.from(sim.y), g0 = Uint16Array.from(sim.gen), moved = new Uint8Array(N);
+  const om = sim.orderMove.bind(sim); sim.orderMove = (ids, x, y) => { for (const i of ids) moved[i] = 1; return om(ids, x, y); };
+  const tk = sim._toKeep.bind(sim); sim._toKeep = (list) => { for (const [, i] of list) moved[i] = 1; return tk(list); };
+  for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === DEF && UNITS[sim.type[i]].cls === C.INF) P.lanes.def0++;
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.type[i] === U.rifle) P.rifles0++;
   // forward-deployed vehicles: outside the wall when the battle opens
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === DEF && UNITS[sim.type[i]].cls === C.VEH && sim.x[i] < 945) P.fwd.push({ i, gen: sim.gen[i], key: UNITS[sim.type[i]].key, x: sim.x[i], y: sim.y[i], diedT: -1, by: '', hitsBy: {} });
@@ -55,6 +61,13 @@ function play(setup, opts = {}) {
     fire(i, d, w, slot, eg, x, y, c);
     if ((slot ? sim.ammo2[i] : sim.ammo[i]) >= a0) return;
     P.sectorShots[sim.sectorAt(x, y)]++;
+    if (d.cls === C.INF && !w.arc && w.key !== 'gl') {
+      // did he have a line of fire, and was the target inside his arc?
+      P.lanes.shots++;
+      if (sim.rank[i] > 2) P.lanes.noLane++;
+      const t = slot ? sim.target2[i] : sim.target[i];
+      if (eg && t >= 0 && sim.alive[t] && !sim.el[t]) { const sg = sim.segs[sim.mseg[c]], ex = sim.x[t] - x, ey = sim.y[t] - y, o = ex * sg.nx + ey * sg.ny; if (o * o < 0.0669 * (ex * ex + ey * ey)) P.lanes.offArc++; }
+    }
     if (w.key !== 'rifle') return;
     const t = sim.target[i];
     if (t < 0 || !sim.alive[t]) { P.rifle.open++; return; }
@@ -118,6 +131,20 @@ function play(setup, opts = {}) {
     }
     for (const k of P.carriers.keys()) if (!seen.has(k)) P.carriers.delete(k);
     P.carriersStranded += stranded;
+    // --- lines of fire: who has an enemy in reach but no line, how tightly the garrison is packed, how far anyone has strayed
+    {
+      const cells = new Map();
+      for (let i = 0; i < sim.n; i++) {
+        if (!sim.alive[i] || sim.team[i] !== DEF) continue;
+        const d = UNITS[sim.type[i]];
+        if (d.cls !== C.INF) continue;
+        if (sim.state[i] !== S_MOVE) { const k = (((sim.y[i] / 2) | 0) * 720 + ((sim.x[i] / 2) | 0)) * 2 + sim.el[i], v = (cells.get(k) || 0) + 1; cells.set(k, v); if (v > P.lanes.maxCell) P.lanes.maxCell = v; }
+        if (!moved[i] && sim.gen[i] === g0[i] && i < x0.length) { const w = Math.hypot(sim.x[i] - x0[i], sim.y[i] - y0[i]); if (w > P.lanes.wander) P.lanes.wander = w; }
+        const w = d.wdef;
+        if (!w || w.arc || w.key === 'gl' || sim.ammo[i] < 1 || sim.state[i] === S_MOVE) continue;
+        if (sim.x[i] - sim.orcMaxX < w.range) { if (P.lanes.firstContact < 0) P.lanes.firstContact = t; if (t > P.lanes.firstContact + 30) { P.lanes.inReach++; if (sim.rank[i] > 2) P.lanes.blocked++; } }
+      }
+    }
     // --- defenders pinned
     if (P.contactT >= 0) for (let g = 0; g < sim.ng; g++) {
       if (sim.gTeam[g] !== DEF || sim.gExempt[g] || sim.gAlive[g] < 5) continue;
@@ -295,6 +322,26 @@ const CHECKS = {
     const dead = P.fwd.filter((f) => f.diedT >= 0), melee = P.fwd.reduce((a, f) => a + (f.hitsBy.smash || 0) + (f.hitsBy.melee || 0), 0);
     verdict('forward armour', melee >= 20, `four vehicles 200 m in front of the wall took ${melee} blows from the horde's blades and trolls (wanted 20 or more: they were attacked, not walked past)`,
       `${dead.length} of ${P.fwd.length} destroyed${dead.length ? ' (' + dead.map((f) => `${f.key} at ${Math.round(f.diedT)} s by ${f.by}`).join(', ') + ')' : ''} · attacker-seconds spent beyond them while they lived: ${P.past}`);
+  }],
+  lanes: ['Nobody fires through his own side; men find firing places without wandering or fidgeting', () => {
+    let shots = 0, noLane = 0, offArc = 0, inReach = 0, blocked = 0, maxCell = 0, wander = 0; const rate = [];
+    for (const { P } of battles()) {
+      const L = P.lanes; shots += L.shots; noLane += L.noLane; offArc += L.offArc; inReach += L.inReach; blocked += L.blocked;
+      if (L.maxCell > maxCell) maxCell = L.maxCell; if (L.wander > wander) wander = L.wander;
+      rate.push(P.sim.stats.reposts / Math.max(1, L.def0) / Math.max(1, (P.sim.result ? P.sim.result.time : P.sim.time) / 60));
+    }
+    verdict('lanes: no shot without a line', noLane === 0 && offArc <= shots * 0.001, `of ${shots} direct shots by defenders on foot, ${noLane} were fired with no line of fire and ${offArc} along a wall (wanted none)`, '');
+    verdict('lanes: men find places', blocked <= inReach * 0.15, `of defender-seconds with an enemy in reach (after the first half-minute of contact), ${pct(blocked / Math.max(1, inReach))} were spent with no line of fire (limit 15%)`, '');
+    verdict('lanes: no wandering or fidgeting', wander <= 31 && Math.max(...rate) <= 2, `furthest anyone strayed from his post without an order: ${Math.round(wander)} m (limit 30); moves to a new firing place per man per minute: ${rate.map((v) => v.toFixed(2)).join(', ')} (limit 2)`, '');
+    verdict('lanes: room for everyone', maxCell <= 5, `most standing defenders in one 2 m cell: ${maxCell} (limit 5)`, '');
+    // three hundred rifles ordered onto one third of the wall: frontage, not numbers, decides how many can fire
+    const s = preset('garrison', 1);
+    s.groups = s.groups.filter((g) => g.team !== DEF || UNITS[U[g.type]].cls !== C.INF);
+    const mid = map.wallAt(0.5);
+    s.groups.push(makeGroup('rifle', 300, mid.x, mid.y, mid.ang, 110), makeGroup('cmd', 1, mid.x + 2, mid.y));
+    const M = play(s, { policy: 'none', max: 500 });
+    verdict('lanes: a packed wall', M.lanes.noLane === 0, `300 rifles massed on 110 m of wall: ${pct(M.lanes.blocked / Math.max(1, M.lanes.inReach))} of their time in reach was spent with no line of fire (frontage for about 180 at the parapet, more as they spread along it), and none fired without one`,
+      `most in one 2 m cell ${M.lanes.maxCell} · furthest from post ${Math.round(M.lanes.wander)} m · moves per man per minute ${(M.sim.stats.reposts / 300 / Math.max(1, M.sim.time / 60)).toFixed(2)}`);
   }],
   keep: ['Abandoning the wall for the Hornburg at once is not a free win (a known, open problem)', () => {
     // the stand-in commander, who also orders everyone into the keep in the first second

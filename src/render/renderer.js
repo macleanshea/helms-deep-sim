@@ -234,7 +234,7 @@ export class Renderer {
     gl.bindVertexArray(null);
   }
 
-  _put(m, x, y, z, yaw, scale, phase, r, g, b, flash, walk, atk, tilt) {
+  _put(m, x, y, z, yaw, scale, phase, r, g, b, flash, walk, atk, tilt, pose = 0) {
     if (m.n >= m.cap) {
       m.cap *= 2;
       const nd = new ArrayBuffer(m.cap * ISTRIDE); new Uint8Array(nd).set(m.u8);
@@ -242,7 +242,7 @@ export class Renderer {
     }
     const o = m.n * 8, f = m.f, u = m.u8, b8 = m.n * ISTRIDE;
     f[o] = x; f[o + 1] = y; f[o + 2] = z; f[o + 3] = yaw; f[o + 4] = scale; f[o + 5] = phase;
-    u[b8 + 24] = r; u[b8 + 25] = g; u[b8 + 26] = b; u[b8 + 27] = flash; u[b8 + 28] = walk; u[b8 + 29] = atk; u[b8 + 30] = tilt; u[b8 + 31] = 0;
+    u[b8 + 24] = r; u[b8 + 25] = g; u[b8 + 26] = b; u[b8 + 27] = flash; u[b8 + 28] = walk; u[b8 + 29] = atk; u[b8 + 30] = tilt; u[b8 + 31] = pose;
     m.n++;
   }
 
@@ -639,7 +639,7 @@ export class Renderer {
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
   _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
     const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
-    const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, crews = sim.ff.crews, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
+    const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, crews = sim.ff.crews, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
     const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
     const hw = vw / 2 + 60, hh = vh / 2 + 120;
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
@@ -710,9 +710,9 @@ export class Renderer {
       if (d.role === R.TOWER) atk = st === S_DONE ? 255 : 0;
       else { const ft = time - fireT[i], dur = d.team === DEF ? 0.16 : d.role === R.CATAPULT ? 1.2 : d.role === R.RAM ? 0.7 : 0.38; if (ft < dur) atk = ((1 - ft / dur) * 255) | 0; }
       // mid-distance stand-ins are tinted by side so the two armies still read at a glance
-      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 226, 228, 238, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
+      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0, walk ? 0 : poseOf[i]); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 226, 228, 238, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
       else if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, 255, 236, 205, flash, walk, 0, 5);
-      else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0);
+      else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0, team[i] === DEF && !walk ? poseOf[i] : 0);
       if (um_i.turret) this._put(um_i.turret, xi, yi, zi, trot[i], um_i.scale, 0, v, v, v, flash, 0, atk, 0);
     }
     this.stats.units = drawn; this.stats.dots = dots;

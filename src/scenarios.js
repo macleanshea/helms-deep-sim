@@ -1,7 +1,7 @@
 // Formation layout and preset orders of battle.
 
 import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS, featureFlags } from './config.js';
-import { KEEP, N_WALL } from './map.js';
+import { KEEP, N_WALL, WALL_HALF } from './map.js';
 import { mulberry } from './rng.js';
 
 let nextId = 1;
@@ -62,6 +62,18 @@ export function groupPositions(map, g, strict = false) {
   const r = mulberry(g.id * 7919 + 13);
   const jit = def.cls === C.OBST ? (def.ob === 'mine' ? 0.8 : 0) : def.team === ORC ? 0.3 : 0.12;
   const open = strict && def.team === ORC ? walkable(map) : null;
+  if (g.parapet && onWall) {
+    // along a wall walk, front to back: the first rank kneels at the parapet, the second stands behind it
+    const { s, half } = g.parapet, st = Math.min(sp, 1.5), nc = g.w > 0 ? Math.max(1, Math.floor(g.w / st) + 1) : g.count;
+    for (let o = half - 1.0; o > -half + 0.8 && out.length < g.count * 2; o -= 1.6) {
+      for (let c = 0; c < nc && out.length < g.count * 2; c++) {
+        const a = (c - (nc - 1) / 2) * st + (r() - 0.5) * 0.2;
+        const x = g.x + ux * a + px * o * s, y = g.y + uy * a + py * o * s;
+        if (canPlace(map, def, x, y, true)) out.push(x, y);
+      }
+    }
+    if (out.length >= g.count * 2) return out;
+  }
   for (let ri = 0; ri < maxRows && out.length < g.count * 2; ri++) {
     const off = (ri & 1 ? 1 : -1) * Math.ceil(ri / 2);
     for (let c = 0; c < cols && out.length < g.count * 2; c++) {
@@ -81,6 +93,10 @@ export function groupBounds(g) {
 }
 
 // ---- helpers for presets -------------------------------------------------
+// In the new challenges (with the `lanes` rule) the wall garrisons stand two deep at the parapet
+// rather than three deep across the walk. Set by buildPreset; the classic scenarios never see it.
+let twoDeep = false;
+
 function alongWall(map, type, count, t0, t1, off = 0) {
   const out = [];
   const segs = Math.max(1, Math.round((t1 - t0) * N_WALL / 3));
@@ -90,7 +106,8 @@ function alongWall(map, type, count, t0, t1, off = 0) {
     const n = Math.round((count * (k + 1)) / segs) - Math.round((count * k) / segs);
     // `off` shifts the line west of the wall (toward the attackers)
     let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
-    if (n > 0) out.push(makeGroup(type, n, p.x + nx * off, p.y + ny * off, p.ang, (b - a) * map.wallLen - 2));
+    const deep = twoDeep && !off && UNITS[U[type]].cls === C.INF ? { parapet: { s: -Math.sin(p.ang) * nx + Math.cos(p.ang) * ny > 0 ? 1 : -1, half: WALL_HALF } } : {};
+    if (n > 0) out.push(makeGroup(type, n, p.x + nx * off, p.y + ny * off, p.ang, (b - a) * map.wallLen - 2, deep));
   }
   return out;
 }
@@ -101,7 +118,8 @@ function alongRing(type, count, a0, a1, r = KEEP.r) {
     const a = ((a0 + ((a1 - a0) * (k + 0.5)) / segs) * Math.PI) / 180;
     const n = Math.round((count * (k + 1)) / segs) - Math.round((count * k) / segs);
     const w = ((Math.abs(a1 - a0) / segs) * Math.PI / 180) * r - 2;
-    if (n > 0) out.push(makeGroup(type, n, KEEP.cx + r * Math.cos(a), KEEP.cy + r * Math.sin(a), a + Math.PI / 2, w));
+    // (the perpendicular of a group turned a quarter round from its bearing points into the keep: outward is the other way)
+    if (n > 0) out.push(makeGroup(type, n, KEEP.cx + r * Math.cos(a), KEEP.cy + r * Math.sin(a), a + Math.PI / 2, w, twoDeep && r === KEEP.r ? { parapet: { s: -1, half: KEEP.half } } : {}));
   }
   return out;
 }
@@ -316,7 +334,7 @@ export const PRESETS = [
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles', level: 'Hard',
-    blurb: 'A lone rifle company with few heavy weapons, and ten thousand at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
+    blurb: 'A lone rifle company with few heavy weapons, and ten thousand and more at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
     build: (map, sb, lay) => ({
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
@@ -324,7 +342,7 @@ export const PRESETS = [
         makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(10000, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
+        ...fieldWorks(map, 0.6), ...horde(10500, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
       ],
       options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
     }),
@@ -401,7 +419,9 @@ export function forceCost(groups) {
 export function buildPreset(map, key, sandbox = false, ff = null) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
   nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
+  twoDeep = !p.hidden && featureFlags(ff).lanes;
   const s = p.build(map, sandbox, featureFlags(ff).layout);
+  twoDeep = false;
   if (ff) s.options.ff = ff;
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
   if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);

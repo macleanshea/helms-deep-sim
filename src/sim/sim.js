@@ -12,6 +12,7 @@ import { moraleMethods } from './morale.js';
 import { directorMethods } from './director.js';
 import { warlordMethods } from './warlord.js';
 import { engineMethods } from './engines.js';
+import { postMethods } from './posts.js';
 
 export const MAX_UNITS = 1 << 16;
 const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast grid
@@ -66,6 +67,9 @@ export class Sim {
     this.slotAcc = new Uint32Array(N); this.slotMask = new Uint32Array(N);
     this.eHalt = new Float32Array(N); this.eIdle = new Float32Array(N); this.eEver = new Uint8Array(N); this.eNoDraft = new Float32Array(N);
     this.stuck = new Uint8Array(N);
+    // lines of fire: a standing defender's rank (3: no line of fire) and posture (1 kneeling, 2 prone), the post he keeps near, when he may next look for a place
+    this.rank = new Uint8Array(N); this.pose = new Uint8Array(N); this.ax = new Float32Array(N); this.ay = new Float32Array(N); this.seekT = new Float32Array(N); this.snagT = new Float32Array(N);
+    this.resT = new Float32Array(FW * FH); this._arcOn = false; this._anx = 0; this._any = 0;
     this.engines = [];
     this.occ = new Uint8Array(FW * FH * 2); this.blk = new Int32Array(FW * FH); this.blkList = [];
     this.bigHead = new Int32Array(BW * BH).fill(-1); this.bnext = new Int32Array(N);
@@ -118,7 +122,7 @@ export class Sim {
     this.count = [0, 0]; this.initial = [0, 0]; this.defCombat = 0;
     this.result = null; this.routing = false; this.routT = 0;
     this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0,
-      laddersUp: 0, towersUp: 0, thrown: 0, dropped: 0, recovered: 0, footholdT: -1, blocked: 0, pinnedDef: 0, rallied: 0 };
+      laddersUp: 0, towersUp: 0, thrown: 0, dropped: 0, recovered: 0, footholdT: -1, blocked: 0, pinnedDef: 0, rallied: 0, reposts: 0 };
     this.support = {};
     const sb = !!this.opt.sandbox;
     for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
@@ -195,9 +199,10 @@ export class Sim {
     const am = this.opt.ammoMult;
     this.ammo[i] = d.pool ? d.pool : d.carry ? d.carry : d.ammo ? (am > 50 ? 1e9 : Math.ceil(d.ammo * am)) : 0;
     this.ammo2[i] = d.ammo2 ? (am > 50 ? 1e9 : d.ammo2 * am) : 0;
-    this.target[i] = this.target2[i] = -1; this.aux[i] = 0; this.aux2[i] = -1; this.hitT[i] = -10; this.fireT[i] = -10; this.linkT[i] = 0;
+    this.target[i] = this.target2[i] = -1; this.aux[i] = 0; this.aux2[i] = -1; this.hitT[i] = -10; this.fireT[i] = -10; this.linkT[i] = 0; this.snagT[i] = 0;
     this.crewOf[i] = -1; this.crewAcc[i] = this.crewPts[i] = this.haveAcc[i] = this.crewHave[i] = 0; this.slotAcc[i] = this.slotMask[i] = 0;
     this.eHalt[i] = 0; this.eIdle[i] = 0; this.eEver[i] = 0; this.eNoDraft[i] = 0; this.stuck[i] = 0;
+    this.rank[i] = 0; this.pose[i] = 0; this.ax[i] = x; this.ay[i] = y; this.seekT[i] = 0;
     const c = this.map.cellOf(x, y);
     this.el[i] = (d.team === DEF ? this.elevD[c] : this.elev[c]) ? 1 : 0;
     if (g < 0) g = this.miscGroup[d.team];
@@ -452,7 +457,8 @@ export class Sim {
     const c1 = ((ny / CELL) | 0) * GW + ((nx / CELL) | 0);
     if (c1 !== c0) {
       const orc = !mode;
-      if (!this.canEnter(c0, c1, sz, orc)) {
+      // (someone shoved onto the edge of a rock face may always step off it onto open ground)
+      if (!this.canEnter(c0, c1, sz, orc) && !(t0 === T.CLIFF && this.mtype[c1] !== T.CLIFF && !this.elev[c1] && this.ff.fields)) {
         blocked = c1;
         const ca = ((y / CELL) | 0) * GW + ((nx / CELL) | 0);
         if (ca === c0 || this.canEnter(c0, ca, sz, orc)) { ny = y; vy *= 0.3; }
@@ -512,7 +518,7 @@ export class Sim {
   }
 
   /** Smoothly interpolated flow direction at a point; result in this.fdx / this.fdy. `d` is the field to read (the horde's own by default). */
-  _flow(x, y, d = this.orcDir) {
+  _flow(x, y, d = this.orcDir, own = false) {
     const gx = x / CELL - 0.5, gy = y / CELL - 0.5;
     let ix = Math.floor(gx), iy = Math.floor(gy);
     const fx = gx - ix, fy = gy - iy;
@@ -524,9 +530,10 @@ export class Sim {
     if ((k = d[c + 1]) !== 255) { const w = fx * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW]) !== 255) { const w = (1 - fx) * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW + 1]) !== 255) { const w = fx * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
-    if (sx * sx + sy * sy < 0.36 && this.ff.fields) {
+    if ((own || sx * sx + sy * sy < 0.36) && this.ff.fields) {
       // where the neighbouring cells pull against each other (beside a ramp, round a corner) the blend
-      // cancels out and he would dither on the spot: go by the cell he is standing on
+      // cancels out and he would dither on the spot, or (`own`) it has just walked him into ground he
+      // cannot step onto, off the edge of a causeway: go by the cell he is standing on
       const c0 = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
       if ((k = d[c0]) !== 255) { sx = DXN[k]; sy = DYN[k]; }
     }
@@ -848,6 +855,7 @@ export class Sim {
                 this.rot[i] = Math.atan2(dy, dx);
                 let acc = w.acc; if (this.el[t] && !el) acc *= 0.22;
                 if (this.ff.suppress) { const pt = this.gPin[this.grp[t]]; if (pt) acc *= pt === 2 ? 0.25 : 0.5; } // men keeping their heads down are hard to hit
+                if (this.pose[t]) acc *= this.pose[t] === 2 ? 0.6 : 0.75; // and so is a man kneeling at the parapet or lying prone
                 const hit = this.rand() < acc, zt = this.unitZ(t) + 1.2;
                 this.fx.tracer(x, y, this.unitZ(i) + 1.3, this.x[t] + (hit ? 0 : (this.rand() - 0.5) * 8), this.y[t] + (hit ? 0 : (this.rand() - 0.5) * 8), zt + (hit ? 0 : this.rand() * 2), TR.ARROW, hit ? 1 : 0);
                 if (this.ff.suppress) this.gSup[this.grp[t]] += 0.5; // bolts rattling off the merlons keep heads down
@@ -901,7 +909,7 @@ export class Sim {
           if (wx * wx + wy * wy < 4 && t < 0 && this.gPin[g] < 2 && !this.gOrder[g]) this.aux2[i] = this.tick + 90;
           this.bx[i] = x; this.by[i] = y;
         }
-        if (!direct && this.aux2[i] > this.tick && this.ff.fields) {
+        if (!direct && this.aux2[i] > this.tick && this.ff.fields && this.snagT[i] <= this.time) { // (unless that has just walked him to the edge of a drop)
           const o = this._objOf(g);
           if (o) { const wx = o.x - x, wy = o.y - y, wl = Math.sqrt(wx * wx + wy * wy); if (wl > 6) { dirx = wx / wl; diry = wy / wl; direct = true; } }
         }
@@ -911,10 +919,13 @@ export class Sim {
           if (bs >= 0) { const sg = this.segs[bs], bx = sg.x - x, by = sg.y - y, bl = Math.sqrt(bx * bx + by * by); if (bl < 140) { dirx = bx / bl; diry = by / bl; direct = true; } }
         }
         if (!direct) {
-          if (this._flow(x, y, fld)) { dirx = this.fdx; diry = this.fdy; }
+          if (this._flow(x, y, fld, this.snagT[i] > this.time)) { dirx = this.fdx; diry = this.fdy; }
           else if (t >= 0 && this.alive[t]) { const dx = this.x[t] - x, dy = this.y[t] - y, l = Math.sqrt(dx * dx + dy * dy) || 1; dirx = dx / l; diry = dy / l; }
+          // somewhere his own path does not reach (inside the walls, on ground it was never laid over): make for the garrison
+          else if (fld !== this.orcDir && this.ff.fields && this._flow(x, y, this.orcDir, this.snagT[i] > this.time)) { dirx = this.fdx; diry = this.fdy; }
         }
         const blk = this._move(i, dirx, diry, speed, d.sz, 0);
+        if (blk >= 0 && !this.elev[blk] && this.ff.fields) this.snagT[i] = this.time + 2; // the ground refused him: see the path note in _flow
         if (blk >= 0 && this.elev[blk]) {
           if (this.lad[blk] && !d.sz && !el && !shut && !(d.cav && this.ff.fixes)) { this._startClimb(i, blk); return; }
           if (this.cd[i] <= 0) {
@@ -1239,9 +1250,13 @@ export class Sim {
     const c = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
     const eg = this.elevD[c], el = eg ? 1 : 0;
     this.el[i] = el;
+    const lanes = d.cls === C.INF && this.ff.lanes;
     if (this.state[i] === S_MOVE) {
       const dx = this.tx[i] - x, dy = this.ty[i] - y, d2 = dx * dx + dy * dy;
+      // a man lying or kneeling takes a moment to get up before he goes anywhere
+      if (this.pose[i]) { this.linkT[i] = this.time + (this.pose[i] === 2 ? 1 : 0.5); this.pose[i] = 0; }
       if (d2 < 1 || this.time > this.aux[i]) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; }
+      else if (lanes && this.time < this.linkT[i]) { this.vx[i] = this.vy[i] = 0; }
       else {
         let dirx, diry;
         const l = Math.sqrt(d2);
@@ -1269,8 +1284,14 @@ export class Sim {
     let slow = this.gState[g] >= 1 || this.gConf[g] > this.time ? 0.6 : 1;
     if (this.gPin[g]) slow *= this.gPin[g] === 2 ? 0.45 : 0.75; // heads down under volleys and rocks
     const w = d.wdef;
+    if (lanes && (this.tick + i) % 5 === 0) this._post(i, d, x, y, eg, c);
     if (this.cd[i] > 0) this.cd[i] -= DT * slow;
-    else if (this.ammo[i] >= 1) this._fire(i, d, w, 0, eg, x, y, c);
+    else if (this.ammo[i] >= 1) {
+      // nobody shoots through the men in front of him: without a line of fire he goes looking for one
+      // (grenades and mortar bombs go over their heads)
+      if (lanes && this.rank[i] > 2 && !w.arc && w.key !== 'gl') { this.cd[i] = 0.4; if (this.time >= this.seekT[i] && x - this.orcMaxX < w.range * 1.5) this._seek(i, d, x, y, eg, c); }
+      else this._fire(i, d, w, 0, eg, x, y, c);
+    }
     else if (d.cls === C.INF) this._bayonet(i, x, y);
     if (d.w2def) {
       if (this.cd2[i] > 0) this.cd2[i] -= DT * slow;
@@ -1335,9 +1356,12 @@ export class Sim {
     // holding fire to a set distance shortens the reach but not the accuracy curve: close shots hit far more often
     const reach = hold > 0 && hold < range ? Math.max(hold, (w.min || 0) + 15) : range;
     let t = tA[i], dx = 0, dy = 0, d2 = 0, ok = false;
+    // on a wall he covers the ground before him, not along it
+    this._arcOn = !!eg && this.ff.lanes;
+    if (this._arcOn) { const sg = this.segs[this.mseg[c]]; this._anx = sg.nx; this._any = sg.ny; }
     if (t >= 0 && this.alive[t] && this.team[t] === ORC) {
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
-      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0);
+      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0) && this._arc(t, dx, dy, d2);
     }
     if (!ok) {
       t = this._acquireDirect(i, w, reach, eg, x, y);
@@ -1464,7 +1488,7 @@ export class Sim {
             const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
             if (e2 > r2 || e2 < m2) continue;
             const sc = e2 * (0.5 + this.rand());
-            if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+            if (sc < bs && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
           }
           if (best >= 0) return best;
         }
@@ -1472,7 +1496,7 @@ export class Sim {
           const j = this._randOrcNear(f.x, f.y, f.r);
           if (j < 0) break;
           const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
-          if (e2 <= r2 && e2 >= m2 && (!w.prefOnly || (UNITS[this.type[j]].hvt & w.pref)) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) return j;
+          if (e2 <= r2 && e2 >= m2 && (!w.prefOnly || (UNITS[this.type[j]].hvt & w.pref)) && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) return j;
         }
       }
     }
@@ -1490,7 +1514,7 @@ export class Sim {
         if (e2 > r2 || e2 < m2) continue;
         if (td.cmd && e2 > 22500 && this.ff.captains) continue;        // a captain is not picked out of the host unless close or marked
         const sc = e2 * (0.5 + this.rand()) * (carrier ? 1.2 : td.pri || 1);
-        if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+        if (sc < bs && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
       }
       if (best >= 0 || w.prefOnly) return best;
     }
@@ -1515,7 +1539,7 @@ export class Sim {
       if (j < 0) continue;
       const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
       if (e2 > r2 || e2 < m2) continue;
-      if (!(el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) continue;
+      if (!this._arc(j, ex, ey, e2) || !(el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) continue;
       // prefer targets that are not tucked in under one's own wall
       if (eg && !w.speed && this.deadG[((this.y[j] / CELL) | 0) * GW + ((this.x[j] / CELL) | 0)] === eg && this.state[j] !== S_CLIMB) { fallback = j; continue; }
       if (e2 > 22500 && !f && UNITS[this.type[j]].cmd && this.ff.captains) continue; // a captain is not picked out of the host at long range
@@ -1719,7 +1743,7 @@ export class Sim {
         // keep the whole block on the level that was clicked (all on the wall walk, or all on the ground)
         if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & OB.AV)))) continue;
         const i = list[k++];
-        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1;
+        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1; this.ax[i] = px; this.ay[i] = py;
         this.aux[i] = this.time + 30 + Math.hypot(px - this.x[i], py - this.y[i]) / UNITS[this.type[i]].speed * 4;
         any = true;
       }
@@ -1742,6 +1766,8 @@ export class Sim {
       this._keepField = { t: this.time, court: this._orderField(KEEP.cx - 24, KEEP.cy - 34, false, 6), ring: this._orderField(ring, 0, false, 6) };
     }
     const kf = this._keepField, slots = this.map.keepSlots;
+    // the court runs round the inner rock: one path field for each twelfth of it, so that a man is led round the rock to his own place
+    const sect = this.ff.fixes ? this._keepSectors() : null, rk = KEEP.t1;
     let s = this._slotCursor || 0;
     for (const [, i] of list) {
       let slot = null;
@@ -1753,12 +1779,38 @@ export class Sim {
         if (!occ) slot = q;
       }
       if (!slot) slot = { x: KEEP.cx - 30 + (this.rand() - 0.5) * 40, y: KEEP.cy - 34 + (this.rand() - 0.5) * 30 };
-      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1;
+      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1; this.ax[i] = slot.x; this.ay[i] = slot.y;
       this.ord[i] = this.elev[this.map.cellOf(slot.x, slot.y)] === 2 ? kf.ring : kf.court;
+      if (sect && this.ord[i] === kf.court) { const o = sect[(((Math.atan2(slot.y - rk.y, slot.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0]; if (o >= 0) this.ord[i] = o; }
       this.aux[i] = this.time + 40 + Math.hypot(slot.x - this.x[i], slot.y - this.y[i]) / UNITS[this.type[i]].speed * 4;
     }
     this._slotCursor = s % slots.length;
     return list.length;
+  }
+
+  /** Path fields into each twelfth of the Hornburg's court (by bearing from the inner rock). Built once: the rock does not move. */
+  _keepSectors() {
+    if (this._keepSect) return this._keepSect;
+    const lists = []; for (let k = 0; k < 12; k++) lists.push([]);
+    const rk = KEEP.t1, seen = new Uint8Array(GW * GH);
+    for (const q of this.map.keepSlots) {
+      const c = this.map.cellOf(q.x, q.y);
+      if (seen[c] || this.elev[c] === 2) continue;
+      seen[c] = 1; lists[(((Math.atan2(q.y - rk.y, q.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0].push(c);
+    }
+    const cost = new Uint16Array(GW * GH), mt = this.mtype;
+    for (let c = 0; c < cost.length; c++) cost[c] = mt[c] === T.CLIFF ? 0 : 10;
+    const out = [];
+    for (let k = 0; k < 12; k++) {
+      const src = lists[k];
+      if (!src.length) { out.push(-1); continue; }
+      for (let q = 0; q < src.length; q++) this.srcBuf[q] = src[q];
+      const dir = new Uint8Array(GW * GH);
+      this.solver.solve(cost, this.srcBuf, src.length, dir, this.navDef);
+      this.orders[40 + k] = { dir, x: src, y: 0, r: 6 }; // (beyond the pool of order paths, which is recycled)
+      out.push(40 + k);
+    }
+    return (this._keepSect = out);
   }
 
   /**
@@ -1894,4 +1946,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods);

@@ -534,6 +534,7 @@ export function buildUI(app, portraits) {
       ])}`],
     ['tips', 'Tips', `${rows([
         ['Ammunition', 'Troops re-arm within 60 m of a cache or supply drop. An amber pip marks a soldier out of rounds.'],
+        ['Lines of fire', 'Nobody shoots through his own men. On a battlement two ranks fire, the front one kneeling at the parapet; on open ground three, prone, kneeling and standing. Anyone further back looks for a gap nearby or waits his turn, and steps up when a man ahead falls. A man on a wall covers the ground in front of him, not along the wall. Packing more men onto a wall does not add fire: spread them along it.'],
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Guns on the Hornburg and grenades can.'],
         ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away. Crossbow volleys and catapult rocks pin your own platoons the same way: they fire slower and wilder until it lifts.'],
         ['Shield walls ▣', 'Inside the reach of your small arms the Uruk-hai lock shields (pale on the map, marked ▣): slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],

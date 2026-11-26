@@ -205,6 +205,7 @@ export const FEATURES = {
   shields:   { name: 'Shield wall', desc: 'Escort and assault companies lock shields in the killing ground: slow, frontal cover from bullets, none from blast. Crossbows set pavises.' },
   tier2:     { name: 'Adaptive horde', desc: 'Surges at a sector that falls silent, changes the next wave to what worked, and confirms its target late.' },
   intel:     { name: 'Honest intelligence', desc: 'The horde plans from what it has seen on the walls and what has fired, not from the true positions.' },
+  lanes:     { name: 'Lines of fire', desc: 'Defenders cannot shoot through their own men: two ranks fire from a battlement, three on the flat (prone, kneeling, standing), and the rest find a place or wait. No firing along a wall. Standing men take up room.' },
   layout:    { name: 'Task-force layout', desc: 'The generated horde is drawn up by task force: captains spread out, sappers dispersed, engines in front, wargs at the rear.', setup: true },
 };
 /** Resolve a partial flag set (or 'none' / 'all') into a full table of booleans. */
