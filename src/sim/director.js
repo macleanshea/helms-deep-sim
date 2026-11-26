@@ -129,7 +129,7 @@ export const directorMethods = {
    */
   _weakSector() {
     const d = this.dir, held = [0, 0, 0], dmg = [0, 0, 0], nseg = [0, 0, 0], fell = [0, 0, 0], bled = [0, 0, 0];
-    const intel = this.ff.intel;
+    const intel = this.ff.intel, open = [0, 0, 0];
     for (let i = 0; i < this.n; i++) {
       if (!this.alive[i] || this.team[i] !== DEF) continue;
       const u = UNITS[this.type[i]];
@@ -150,7 +150,10 @@ export const directorMethods = {
       let known = 0, sum = 0;
       for (let k = 0; k < 3; k++) if (wl.seen[k] >= 0) { known++; sum += wl.seen[k]; }
       const avg = known ? sum / known : 1, pk = Math.max(1, wl.peak[0], wl.peak[1], wl.peak[2]);
-      for (let k = 0; k < 3; k++) held[k] = (wl.seen[k] >= 0 ? wl.seen[k] : avg) + 0.5 * avg * (wl.peak[k] / pk);
+      for (let k = 0; k < 3; k++) {
+        held[k] = (wl.seen[k] >= 0 ? wl.seen[k] : avg) + 0.5 * avg * (wl.peak[k] / pk);
+        if (wl.seen[k] >= 0 && known > 1 && wl.seen[k] < 0.25 * avg) open[k] = 1.2; // a wall it has looked at and found all but empty is an open door
+      }
     }
     const y0 = this.map.wallJoin.y, y1 = this.map.wallTop.y, lo = this.loss, mark = d ? d.lossMark : null;
     const cw = WORLD_W / 16, ch = WORLD_H / 16;
@@ -166,7 +169,7 @@ export const directorMethods = {
     const mh = mx(held), mf = mx(fell), mb = mx(bled);
     let best = 0, bs = -1e9;
     for (let k = 0; k < 3; k++) {
-      const sc = 1.0 * (1 - held[k] / mh) + 0.8 * (dmg[k] / Math.max(1, nseg[k])) + 0.5 * (fell[k] / mf) - 0.6 * (bled[k] / mb) + 0.15 * this.rand2();
+      const sc = 1.0 * (1 - held[k] / mh) + 0.8 * (dmg[k] / Math.max(1, nseg[k])) + 0.5 * (fell[k] / mf) - 0.6 * (bled[k] / mb) + 0.15 * this.rand2() + open[k];
       if (sc > bs) { bs = sc; best = k; }
     }
     return best;

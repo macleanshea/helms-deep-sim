@@ -685,7 +685,7 @@ export class Renderer {
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + 1; PFv[o + 3] = d.size * 0.42; PFv[o + 4] = d.size * 0.42; PFv[o + 5] = 0; PFv[o + 6] = SPR.dot;
         let r, g, b;
         if (team[i] === DEF) { if (d.ammo && ammo[i] < 1) { r = 255; g = 168; b = 60; } else { r = 110; g = 210; b = 255; } }
-        else if (gShield[grp[i]] && crewOf[i] < 0) { r = 196 + (h % 40); g = 118 + (h % 24); b = 72; } // behind locked shields: a duller, bronze dot
+        else if (gShield[grp[i]] && crewOf[i] < 0) { r = 214 + (h % 24); g = 216 + (h % 20); b = 226; } // behind locked shields: a steel-pale dot, neither side's colour
         else { r = 150 + (h % 80); g = 42 + (h % 24); b = 30; }
         if (flash) { r = 255; g = 255; b = 255; }
         PU[o + 7] = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
@@ -710,7 +710,7 @@ export class Renderer {
       if (d.role === R.TOWER) atk = st === S_DONE ? 255 : 0;
       else { const ft = time - fireT[i], dur = d.team === DEF ? 0.16 : d.role === R.CATAPULT ? 1.2 : d.role === R.RAM ? 0.7 : 0.38; if (ft < dur) atk = ((1 - ft / dur) * 255) | 0; }
       // mid-distance stand-ins are tinted by side so the two armies still read at a glance
-      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 240, 150, 96, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
+      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 226, 228, 238, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
       else if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, 255, 236, 205, flash, walk, 0, 5);
       else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0);
       if (um_i.turret) this._put(um_i.turret, xi, yi, zi, trot[i], um_i.scale, 0, v, v, v, flash, 0, atk, 0);

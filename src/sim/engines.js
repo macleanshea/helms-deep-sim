@@ -47,6 +47,7 @@ export const engineMethods = {
 
   /** Find hands for engine e among the troops standing or marching close by. */
   _draft(e, d) {
+    if (this.time < this.eNoDraft[e]) return;
     const cr = d.crew, x = this.x[e], y = this.y[e];
     const cx = (x / OCS) | 0, cy = (y / OCS) | 0;
     const uruk = U.uruk, troll = U.troll;
@@ -96,7 +97,7 @@ export const engineMethods = {
     }
     const cr = UNITS[this.type[e]].crew;
     // too few hands for too long: he gives it up and goes back to the fight
-    if (this.eIdle[e] > 0 && this.time - this.eIdle[e] > 20 && this.crewPts[e] < cr.min) { this.crewOf[i] = -1; return false; }
+    if (this.eIdle[e] > 0 && this.time - this.eIdle[e] > 20 && this.crewPts[e] < cr.min) { this.crewOf[i] = -1; this.eNoDraft[e] = this.time + 30; return false; } // and it is left alone for a while
     const pts = d.role === R.TROLL ? cr.troll : 1;
     const k = this.slot[i];
     this.haveAcc[e] += pts; this.slotAcc[e] |= 1 << k;
@@ -106,8 +107,8 @@ export const engineMethods = {
     const x = this.x[i], y = this.y[i], dx = sx - x, dy = sy - y, d2 = dx * dx + dy * dy;
     this.el[i] = 0;
     if (this.cd[i] > 0) this.cd[i] -= DT;
-    if (d2 < 12) {
-      // in his place: he goes where the engine goes
+    if (d2 < 20) {
+      // in his place (or as near as the wall lets him get): he goes where the engine goes
       this.crewAcc[e] += pts;
       if (this.gShield[g]) this.stuck[e] = 3;
       const f = d2 > 0.04 ? 0.35 : 1;

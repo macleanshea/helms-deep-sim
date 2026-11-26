@@ -43,7 +43,7 @@ export const warlordMethods = {
       allIn: false, resOut: 0, huntT: -100, open: false,
       foot: [0, 0, 0, 0], footN: 0, footSec: -1, swungT: -100,
       near: [0, 0, 0], atFoot: [0, 0, 0], quiet: [0, 0, 0], wallTop: [0, 0, 0], seen: [-1, -1, -1], heat: new Float32Array(4), peak: new Float32Array(4),
-      exposed: 0, exCells: [], exAll: [], notedRes: false, shieldNoteT: -100, backNoteT: -100,
+      exposed: 0, exCells: [], exAll: [], abandoned: false, emptyT: -1, notedRes: false, shieldNoteT: -100, backNoteT: -100,
     };
     this.catWary = false;
     this.fields = [];
@@ -102,6 +102,7 @@ export const warlordMethods = {
       sec[own === 1 ? (this.rand2() < 0.5 ? 0 : 2) : 1] = main;
       if (hasRam && !this.segs[this.map.GATE].breached && main !== 0) sec[2] = 3;
     }
+    if (wl.abandoned) { sec[0] = sec[1] = sec[2] = 3; main = -1; } // nobody on the wall: everything goes for the keep
     wl.plans[wave] = { main, sec, kind };
     if (main >= 0) this._wlMain(main);
     return wl.plans[wave];
@@ -120,6 +121,12 @@ export const warlordMethods = {
       if (sc > bs) { bs = sc; best = k; }
     }
     wl.breachSeg = best;
+  },
+
+  /** Where company g's force is bound (a point with x and y), or null. */
+  _objOf(g) {
+    const f = this.wl.forces[this.gForce[g]];
+    return f && f.sector >= 0 ? this._wlObj(f) : null;
   },
 
   /** The y a ladder crew of company g should make for, or -1 to leave it to the crew. */
@@ -307,10 +314,10 @@ export const warlordMethods = {
     }
 
     // --- a foothold on the wall draws in whoever has not yet closed
-    if (wl.footSec >= 0 && this.time - wl.swungT > 45) {
+    if (wl.footSec >= 0 && this.time - wl.swungT > 90) {
       let any = false;
       for (const f of wl.forces) {
-        if (f.reserve || f.state || f.swung || f.sector === wl.footSec || f.sector > 2 || f.far < 200 || f.n < 10) continue;
+        if (wl.abandoned || f.reserve || f.state || f.swung || f.sector === wl.footSec || f.sector > 2 || f.far < 200 || f.n < 10) continue;
         f.sector = wl.footSec; f.swung = true; any = true;
         for (const gid of f.groups) this._wlField(gid, f);
       }
@@ -328,7 +335,7 @@ export const warlordMethods = {
           if (more && !f.backs && f.n0 >= 40 && f.n >= 8 && f.n < 0.3 * f.n0 && f.far > 280 && f.far < 1e8 && this.time - f.t0 > 30) {
             f.state = BACK; f.backT = this.time; f.backs = 1;
             for (const gid of f.groups) if (!this.gExempt[gid]) { this.gOrder[gid] = BACK; this.gHoldX[gid] = RALLY_X; }
-            if (this.time - wl.backNoteT > 150) { wl.backNoteT = this.time; this._alert(null, 0, 'The enemy pulls back to regroup', 'good', f.cx, f.cy, true); }
+            if (this.time - wl.backNoteT > 150) { wl.backNoteT = this.time; this._alert(null, 0, 'The enemy pulls back to regroup', 'good', f.cx, f.cy); }
           }
         } else if (f.state === BACK) {
           // rejoin when fresh troops come up level in the same lane, or after a long enough breather
@@ -382,7 +389,7 @@ export const warlordMethods = {
     const wl = this.wl, foot = wl.foot, near = wl.near, top = wl.wallTop;
     const atFoot = wl.atFoot;
     foot[0] = foot[1] = foot[2] = foot[3] = 0; near[0] = near[1] = near[2] = 0; top[0] = top[1] = top[2] = 0; atFoot[0] = atFoot[1] = atFoot[2] = 0;
-    let ex = 0, exX = 0, exY = 0;
+    let ex = 0, exX = 0, exY = 0, allDef = 0, inKeep = 0;
     const exCells = wl.exCells, exAll = wl.exAll; exCells.length = 0; exAll.length = 0;
     const S = this.sectors, obs2 = OBSERVE * OBSERVE, kr2 = (KEEP.r + 14) * (KEEP.r + 14);
     for (let i = 0, n = this.n; i < n; i++) {
@@ -396,7 +403,8 @@ export const warlordMethods = {
       } else {
         const d = UNITS[this.type[i]];
         if (d.cls === C.CACHE) continue;
-        if (this.el[i]) { if (d.cls === C.INF) { const k = this.sectorAt(x, y); if (k < 3) top[k] += d.supply || 1; } continue; }
+        if (d.cls === C.INF) { allDef++; const kx = x - KEEP.cx, ky = y - KEEP.cy; if (kx * kx + ky * ky < kr2) inKeep++; }
+        if (this.el[i]) { if (d.cls === C.INF) { const k = this.sectorAt(x, y); if (k < 3) top[k] += 1; } continue; }
         // on the ground west of the wall and outside the Hornburg: in the open. Anything there is made for;
         // infantry there is also what the warg riders are loosed at.
         if (x < 945) {
@@ -410,6 +418,19 @@ export const warlordMethods = {
       }
     }
     wl.exposed = ex; if (ex) { wl.exX = exX / ex; wl.exY = exY / ex; }
+    // The Deeping Wall given up: next to nobody on it and most of the garrison shut in the Hornburg, for ten
+    // seconds running. Then there is nothing to be had by scaling an empty wall, and the host turns on the keep.
+    const empty = allDef > 0 && top[0] + top[1] + top[2] < 0.1 * allDef && inKeep > 0.6 * allDef;
+    if (!empty) wl.emptyT = -1; else if (wl.emptyT < 0) wl.emptyT = this.time;
+    const gone = empty && this.time - wl.emptyT >= 10;
+    if (gone !== wl.abandoned && this.ff.warlord) {
+      wl.abandoned = gone;
+      if (gone) {
+        let any = false;
+        for (const f of wl.forces) { if (f.reserve || f.sector < 0 || f.sector === 3) continue; f.sector = 3; any = true; for (const gid of f.groups) this._wlField(gid, f); }
+        if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, 'The Deeping Wall stands empty — the host turns on the Hornburg', 'bad', this.segs[this.map.GATE].ox, this.segs[this.map.GATE].oy, true);
+      }
+    }
     // what the horde has seen of each sector's wall: a head-count whenever enough of it is close enough to look
     for (let k = 0; k < 3; k++) if (near[k] >= 5) wl.seen[k] = top[k];
     // a foothold: a dozen on the wall walk of one sector, two looks running
@@ -575,7 +596,7 @@ export const warlordMethods = {
       const gs = this.segs[this.map.GATE];
       if (gs.breached || this.gateDir[c] === 255) return this.orcDir;
       const dx = (c % GW) * CELL + 2 - gs.ox, dy = ((c / GW) | 0) * CELL + 2 - gs.oy;
-      return dx * dx + dy * dy < 3600 ? this.orcDir : this.gateDir;
+      return dx * dx + dy * dy < 32400 ? this.orcDir : this.gateDir; // within 180 m the fight itself leads: the ram's own path does not suit men on foot round the causeway
     }
     const fl = this.fields[k - 1];
     fl.want = this.time;

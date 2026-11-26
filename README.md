@@ -38,7 +38,19 @@ its culvert.
 The welcome screen offers two ways to play; the **Sandbox / Challenge** switch in the top bar
 changes between them at any time.
 
-A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first):
+A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first). There are
+three, one to a difficulty:
+
+| | Scenario | The night |
+| --- | --- | --- |
+| Easy | **First Night** | A company on the centre of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
+| Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
+| Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
+
+In each the first wave is a real assault, not a probe, so the fight reaches the wall early, and a
+platoon is kept below the wall where the enemy cannot count it. Difficulty is measured, not
+guessed: see *Headless runs and balance* below.
+
 
 - The enemy and the battle options are fixed. The garrison is issued at its full
   **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
@@ -238,12 +250,15 @@ plays out the same way:
 
 ```bash
 node tools/headless.js garrison                       # preset, nobody giving orders
-node tools/headless.js --preset recon --policy auto   # with a stand-in commander
+node tools/headless.js --preset first-night --policy auto   # with a stand-in commander
 node tools/headless.js --preset garrison --seed 3 --opt cpRate=0.05 --json --verify
-npm run matrix                                        # every challenge preset x policy x seed, as a table
+npm run matrix                                        # every challenge x policy x seed, as a table
+npm run checks                                        # does the siege behave? pass or fail, with numbers
 ```
 
-Presets are `garrison`, `three-hundred`, `combined`, `recon` and `empty`. `--policy auto` plays
+Presets are `first-night`, `garrison`, `three-hundred` and `empty`, plus the four original
+scenarios kept as `classic-garrison`, `classic-three-hundred`, `classic-combined` and
+`classic-recon` (not offered in the game; see the flags below). `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
 `--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
@@ -252,15 +267,40 @@ state hashes match. Each run also reports how the siege went: ladders raised and
 engines dropped and picked up again, when the first attacker reached the wall and when the first
 foothold was won, how far from the works each kind of attacker fell, and the cost of the dearest
 ten steps. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
-and survivors per scenario — the tuning target is that giving no orders loses, and the
-stand-in commander wins most nights without it being a walkover.
+and survivors per scenario.
+
+**How difficulty is judged.** The yardstick is the stand-in commander, who calls support sensibly
+but never moves a man, marks a target or changes a stance; a player can do all of those. Over ten
+seeds:
+
+| | Stand-in commander | Nobody giving orders |
+| --- | --- | --- |
+| Easy | wins nearly every night with about half the garrison left | usually loses, late in the night |
+| Medium | wins most nights with about a third left | always loses |
+| Hard | wins fewer than half | always loses, with a third of the night to go |
+
+Hard is meant to need more than the stand-in gives.
+
+**A known hole.** Ordering the whole garrison into the Hornburg in the first second wins all three
+scenarios, with most of the garrison alive. The horde does turn on the keep when the Deeping Wall is
+left empty, and sends its sappers at the gate, but it cannot force the causeway before dawn. The
+difficulty ratings hold for a player who defends the wall. `npm run checks` reports this as OPEN.
+
+`tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
+pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left
+crewless, ladders thrown down the instant they go up, riflemen who never fire, platoons pinned for
+the whole fight, captains who cannot be killed or who bunch together, warg riders who never
+leave the reserve, forces going back and forth, alert floods, surges at a sector that is still
+firing, an empty stretch of wall ignored, soldiers stuck for good, troops in front of the wall
+walked past, hordes too big to fit, and the keep used as a free win.
 
 ### Feature flags and the developer menu
 
 Every siege rule added on top of the original game sits behind a flag (`FEATURES` in
 `src/config.js`): `fixes`, `captains`, `warlord`, `clock`, `fields`, `physics`, `crews`,
 `throwdown`, `suppress`, `shields`, `tier2`, `intel` and `layout`. All are on by default. With all
-of them off the battle plays exactly as it did before they existed, to the same state hash.
+of them off the battle plays exactly as it did before they existed, to the same state hash
+(`node tools/headless.js --preset classic-garrison --policy auto --ff none` ends on `473e12de`).
 
 - In the browser, **Dev** in the top bar lists them with a switch each, and during a battle shows
   the siege counters. Changes apply to the next battle (`layout` when a horde is next drawn up)

@@ -9,7 +9,7 @@ import os from 'node:os';
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
-const presets = get('presets', 'recon,three-hundred,garrison,combined').split(',');
+const presets = get('presets', 'first-night,garrison,three-hundred').split(',');
 const policies = get('policies', 'none,auto').split(',');
 const seeds = Array.from({ length: +get('seeds', 3) }, (_, i) => i + 1);
 const extra = [];

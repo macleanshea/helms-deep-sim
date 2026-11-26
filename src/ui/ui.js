@@ -71,10 +71,10 @@ export function buildUI(app, portraits) {
   ui.refreshPresetList = () => {
     const sb = app.isSandbox(), cur = preset.value;
     preset.innerHTML = '';
-    const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank);
+    const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank && !p.hidden);
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
-      const o = el('option', null, p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
+      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
@@ -536,7 +536,7 @@ export function buildUI(app, portraits) {
         ['Ammunition', 'Troops re-arm within 60 m of a cache or supply drop. An amber pip marks a soldier out of rounds.'],
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Guns on the Hornburg and grenades can.'],
         ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away. Crossbow volleys and catapult rocks pin your own platoons the same way: they fire slower and wilder until it lifts.'],
-        ['Shield walls', 'Inside the reach of your small arms the Uruk-hai lock shields: slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],
+        ['Shield walls ▣', 'Inside the reach of your small arms the Uruk-hai lock shields (pale on the map, marked ▣): slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],
         ['Captains ★', 'They follow behind their own companies, which will not rout while he stands and rally to him if they do. The troops around him take most shots aimed at him: thin them, then mark him with focus fire.'],
         ['Siege works', 'Small arms cannot hurt a ladder, ram or tower, only the Uruk-hai and trolls moving it; others step in for the fallen, and a dropped engine can be picked up again. Men at an uncontested ladder head throw the ladder down. Alerts warn of each engine in time to act.'],
         ['The reserve', 'Warg riders wait out of range for a breach or a fallen gate, and ride down troops caught outside the walls. Shortly before dawn everything the enemy has left comes on at once.'],

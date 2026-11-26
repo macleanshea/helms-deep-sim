@@ -131,13 +131,14 @@ function waveKinds(W) {
  * Build the horde as a series of waves. Wave 0 is laid out on the field; the others are
  * tagged with their `phase` and held off-map (their x is the distance behind the wave's front
  * rank, so it is negative) until the assault director brings them on.
- *   mix: unit shares and counts, `waves` (how many), `sizes` (relative infantry weight per wave),
+ *   mix: unit shares and counts, `waves` (how many), `kinds` (the character of each wave, instead of the
+ *        usual probe-then-assaults), `sizes` (relative infantry weight per wave),
  *        `layout` (true: draw each wave up by task force rather than in uniform ranks by type).
  */
 export function horde(total, mix = {}) {
   const m = { uruk: 0.7, archer: 0.2, berserker: 0.06, warg: 0.03, ...mix };
   const W = mix.waves ?? (total > 12000 ? 6 : total > 5000 ? 5 : total > 1500 ? 4 : 3);
-  const kinds = waveKinds(W);
+  const kinds = mix.kinds && mix.kinds.length === W ? mix.kinds : waveKinds(W);
   const g = [];
   const V = Math.PI / 2;
   const lanes = [140, 276, 412, 548, 684, 820];
@@ -279,9 +280,59 @@ function garrison(map, scale = 1) {
   return g;
 }
 
+// The challenges, one to a difficulty. Each is built round the siege rules: a wave big enough to reach the
+// wall, a garrison with an answer to every engine if it is used well, and a reserve below the wall that the
+// horde cannot see. `level` is how hard it is for a commander who only calls support and never moves a man:
+//   easy    he wins nearly every night with more than half the garrison left
+//   medium  he wins most nights, with about a third left
+//   hard    he wins less than half the time: the player has to do better than that
+// (measured with `npm run matrix`; see the README).
 export const PRESETS = [
   {
-    key: 'garrison', name: 'The Hornburg Garrison',
+    key: 'first-night', name: 'First Night', level: 'Easy',
+    blurb: 'A company on the centre of the wall and thirty-two hundred coming in three waves, with ladders, a ram and sappers. A short night to learn the siege.',
+    build: (map, sb, lay) => ({
+      groups: [
+        ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
+        ...alongRing('rifle', 10, 175, 215), ...alongRing('at', 3, 175, 205),
+        makeGroup('mortar', 3, 1070, 460, Math.PI / 2, 16), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
+        // a platoon kept below the wall: the enemy cannot count it, and it can be sent up wherever the ladders land
+        makeGroup('rifle', 16, 1030, 450, Math.PI / 2, 30),
+        ...alongWall(map, 'wire', 44, 0.28, 0.72, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
+        ...horde(3200, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
+      ],
+      options: { dawn: 600, cpStart: 10, cpRate: 3 / 60 },
+    }),
+  },
+  {
+    key: 'garrison', name: 'The Hornburg Garrison', level: 'Medium',
+    blurb: 'Five hundred behind wire and mines, against eighteen thousand Uruk-hai in four waves with towers, trolls and catapults.',
+    build: (map, sb, lay) => ({
+      groups: [...garrison(map, 0.6), makeGroup('tank', 1, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 2, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map),
+        ...horde(18000, { layout: lay, waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
+      options: { dawn: 1200, cpRate: 2 / 60 },
+    }),
+  },
+  {
+    key: 'three-hundred', name: 'Three Hundred Rifles', level: 'Hard',
+    blurb: 'A lone rifle company with few heavy weapons, and ten thousand at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
+    build: (map, sb, lay) => ({
+      groups: [
+        ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
+        ...alongRing('rifle', 60, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
+        makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
+        makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
+        ...fieldWorks(map, 0.6), ...horde(10000, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
+      ],
+      options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
+    }),
+  },
+  // The four original scenarios, as they were. Not offered in the game: with every rule switched off they
+  // replay the old battles exactly, which is how a change to the rules is shown not to have disturbed anything.
+  {
+    key: 'classic-garrison', name: 'Classic: The Hornburg Garrison', hidden: true,
     blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
     build: (map, sb, lay) => ({
       groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { layout: lay, waves: sb ? 1 : 5 })],
@@ -289,7 +340,7 @@ export const PRESETS = [
     }),
   },
   {
-    key: 'three-hundred', name: 'Three Hundred Rifles',
+    key: 'classic-three-hundred', name: 'Classic: Three Hundred Rifles', hidden: true,
     blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — how you spend your support will decide this.',
     build: (map, sb, lay) => ({
       groups: [
@@ -303,7 +354,7 @@ export const PRESETS = [
     }),
   },
   {
-    key: 'combined', name: 'Combined Arms vs. the Host',
+    key: 'classic-combined', name: 'Classic: Combined Arms vs. the Host', hidden: true,
     blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
     build: (map, sb, lay) => ({
       groups: [
@@ -317,7 +368,7 @@ export const PRESETS = [
     }),
   },
   {
-    key: 'recon', name: 'Recon Platoon',
+    key: 'classic-recon', name: 'Classic: Recon Platoon', hidden: true,
     blurb: 'Forty-odd soldiers and twenty-two hundred orcs in three waves. A short night to learn the controls.',
     build: (map, sb, lay) => ({
       groups: [

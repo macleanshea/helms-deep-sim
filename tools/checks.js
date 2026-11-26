@@ -141,7 +141,8 @@ function crowded(sim, i) {
 
 const preset = (key, seed, ff = null, sandbox = false) => { const s = buildPreset(map, key, sandbox, ff); s.options.seed = seed; return s; };
 const results = [];
-function verdict(name, ok, what, detail) { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}: ${what}\n      ${detail}`); }
+/** `open`: a known, unsolved problem. It is reported as OPEN and does not fail the run. */
+function verdict(name, ok, what, detail, open = false) { results.push({ name, ok, open }); console.log(`${ok ? 'PASS' : open ? 'OPEN' : 'FAIL'}  ${name}: ${what}\n      ${detail}`); }
 
 // The three or four full battles most checks read from, played once and shared.
 let shared = null;
@@ -151,7 +152,7 @@ function battles() {
   for (const [key, seed] of BATTLES) { process.stderr.write(`  playing ${key} seed ${seed}…\n`); shared.push({ key, seed, P: play(preset(key, seed), { policy: 'auto' }) }); }
   return shared;
 }
-const BATTLES = PRESETS.filter((p) => p.key !== 'empty' && !p.sandboxOnly).map((p) => [p.key, 1]).concat([[PRESETS[0].key, 2]]);
+const BATTLES = PRESETS.filter((p) => p.key !== 'empty' && !p.hidden).map((p) => [p.key, 1]).concat([['garrison', 2]]);
 const each = (f) => battles().map((b) => `${b.key}/${b.seed} ${f(b.P)}`).join(' · ');
 
 const CHECKS = {
@@ -202,12 +203,12 @@ const CHECKS = {
       } });
       return P;
     };
-    const key = BATTLES[0][0], base = battles()[0].P, H = hunt(key);
+    const key = 'garrison', base = battles().find((b) => b.key === key).P, H = hunt(key);
     const lost = (P) => P.sim.stats.lostOrc.chief || 0, n0 = base.sim.stats.startOrc.chief || 0;
     verdict('captains: can be hunted', lost(H) >= Math.max(2, n0 * 0.3) && lost(H) > lost(base), `a commander hunting them killed ${lost(H)} of ${n0} (the stand-in, not hunting, ${lost(base)}); wanted at least 30% and more than the stand-in`,
       `killed by: ${JSON.stringify(H.capKilled)} · air strikes ${H.calls.air || 0} · the hunter ${H.sim.result && H.sim.result.win ? 'won' : 'lost'}`);
     // eight captains placed in one heap in a sandbox, with companies across the valley
-    const s = preset(BATTLES[0][0], 1, null, true);
+    const s = preset('garrison', 1, null, true);
     s.groups = s.groups.filter((g) => g.team === DEF);
     for (const y of [140, 276, 412, 548, 684, 820]) s.groups.push(makeGroup('uruk', 300, 300, y, Math.PI / 2, 100));
     s.groups.push(makeGroup('chief', 8, 240, 480, Math.PI / 2, 20));
@@ -230,7 +231,7 @@ const CHECKS = {
       rows.push(`${key}/${seed}: loosed at ${P.wargs.firstLoose < 0 ? 'never' : Math.round(P.wargs.firstLoose) + ' s'} of ${Math.round(end)} (${P.wargs.why || '-'}), held ${pct(P.wargs.heldS / Math.max(1, P.wargs.heldS + P.wargs.looseS))} of their time`);
     }
     // a sandbox has no dawn: are they ever used there?
-    const sb = play(preset(BATTLES[0][0], 1, null, true), { policy: 'auto', max: 1500 });
+    const sb = play(preset('garrison', 1, null, true), { policy: 'auto', max: 1500 });
     const sbUsed = sb.wargs.firstLoose >= 0;
     verdict('wargs', ok && sbUsed, `loosed with at least a minute of battle left in every challenge: ${ok ? 'yes' : 'NO'}; in a sandbox (no dawn): ${sbUsed ? 'loosed at ' + Math.round(sb.wargs.firstLoose) + ' s (' + sb.wargs.why + ')' : 'NEVER'}`, rows.join('\n      '));
   }],
@@ -267,7 +268,7 @@ const CHECKS = {
     const pick = (ff) => {
       const picks = [];
       for (const seed of [1, 2, 3]) {
-        const s = preset(BATTLES[0][0], seed, ff);
+        const s = preset('garrison', seed, ff);
         const probe = new Sim(map, s, null);
         s.groups = s.groups.filter((g) => !(g.team === DEF && UNITS[U[g.type]].cls === C.INF && map.seg[map.cellOf(g.x, g.y)] >= 0 && probe.sectorAt(g.x, g.y) === 2));
         const P = play(s, { policy: 'auto', max: 700 });
@@ -295,6 +296,23 @@ const CHECKS = {
     verdict('forward armour', melee >= 20, `four vehicles 200 m in front of the wall took ${melee} blows from the horde's blades and trolls (wanted 20 or more: they were attacked, not walked past)`,
       `${dead.length} of ${P.fwd.length} destroyed${dead.length ? ' (' + dead.map((f) => `${f.key} at ${Math.round(f.diedT)} s by ${f.by}`).join(', ') + ')' : ''} · attacker-seconds spent beyond them while they lived: ${P.past}`);
   }],
+  keep: ['Abandoning the wall for the Hornburg at once is not a free win (a known, open problem)', () => {
+    // the stand-in commander, who also orders everyone into the keep in the first second
+    const rows = [];
+    let free = 0;
+    for (const p of PRESETS.filter((q) => q.key !== 'empty' && !q.hidden)) {
+      let wins = 0; const left = [];
+      for (const seed of [1, 2, 3]) {
+        const P = play(preset(p.key, seed), { policy: 'auto', tick: (sim) => { if (sim.time > 1 && !sim.retreated) sim.orderRetreat(); } });
+        if (P.sim.result && P.sim.result.win) wins++;
+        left.push(P.sim.defCombat / P.sim.initial[0]);
+      }
+      if (wins === 3 && median(left) > 0.5) free++;
+      rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
+    }
+    verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
+      'the horde turns on the keep and sends its sappers at the gate, but cannot force the causeway before dawn', true);
+  }],
   layout: ['A generated horde of any size fits on the field', () => {
     const rows = [];
     let ok = true;
@@ -318,7 +336,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const names = args.filter((a) => !a.startsWith('--'));
   for (const n of names) if (!CHECKS[n]) { console.error(`unknown check "${n}" (try --list)`); process.exit(1); }
   for (const k of names.length ? names : Object.keys(CHECKS)) CHECKS[k][1]();
-  const bad = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - bad.length} of ${results.length} passed${bad.length ? ': failed ' + bad.map((r) => r.name).join(', ') : ''}`);
+  const bad = results.filter((r) => !r.ok && !r.open), open = results.filter((r) => !r.ok && r.open);
+  console.log(`\n${results.length - bad.length - open.length} of ${results.length} passed${bad.length ? ': failed ' + bad.map((r) => r.name).join(', ') : ''}${open.length ? '; known and open: ' + open.map((r) => r.name).join(', ') : ''}`);
   process.exit(bad.length ? 1 : 0);
 }
