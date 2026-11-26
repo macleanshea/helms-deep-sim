@@ -639,6 +639,7 @@ export class Renderer {
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
   _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
     const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
+    const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, crews = sim.ff.crews, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
     const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
     const hw = vw / 2 + 60, hh = vh / 2 + 120;
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
@@ -683,7 +684,9 @@ export class Renderer {
         const o = dots * PF;
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + 1; PFv[o + 3] = d.size * 0.42; PFv[o + 4] = d.size * 0.42; PFv[o + 5] = 0; PFv[o + 6] = SPR.dot;
         let r, g, b;
-        if (team[i] === DEF) { if (d.ammo && ammo[i] < 1) { r = 255; g = 168; b = 60; } else { r = 110; g = 210; b = 255; } } else { r = 150 + (h % 80); g = 42 + (h % 24); b = 30; }
+        if (team[i] === DEF) { if (d.ammo && ammo[i] < 1) { r = 255; g = 168; b = 60; } else { r = 110; g = 210; b = 255; } }
+        else if (gShield[grp[i]] && crewOf[i] < 0) { r = 196 + (h % 40); g = 118 + (h % 24); b = 72; } // behind locked shields: a duller, bronze dot
+        else { r = 150 + (h % 80); g = 42 + (h % 24); b = 30; }
         if (flash) { r = 255; g = 255; b = 255; }
         PU[o + 7] = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
         PFv[o + 8] = 0; PFv[o + 9] = 0; PFv[o + 10] = 0; PFv[o + 11] = 0; PFv[o + 12] = 0;
@@ -691,7 +694,11 @@ export class Renderer {
         continue;
       }
       const vs = um_i.variants, h2 = Math.imul(i, 2246822519) >>> 20;
-      const m = d.role === R.LADDER && st === S_DONE ? this.meshes.ladderUp : vs.length > 1 ? vs[h2 % vs.length] : vs[0];
+      let m = d.role === R.LADDER && st === S_DONE ? this.meshes.ladderUp : vs.length > 1 ? vs[h2 % vs.length] : vs[0];
+      // with crewed engines the carriers are soldiers of their own: draw the timber alone
+      if (crews && d.crew) { if (d.role === R.LADDER && st !== S_DONE) m = ladderBare || m; else if (d.role === R.RAM) m = ramBare || m; }
+      // locked shields: the rank leans in behind them, and catches the light
+      const sh = team[i] !== DEF && gShield[grp[i]] && crewOf[i] < 0 && d.sz === 0 ? 1 : 0;
       // no two soldiers stand quite the same height or wear quite the same shade
       const sc = um_i.jitter ? um_i.scale * (0.95 + ((h2 >> 4) & 31) * 0.0034) : um_i.scale;
       const v = 200 + (h % 56);
@@ -703,7 +710,8 @@ export class Renderer {
       if (d.role === R.TOWER) atk = st === S_DONE ? 255 : 0;
       else { const ft = time - fireT[i], dur = d.team === DEF ? 0.16 : d.role === R.CATAPULT ? 1.2 : d.role === R.RAM ? 0.7 : 0.38; if (ft < dur) atk = ((1 - ft / dur) * 255) | 0; }
       // mid-distance stand-ins are tinted by side so the two armies still read at a glance
-      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
+      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 240, 150, 96, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
+      else if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, 255, 236, 205, flash, walk, 0, 5);
       else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0);
       if (um_i.turret) this._put(um_i.turret, xi, yi, zi, trot[i], um_i.scale, 0, v, v, v, flash, 0, atk, 0);
     }

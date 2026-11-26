@@ -64,10 +64,19 @@ formations you place yourself take an "advance after" delay. Sandbox battles are
 
 In a challenge the horde attacks in waves: a vanguard that starts on the field, then escalades, the siege
 train and a final assault, which wait beyond the valley mouth and march on in turn. Releases
-are paced so the last and heaviest wave lands shortly before dawn; cutting a wave down quickly
+are paced so the last wave has time to fight at the wall before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to the
-next wave, and an alert names the stretch of wall it is aimed at — the middle waves go for
-whichever sector looks weakest.
+next wave, and an alert names the stretch of wall it is aimed at.
+
+**The horde has a plan.** Each wave is split into task forces by lane, each with a captain and an
+objective: a third of the Deeping Wall, or the gate. Two forces of three go in against whichever
+sector looks weakest *from what the horde has seen* (heads counted on the wall once it is close
+enough to look, and how hard each sector has been firing), so troops kept below the wall are a
+surprise, and the vanguard is a real probe. A force steps off together, with slow engines given a
+head start. Warg riders are held out of range until there is a breach, a fallen gate, or infantry
+caught outside the walls. A force that is spent before it has closed pulls back and comes on again
+with the next wave. A foothold on the wall, or a sector whose fire dies away, draws in whoever has
+not yet committed. Shortly before dawn everything left comes on at once.
 
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
@@ -126,11 +135,28 @@ Orders can be given while paused. The battle waits while a dialog is open.
   stop shooting and its morale wears away. Berserkers cannot be pinned, and warg riders keep most
   of their pace under fire.
 - Both sides have command units (★). Lose one and nearby companies are briefly disorganised
-  and lose morale. Uruk captains march at the rear of their wave and are not shot on sight —
-  mark one with focus fire. Any company that takes heavy losses in a short time may break and
-  run, and can rally later.
+  and lose morale. An Uruk captain follows behind his own companies. While he stands they almost
+  never rout, and a broken company falls back on the nearest captain and rallies there. He is not
+  shot on sight, and the troops pressed around him take most shots aimed at him: thin them with
+  high explosive, then mark him with focus fire.
+- **Bodies take space.** Only so many can stand in one spot, so a ladder, a breach or a gate
+  admits a column, not a crowd. Trolls and engines push the small aside.
+- **Siege engines are timber with a crew.** Small arms cannot hurt a ladder, ram, tower or
+  catapult, only the Uruk-hai and trolls moving it. It slows as they fall and is set down when too
+  few are left; others nearby step in, and a later wave can pick up an abandoned one. Marksmen pick
+  out the carriers. Grenades, mortars, rockets and air strikes destroy the engine itself.
+- **Ladders can be thrown down.** Defenders at a ladder head, with no attacker yet on the wall
+  beside them, heave it off; it lies at the foot until it is raised again.
+- **Shield walls.** Inside the reach of the garrison's small arms the Uruk-hai lock shields:
+  slower, but most bullets from the front are stopped. Riflemen hold their fire on a distant shield
+  wall rather than waste it (machine guns keep it pinned). Mortars, grenades and fire from the
+  flank are the answer; wire breaks the formation. Beyond small-arms reach they come on fast in
+  open order.
+- **Their fire pins you too.** Crossbow volleys and catapult rocks pin the platoons they land on:
+  a slower, wilder fire until it lifts. A commander nearby steadies them. Catapults have missions
+  (your mortars, the stretch of wall the trolls are battering, the escalade's sector, your
+  ammunition points) and keep out of rocket reach once one has been lost to a rocket.
 - Siege towers carry 50 attackers each and unload them onto the wall walk when they dock.
-  Catapults batter the wall and counter-battery mortars that keep firing from one place.
 - Alerts warn before the damage is done — a ram on the causeway, sappers running for the
   culvert, ladder crews closing, the gate at half strength, a sector out of ammunition.
 - A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
@@ -173,7 +199,8 @@ closer.
 
 - `src/sim/` — the simulation, with no DOM dependencies (`morale.js` holds morale and
   suppression, `support.js` the support calls and Command Points, `director.js` the pacing of
-  the horde's waves). Units live in typed arrays, find each
+  the horde's waves, `warlord.js` the horde's battle plan, `engines.js` crewed siege engines and
+  ladder throw-down). Units live in typed arrays, find each
   other through uniform grids, and the horde navigates with a congestion-aware flow field that
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
   renderer interpolates between them.
@@ -221,6 +248,22 @@ a careful commander (resupplies dry sectors, strikes siege engines before they r
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
 `--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
 `--json` prints one summary line including the score, and `--verify` runs twice and checks the
-state hashes match. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
+state hashes match. Each run also reports how the siege went: ladders raised and thrown down,
+engines dropped and picked up again, when the first attacker reached the wall and when the first
+foothold was won, how far from the works each kind of attacker fell, and the cost of the dearest
+ten steps. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
 and survivors per scenario — the tuning target is that giving no orders loses, and the
-stand-in commander wins without it being a walkover.
+stand-in commander wins most nights without it being a walkover.
+
+### Feature flags and the developer menu
+
+Every siege rule added on top of the original game sits behind a flag (`FEATURES` in
+`src/config.js`): `fixes`, `captains`, `warlord`, `clock`, `fields`, `physics`, `crews`,
+`throwdown`, `suppress`, `shields`, `tier2`, `intel` and `layout`. All are on by default. With all
+of them off the battle plays exactly as it did before they existed, to the same state hash.
+
+- In the browser, **Dev** in the top bar lists them with a switch each, and during a battle shows
+  the siege counters. Changes apply to the next battle (`layout` when a horde is next drawn up)
+  and are remembered in the browser. The menu is a temporary testing aid.
+- Headless, `--ff` takes `all`, `none`, a list to switch on alone (`--ff crews,physics`) or a
+  list to switch off (`--ff -shields,-intel`). `tools/matrix.js` passes it through.

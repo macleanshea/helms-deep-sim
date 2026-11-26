@@ -1,6 +1,6 @@
 // DOM user interface: setup panels, battle HUD, toasts and dialogs.
 
-import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C, R } from '../config.js';
+import { UNITS, U, DEF, ORC, SUPPORT, WEAPONS, C, R, FEATURES } from '../config.js';
 import { SUPPLY_R } from '../sim/support.js';
 import { PRESETS, waveSummary, forceCost } from '../scenarios.js';
 
@@ -100,7 +100,8 @@ export function buildUI(app, portraits) {
   $('btnBack').addEventListener('click', () => app.backToSetup());
   $('btnResult').addEventListener('click', () => { if (app.sim && app.sim.result) ui.showEnd(app.sim); });
   $('btnHelp').addEventListener('click', () => { ui.closePopups(); ui.showHelp(); });
-  $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); ui.toggleSettings(); $('btnSettings').blur(); });
+  $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); ui.toggleDev(false); ui.toggleSettings(); $('btnSettings').blur(); });
+  $('btnDev').addEventListener('click', (e) => { e.stopPropagation(); ui.toggleSettings(false); ui.toggleDev(); $('btnDev').blur(); });
   $('btnSound').addEventListener('click', () => { const m = app.toggleMute(); $('btnSound').classList.toggle('off', m); });
   for (const b of document.querySelectorAll('#speedCtl .seg')) b.addEventListener('click', () => { app.setSpeed(+b.dataset.speed); b.blur(); });
 
@@ -124,6 +125,7 @@ export function buildUI(app, portraits) {
       const meta = (r ? `<i class="rng" title="${r.what}">${RANGE_SVG}${r.text}</i>` : '') + (d.cost && showCost ? `<em title="Requisition points each">${d.cost} pts</em>` : '');
       b.append(ic, el('div', null, `<b><span class="nm">${d.name}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</b><span>${d.desc}</span>`));
       b.addEventListener('click', () => { app.selectPlaceTool(app.tool && app.tool.type === d.key ? null : d.key); b.blur(); });
+      if (d.note) bindTip(b, d.name, `${d.note}<br><br><b>Answer:</b> ${d.counter}`);
       palette.append(b);
     };
     const mine = UNITS.filter((d) => d.team === tab && !d.hidden);
@@ -531,10 +533,13 @@ export function buildUI(app, portraits) {
     ['tips', 'Tips', `${rows([
         ['Ammunition', 'Troops re-arm within 60 m of a cache or supply drop. An amber pip marks a soldier out of rounds.'],
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Guns on the Hornburg and grenades can.'],
-        ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away.'],
-        ['Captains ★', 'They drive their wave on from the rear. Mark one with focus fire; when he falls, his companies waver.'],
-        ['Siege works', 'Ladders and towers reach the wall walk, sappers blow the culvert, rams break the gate and catapults hunt mortars that stay put. Alerts warn of each in time to act.'],
+        ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away. Crossbow volleys and catapult rocks pin your own platoons the same way: they fire slower and wilder until it lifts.'],
+        ['Shield walls', 'Inside the reach of your small arms the Uruk-hai lock shields: slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],
+        ['Captains ★', 'They follow behind their own companies, which will not rout while he stands and rally to him if they do. The troops around him take most shots aimed at him: thin them, then mark him with focus fire.'],
+        ['Siege works', 'Small arms cannot hurt a ladder, ram or tower, only the Uruk-hai and trolls moving it; others step in for the fallen, and a dropped engine can be picked up again. Men at an uncontested ladder head throw the ladder down. Alerts warn of each engine in time to act.'],
+        ['The reserve', 'Warg riders wait out of range for a breach or a fallen gate, and ride down troops caught outside the walls. Shortly before dawn everything the enemy has left comes on at once.'],
       ])}`],
+    ['enemy', 'Know your enemy', `${rows(UNITS.filter((d) => d.team === ORC && d.note).map((d) => [d.name, `${d.note}<br><i>Answer:</i> ${d.counter}`]))}`],
   ];
   let helpTab = 'basics';
   ui.showHelp = () => {
@@ -634,8 +639,41 @@ export function buildUI(app, portraits) {
     menu.style.left = Math.max(8, Math.min(innerWidth - menu.offsetWidth - 8, b.right - menu.offsetWidth + 40)) + 'px';
   };
   window.addEventListener('pointerdown', (e) => { const t = e.target instanceof Node ? e.target : null; if (!menu.hidden && !(t && (menu.contains(t) || btnSettings.contains(t)))) ui.toggleSettings(false); }, true);
+  // ------------------------------------------------------- developer menu
+  // Temporary: switches for each of the siege rules, for testing them one at a time.
+  const dev = $('devMenu'), btnDev = $('btnDev');
+  const renderDev = () => {
+    dev.innerHTML = '<h3>Developer: siege rules</h3>';
+    const battle = app.mode === 'battle';
+    dev.append(el('p', 'dev-note', battle ? 'This battle keeps the rules it started with. Changes apply to the next one.' : 'Applies to the next battle. All off plays the game exactly as it was before these rules.'));
+    const bar = el('div', 'set-seg');
+    for (const [k, t] of [['all', 'All on'], ['none', 'All off']]) { const b = el('button', '', t); b.addEventListener('click', () => { app.setFlag(k); renderDev(); }); bar.append(b); }
+    dev.append(bar);
+    for (const k in FEATURES) {
+      const f = FEATURES[k], row = el('label', 'dev-row'), box = el('input');
+      box.type = 'checkbox'; box.checked = !!app.flags[k];
+      box.addEventListener('change', () => { app.setFlag(k, box.checked); renderDev(); });
+      const live = battle && app.sim ? (app.sim.ff[k] ? 'on in this battle' : 'off in this battle') : '';
+      row.append(box, el('div', null, `<b>${f.name}${f.setup ? ' <i>(when a horde is drawn up)</i>' : ''}</b><span>${f.desc}${live ? ` <em>${live}</em>` : ''}</span>`));
+      dev.append(row);
+    }
+    if (battle && app.sim) {
+      const st = app.sim.stats, so = st.startOrc;
+      dev.append(el('p', 'dev-stats', `<b>This battle</b> · ladders raised ${st.laddersUp}/${so.ladder || 0}, thrown down ${st.thrown} · towers docked ${st.towersUp}/${so.tower || 0} · engines dropped ${st.dropped}, picked up again ${st.recovered} · shots stopped by shields ${st.blocked} · companies rallied ${st.rallied} · first foothold ${st.footholdT < 0 ? 'none yet' : Math.round(st.footholdT) + ' s'}`));
+    }
+  };
+  ui.toggleDev = (on = dev.hidden) => {
+    if (!on) { dev.hidden = true; btnDev.classList.remove('open'); return; }
+    renderDev();
+    dev.hidden = false; btnDev.classList.add('open');
+    const b = btnDev.getBoundingClientRect();
+    dev.style.top = b.bottom + 10 + 'px';
+    dev.style.left = Math.max(8, Math.min(innerWidth - dev.offsetWidth - 8, b.right - dev.offsetWidth + 60)) + 'px';
+  };
+  window.addEventListener('pointerdown', (e) => { const t = e.target instanceof Node ? e.target : null; if (!dev.hidden && !(t && (dev.contains(t) || btnDev.contains(t)))) ui.toggleDev(false); }, true);
+
   /** Close any open popover; true if one was open. */
-  ui.closePopups = () => { const was = !menu.hidden || !coach.hidden; ui.toggleSettings(false); ui.hideCoach(); return was; };
+  ui.closePopups = () => { const was = !menu.hidden || !coach.hidden || !dev.hidden; ui.toggleSettings(false); ui.toggleDev(false); ui.hideCoach(); return was; };
 
   ui.showEnd = (sim) => {
     const r = sim.result, st = sim.stats;

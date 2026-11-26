@@ -6,23 +6,37 @@
 // Flags: --preset, --seed, --max (seconds), --policy none|auto|dump, --horde n, --opt key=value (repeatable;
 // support.<kind>=n reaches the support table), --json (one summary line, nothing else), --quiet,
 // --verify (run twice and compare state hashes). HORDE=n in the environment still works.
+// --ff sets the feature flags (see FEATURES in config.js): "all" (default), "none" (the game as it was
+// before any of them), or a list such as "crews,shields" (only these on) or "-shields,-intel" (all but these).
 import { pathToFileURL } from 'node:url';
 import { buildMap } from '../src/map.js';
 import { buildPreset, horde, forceCost, PRESETS } from '../src/scenarios.js';
 import { scoreBattle } from '../src/score.js';
 import { Sim } from '../src/sim/sim.js';
-import { DEF, ORC } from '../src/config.js';
+import { DEF, ORC, UNITS, FEATURES, featureFlags } from '../src/config.js';
 import { autopilot } from './autopilot.js';
 
 let sharedMap = null;
 
+/** Parse an --ff value into a flag table (null: everything on). */
+export function parseFlags(spec) {
+  if (!spec || spec === 'all') return null;
+  if (spec === 'none') return featureFlags('none');
+  const names = spec.split(',').map((t) => t.trim()).filter(Boolean);
+  for (const n of names) if (!FEATURES[n.replace(/^-/, '')]) throw new Error(`unknown feature "${n}" (try ${Object.keys(FEATURES).join(', ')})`);
+  const only = names.filter((n) => !n.startsWith('-')), off = names.filter((n) => n.startsWith('-')).map((n) => n.slice(1));
+  const out = {};
+  for (const k in FEATURES) out[k] = only.length ? only.includes(k) : !off.includes(k);
+  return out;
+}
+
 /** Run one battle to its end (or `max` seconds) and return a summary object. */
 export function runBattle(cfg = {}) {
-  const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null } = cfg;
+  const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null, ff = null } = cfg;
   if (!PRESETS.some((p) => p.key === preset)) throw new Error(`unknown preset "${preset}" (try ${PRESETS.map((p) => p.key).join(', ')})`);
   const map = sharedMap || (sharedMap = buildMap());
-  const setup = buildPreset(map, preset);
-  if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN));
+  const setup = buildPreset(map, preset, false, ff);
+  if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN, { layout: featureFlags(ff).layout }));
   setup.options.seed = seed;
   for (const [k, v] of Object.entries(opts)) {
     if (k.startsWith('support.')) setup.options.support[k.slice(8)] = v; else setup.options[k] = v;
@@ -32,11 +46,34 @@ export function runBattle(cfg = {}) {
   if (log) log(`defenders ${sim.initial[0]}  orcs ${sim.initial[1]}`);
   let worst = 0, total = 0, next = 60, gateT = -1, ammoMin = 1;
   const gate = sim.segs[map.GATE];
+  // how far from the works each kind of attacker falls
+  const fell = {};
+  const kill = sim.kill.bind(sim);
+  sim.kill = (i, w, silent) => {
+    if (sim.alive[i] && sim.team[i] === ORC && !silent) { const k = UNITS[sim.type[i]].key; (fell[k] || (fell[k] = [])).push(sim._fortDist(sim.x[i], sim.y[i])); }
+    return kill(i, w, silent);
+  };
+  let firstWallT = -1, peakOnWall = 0, peakCell = 0, win10 = 0, worst10 = 0;
+  const cells = new Map();
   while (!sim.result && sim.time < max) {
     const a = performance.now();
     sim.step();
     const d = performance.now() - a;
     total += d; if (d > worst) worst = d;
+    // the cost that matters to a browser frame at 8x speed: the dearest run of ten steps
+    win10 += d; if (sim.tick % 10 === 0) { if (win10 > worst10) worst10 = win10; win10 = 0; }
+    if (sim.tick % 50 === 0) {
+      let on = 0; cells.clear();
+      for (let i = 0; i < sim.n; i++) {
+        if (!sim.alive[i] || sim.team[i] !== ORC) continue;
+        if (sim.el[i]) { on++; continue; }
+        if (sim.rad[i] > 0.7) continue;
+        if (firstWallT < 0 && sim.x[i] > 700 && sim._fortDist(sim.x[i], sim.y[i]) < 40) firstWallT = sim.time;
+        const c = ((sim.y[i] / 2) | 0) * 720 + ((sim.x[i] / 2) | 0), v = (cells.get(c) || 0) + 1;
+        cells.set(c, v); if (v > peakCell) peakCell = v;
+      }
+      if (on > peakOnWall) peakOnWall = on;
+    }
     if (pilot) pilot.step();
     if (gateT < 0 && gate.breached) gateT = sim.time;
     if (log) for (const e of sim.events) if (e.type === 'banner') log(`  [${sim.time.toFixed(0)}s] ${e.text}`);
@@ -50,6 +87,11 @@ export function runBattle(cfg = {}) {
   const r = sim.result || { win: null, reason: 'time limit', time: sim.time };
   const sc = sim.result && !sim.opt.sandbox ? scoreBattle(sim, { budget: setup.budget, spent: forceCost(setup.groups) }) : null;
   const round = (v, p = 2) => +v.toFixed(p);
+  const fellAt = {};
+  for (const k in fell) { const a = fell[k].sort((x, y) => x - y); fellAt[k] = Math.round(a[a.length >> 1]); }
+  const st = sim.stats;
+  let captains = 0;
+  for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === ORC && UNITS[sim.type[i]].cmd) captains++;
   return {
     preset, seed, policy, win: r.win, reason: r.reason, t: round(r.time, 1), dawn: sim.opt.dawn,
     def0: sim.initial[0], defEnd: sim.defCombat, orc0: sim.initial[1], orcEnd: sim.count[ORC],
@@ -58,7 +100,12 @@ export function runBattle(cfg = {}) {
     cp: sim.opt.sandbox ? null : { earned: round(sim.cpStats.earned, 1), bounty: round(sim.cpStats.bounty, 1), spent: sim.cpStats.spent, left: round(sim.cp, 1) },
     lullS: sim.dir ? sim.dir.lullS : 0,
     score: sc ? sc.total : null, medal: sc && sc.medal ? sc.medal.key : null,
-    tickAvg: round(total / Math.max(1, sim.tick)), tickMax: round(worst, 1), hash: sim.hash(),
+    tickAvg: round(total / Math.max(1, sim.tick)), tickMax: round(worst, 1), tick10: round(worst10, 1), hash: sim.hash(),
+    siege: {
+      ladders: st.startOrc.ladder || 0, laddersUp: st.laddersUp, thrown: st.thrown, towers: st.startOrc.tower || 0, towersUp: st.towersUp,
+      dropped: st.dropped, recovered: st.recovered, footholdT: round(st.footholdT, 0), firstWallT: round(firstWallT, 0), peakOnWall, peakCell,
+      captains: `${captains}/${st.startOrc.chief || 0}`, blocked: st.blocked, rallied: st.rallied, fellAt,
+    },
     stats: sim.stats,
   };
 }
@@ -81,6 +128,7 @@ function parseArgs(argv) {
     else if (k === 'seed') cfg.seed = +v;
     else if (k === 'max') cfg.max = +v;
     else if (k === 'horde') cfg.hordeN = +v;
+    else if (k === 'ff') cfg.ff = parseFlags(v);
     else throw new Error(`unknown flag --${k}`);
   }
   if (pos[0]) cfg.preset = pos[0];
@@ -109,5 +157,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.log('lostDef', stats.lostDef, 'by', stats.defLostBy);
     console.log('lostOrc', stats.lostOrc, 'fled', stats.fled, 'routs', stats.routs, 'breaches', stats.breaches);
     if (Object.keys(res.calls).length) console.log('support calls', res.calls);
+    const sg = res.siege;
+    console.log(`siege: ladders raised ${sg.laddersUp}/${sg.ladders} (thrown down ${sg.thrown}), towers docked ${sg.towersUp}/${sg.towers}, engines dropped ${sg.dropped} and picked up again ${sg.recovered}`);
+    console.log(`       first attacker at the wall ${sg.firstWallT < 0 ? 'never' : sg.firstWallT + 's'}, first foothold ${sg.footholdT < 0 ? 'never' : sg.footholdT + 's'}, most on the wall at once ${sg.peakOnWall}, most in one 2 m cell ${sg.peakCell}`);
+    console.log(`       captains alive ${sg.captains}, shots stopped by shields ${sg.blocked}, companies rallied ${sg.rallied}`);
+    console.log('       median distance from the works at death (m):', sg.fellAt);
+    console.log(`perf: avg ${res.tickAvg} ms a step, worst step ${res.tickMax} ms, worst ten steps ${res.tick10} ms`);
   }
 }
