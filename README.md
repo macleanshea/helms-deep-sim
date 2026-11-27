@@ -207,7 +207,9 @@ Press `F2` (or add `?perf` to the URL) for an overlay showing frame time, CPU ti
 simulation and the renderer, GPU time per stage, triangles and draw calls. `?bench` fast-forwards
 the largest scenario to its final assault, when the field is fullest, then steps through a fixed
 set of views and lists the same figures for each: the quickest way to see how much headroom a
-machine has. GPU timings need a browser that exposes
+machine has. Each view also counts the frames that ran over 20 ms and over 33 ms, and a **Copy
+results** button puts the table on the clipboard together with the graphics card, browser and
+resolution it was measured on. GPU timings need a browser that exposes
 `EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
 
 Units are drawn at one of four levels of detail chosen from the zoom: dots, then boxes, then
@@ -306,6 +308,15 @@ breaks the postern and the door from the wall, and pours into the court from two
 battles it loses Medium two nights in three and wins Hard with only a twentieth of the garrison
 left. Easy is still won with nearly everyone alive (its horde is too small to force the doors in
 time), so `npm run checks` still reports this as OPEN.
+
+**Guarding a change.** Three quicker tools say whether a change did what it meant to and nothing
+else: `npm run maplint` stands every preset's armies on the map and solves the paths the battle
+needs (a ram to the gate, the horde to the wall, the garrison between court, walls and the Deep),
+then prints the map's measurements; `npm run golden` hashes the map, the fortress mesh and whole
+battles against `docs/baseline/golden.json`, so a refactor can prove it changed nothing (a change
+meant to alter the map or the rules re-records them with `-- --update`); and `npm run shots` takes
+fixed-camera screenshots with Playwright on the software rasteriser and can compare them with an
+earlier set (`-- --compare docs/baseline/shots`). `docs/roadmap.md` is the plan these guard.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
 pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left

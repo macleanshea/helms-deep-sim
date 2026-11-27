@@ -1,0 +1,38 @@
+preset         policy  seed result end         defenders   horde left   gate   ammo  score  cp            ladders     wall  foothold on wall tick ms
+first-night    none    1    loss   550 (0.92)  0/91        1556/3175    —      0%    233    0/21.7        8/12 -0     160   398      95      2.24 / 65.6 / 148.7
+first-night    none    2    loss   550 (0.92)  0/91        1553/3175    —      0%    234    0/23          8/12 -0     155   408      113     2.12 / 95.8 / 184
+first-night    none    3    loss   543 (0.91)  0/91        1685/3175    —      0%    227    0/23.4        8/12 -0     160   461      114     2.17 / 42.4 / 145.3
+first-night    none    4    loss   563 (0.94)  0/91        1609/3175    —      10%   237    0/23.1        11/12 -0    155   427      65      2.04 / 55.9 / 154.9
+first-night    none    5    loss   537 (0.89)  0/91        1623/3175    —      54%   227    0/21.7        7/12 -0     155   475      87      2.16 / 45.6 / 101.6
+first-night    auto    1    WIN    600 (1.00)  50/91       262/3175     —      27%   765    42/44.4       5/12 -0     165   521      29      1.7 / 37.5 / 87.9
+first-night    auto    2    WIN    600 (1.00)  22/91       609/3175     —      9%    573    38/41.7       7/12 -0     160   507      87      1.95 / 50 / 113.9
+first-night    auto    3    WIN    600 (1.00)  61/91       256/3175     —      36%   701    42/44.4       2/12 -0     165   523      27      1.81 / 44.8 / 128.4
+first-night    auto    4    WIN    600 (1.00)  17/91       800/3175     —      29%   556    38/41.7       8/12 -0     165   515      76      1.81 / 74.3 / 139.4
+first-night    auto    5    WIN    600 (1.00)  44/91       400/3175     —      49%   645    42/44.4       2/12 -0     165   480      55      1.71 / 76.8 / 150.9
+garrison       none    1    loss   884 (0.74)  0/497       8088/18106   705    8%    200    0/22          51/111 -7   630   670      255     3.76 / 54.4 / 231.5
+garrison       none    2    loss   850 (0.71)  0/497       8052/18106   703    0%    195    0/22          68/111 -17  625   710      229     3.45 / 82.4 / 214.8
+garrison       none    3    loss   853 (0.71)  0/497       8104/18106   699    0%    195    0/22          48/111 -3   425   690      218     3.54 / 80.3 / 203.2
+garrison       none    4    loss   846 (0.70)  0/497       8219/18106   699    0%    193    0/22.1        73/111 -17  630   710      253     3.37 / 70.9 / 205.2
+garrison       none    5    loss   843 (0.70)  0/497       7643/18106   701    0%    196    0/22.4        45/111 -3   620   718      273     3.33 / 88.2 / 278.9
+garrison       auto    1    loss   1088 (0.91) 0/497       4546/18106   818    27%   253    46/48.1       52/111 -3   655   748      359     3.36 / 58.7 / 187.9
+garrison       auto    2    loss   1162 (0.97) 0/497       3067/18106   1078   17%   273    50/50.9       83/111 -15  715   930      249     3.35 / 76.7 / 262.8
+garrison       auto    3    WIN    1200 (1.00) 279/497     1535/18106   —      25%   668    50/53.2       46/111 -17  650   938      243     2.97 / 63.8 / 211.9
+garrison       auto    4    WIN    1130 (0.94) 284/497     1374/18106   —      24%   821    50/50.4       23/111 -0   655   938      196     2.85 / 66.4 / 204.6
+garrison       auto    5    WIN    1190 (0.99) 283/497     936/18106    —      15%   721    50/52.7       33/111 -1   635   936      184     3.07 / 74.2 / 199.6
+three-hundred  none    1    loss   608 (0.68)  0/309       6158/10098   497    0%    173    0/20          19/59 -0    185   478      127     2.73 / 50.5 / 142.8
+three-hundred  none    2    loss   596 (0.66)  0/309       6063/10098   497    12%   171    0/20.3        17/59 -3    185   482      124     2.78 / 57.6 / 133.5
+three-hundred  none    3    loss   582 (0.65)  0/309       6115/10098   499    17%   167    0/20          30/59 -0    165   484      231     2.82 / 44.2 / 185.3
+three-hundred  none    4    loss   601 (0.67)  0/309       6073/10098   500    0%    173    0/20          16/59 -0    220   482      113     2.97 / 65.9 / 159.1
+three-hundred  none    5    loss   685 (0.76)  0/309       6110/10098   591    13%   191    0/20.4        52/59 -14   170   501      356     3.08 / 44.4 / 163.3
+three-hundred  auto    1    loss   873 (0.97)  0/309       3923/10098   849    9%    254    38/40.2       51/59 -4    225   557      356     3.31 / 98.9 / 237.4
+three-hundred  auto    2    loss   869 (0.97)  0/309       3347/10098   812    6%    258    38/40.6       38/59 -0    185   526      318     2.7 / 61.7 / 199.3
+three-hundred  auto    3    WIN    900 (1.00)  25/309      2862/10098   797    24%   424    38/41         18/59 -2    170   803      155     2.67 / 75.3 / 224.5
+three-hundred  auto    4    loss   859 (0.95)  0/309       3465/10098   782    14%   255    38/40         29/59 -1    185   505      277     2.5 / 65.2 / 182.3
+three-hundred  auto    5    WIN    900 (1.00)  147/309     2674/10098   —      28%   643    38/41.7       36/64 -4    480   756      117     1.62 / 58.1 / 186.6
+
+first-night    none    wins 0/5   median end 550s (0.92 of dawn)   median survivors 0%   ladders raised 67%   first at the wall 0.26 of dawn
+first-night    auto    wins 5/5   median end 600s (1.00 of dawn)   median survivors 48%   ladders raised 42%   first at the wall 0.28 of dawn
+garrison       none    wins 0/5   median end 850s (0.71 of dawn)   median survivors 0%   ladders raised 46%   first at the wall 0.52 of dawn
+garrison       auto    wins 3/5   median end 1162s (0.97 of dawn)   median survivors 56%   ladders raised 41%   first at the wall 0.55 of dawn
+three-hundred  none    wins 0/5   median end 601s (0.67 of dawn)   median survivors 0%   ladders raised 32%   first at the wall 0.21 of dawn
+three-hundred  auto    wins 2/5   median end 873s (0.97 of dawn)   median survivors 0%   ladders raised 56%   first at the wall 0.21 of dawn

@@ -1,0 +1,26 @@
+PASS  every preset stands all its groups
+      first-night: 1014/1014 · garrison: 4522/4522 · three-hundred: 3491/3491 · benchmark: 4413/4413
+PASS  a horde of any size fits on the field
+      500: 0 left out · 8000: 0 left out · 20000: 5 left out · 30000: 18 left out · 40000: 32 left out (limit 0.5%)
+PASS  gate, postern, door and culvert are in place
+      wall 36/38 sections usable (10.1 m each), ring 26/36, 7 door cells
+PASS  every stair joins the ground to a wall walk
+      0: 6 cells · 1: 10 cells · 2: 7 cells · 3: 6 cells · 4: 6 cells · 5: 5 cells
+PASS  a ram can reach the gate from where it starts
+      first-night: 1/1 rams · garrison: 4/4 rams · three-hundred: 2/2 rams · benchmark: 5/5 rams · steepest causeway step 0.31 m per cell (limit 1.6)
+OPEN  the horde can walk from the valley mouth to the gate and to every wall section
+      207/207 cells of the entry edge lead to the gate; 35/36 wall feet reached (not sections 0)
+OPEN  court, wall walks, steps and the Deep are connected for the garrison
+      49/60 wall walks (not sections 38, 39, 40, 41, 51, 67, 68, 69, 70, 71, 73) · 40/40 stair cells · the Deep reached · 635/635 fall-back places (at least 600 wanted)
+PASS  the postern opens on the Deep, behind the wall
+      outside the postern: reached by the garrison from the court, closed to the valley while the wall stands
+
+measurements (in brackets: as a share of the Deeping Wall's length)
+  Deeping Wall   382.3 m in 38 sections, walk at 12 m, 10 m thick
+  Hornburg wall  326.7 m standing clear of the rock (0.85), walk at 21 m
+  causeway       242.2 m (0.63), 14 m wide · rear ramp 99.7 m
+  the field      70.6 ha in front of the wall
+  the Deep       13.1 ha, 412 m deep (1.08), 472 m across at its widest (1.23)
+  the court      5296 m², 635 fall-back places
+
+6 of 8 passed; 2 known and open
