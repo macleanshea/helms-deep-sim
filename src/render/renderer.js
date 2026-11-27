@@ -17,13 +17,14 @@ import { buildStructures } from './structures.js';
 import { viewMatrix, SIN_P, COS_P } from './camera.js';
 import { S_DONE, S_CLIMB, LADDER_TIME } from '../sim/sim.js';
 import * as SH from './shaders.js';
+import { LAYOUT } from '../layout.js';
 
 const PSTRIDE = 52, PF = 13;         // particle instance: bytes / floats
 const ISTRIDE = 32;                  // mesh instance bytes
 const GRID = 4;                      // terrain mesh spacing (m)
 const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v.map((q) => q / l); })();
 // region covered by the shadow map: the fortress and its approaches
-const SB = { x0: 620, x1: 1190, y0: 160, y1: 840, z0: -8, z1: 120 };
+const SB = { x0: LAYOUT.shadowBox[0], x1: LAYOUT.shadowBox[2], y0: LAYOUT.shadowBox[1], y1: LAYOUT.shadowBox[3], z0: -8, z1: 120 };
 
 // Levels of detail by zoom (CSS px per metre): dots, boxes, stand-ins, full models. The player's
 // model-detail setting (`heroScale`) moves the whole ladder: full models take over at HERO_ZOOM x

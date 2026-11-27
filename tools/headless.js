@@ -10,9 +10,10 @@ import { pathToFileURL } from 'node:url';
 import { buildMap } from '../src/map.js';
 import { buildPreset, horde, forceCost, PRESETS } from '../src/scenarios.js';
 import { scoreBattle } from '../src/score.js';
-import { Sim } from '../src/sim/sim.js';
+import { Sim, FINE_CELL, FINE_W } from '../src/sim/sim.js';
 import { DEF, ORC, UNITS } from '../src/config.js';
 import { autopilot } from './autopilot.js';
+import { LAYOUT } from '../src/layout.js';
 
 let sharedMap = null;
 
@@ -54,8 +55,8 @@ export function runBattle(cfg = {}) {
         if (!sim.alive[i] || sim.team[i] !== ORC) continue;
         if (sim.el[i]) { on++; continue; }
         if (sim.rad[i] > 0.7) continue;
-        if (firstWallT < 0 && sim.x[i] > 700 && sim._fortDist(sim.x[i], sim.y[i]) < 40) firstWallT = sim.time;
-        const c = ((sim.y[i] / 2) | 0) * 720 + ((sim.x[i] / 2) | 0), v = (cells.get(c) || 0) + 1;
+        if (firstWallT < 0 && sim.x[i] > LAYOUT.approach.mid && sim._fortDist(sim.x[i], sim.y[i]) < 40) firstWallT = sim.time;
+        const c = ((sim.y[i] / FINE_CELL) | 0) * FINE_W + ((sim.x[i] / FINE_CELL) | 0), v = (cells.get(c) || 0) + 1;
         cells.set(c, v); if (v > peakCell) peakCell = v;
       }
       if (on > peakOnWall) peakOnWall = on;

@@ -2,7 +2,11 @@
 
 import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS } from './config.js';
 import { KEEP, N_WALL, WALL_HALF } from './map.js';
+import { LAYOUT } from './layout.js';
 import { mulberry } from './rng.js';
+
+// where things stand on this map: the horde's lanes and lines, and the garrison's posts (see src/layout.js)
+const AP = LAYOUT.approach, PO = LAYOUT.posts;
 
 let nextId = 1;
 export function makeGroup(type, count, x, y, ang = Math.PI / 2, w = 0, extra = {}) {
@@ -29,7 +33,7 @@ function walkable(map) {
   if (map._walkable) return map._walkable;
   const gw = WORLD_W / 4, gh = WORLD_H / 4, ok = new Uint8Array(gw * gh), q = new Int32Array(gw * gh);
   let h = 0, t = 0;
-  const start = map.cellOf(300, 480);
+  const start = map.cellOf(AP.open[0], AP.open[1]);
   ok[start] = 1; q[t++] = start;
   while (h < t) {
     const c = q[h++], cx = c % gw, cy = (c / gw) | 0;
@@ -159,8 +163,8 @@ export function horde(total, mix = {}) {
   const kinds = mix.kinds && mix.kinds.length === W ? mix.kinds : waveKinds(W);
   const g = [];
   const V = Math.PI / 2;
-  const lanes = [140, 276, 412, 548, 684, 820];
-  const Wd = 116;
+  const lanes = AP.lanes;
+  const Wd = AP.laneWidth;
   const n = {
     uruk: Math.round(total * m.uruk), archer: Math.round(total * m.archer), berserker: Math.round(total * m.berserker), warg: Math.round(total * m.warg),
     ladder: mix.ladders ?? Math.max(4, Math.round(total / 170)), troll: mix.trolls ?? Math.round(total / 420), ram: mix.rams ?? Math.max(1, Math.round(total / 3000)),
@@ -216,13 +220,13 @@ export function horde(total, mix = {}) {
       const order = [2, 3, 1, 4, 0, 5];
       next(Math.max(column('catapult', mid, 60), singles('chief', (k) => [lanes[order[k % 6]] + ((k / 6) | 0) * 38 - 19 * ((k / 6) | 0 ? 1 : 0), 6 + (k % 3) * 16])));
       next(Math.max(column('archer'), 0));
-      next(Math.max(column('berserker'), singles('sapper', (k) => [443 + (k & 1 ? -1 : 1) * 46 * Math.ceil(k / 2), 6 + (k % 2) * 12])));
+      next(Math.max(column('berserker'), singles('sapper', (k) => [AP.sapper + (k & 1 ? -1 : 1) * 46 * Math.ceil(k / 2), 6 + (k % 2) * 12])));
       next(column('warg', [lanes[0], lanes[5]], 90));
     }
     if (w === 0) {
       // the vanguard stands on the field with its rear rank just inside the valley mouth
       // (drawn up by task force, the front rank stands back out of reach of the mortars in the Deep)
-      const shift = Math.min(440, Math.max(300, 24 - x));
+      const shift = Math.min(AP.vanguard[1], Math.max(AP.vanguard[0], 24 - x));
       for (let k = first; k < g.length; k++) g[k].x += shift;
     }
   }
@@ -274,16 +278,16 @@ function garrison(map, scale = 1) {
   g.push(...alongRing('at', s(8), 165, 230));
   g.push(...alongRing('grenadier', s(14), 170, 260));
   g.push(...alongRing('marksman', s(8), 160, 240));
-  g.push(makeGroup('cmd', 1, KEEP.cx - KEEP.r + 1, KEEP.cy - 6));
+  g.push(makeGroup('cmd', 1, PO.captain[0], PO.captain[1]));
   // courtyard
-  g.push(makeGroup('mortar', s(8), KEEP.cx - 24, KEEP.cy - 40, 0, 40));
-  g.push(makeGroup('cache', 1, KEEP.cx - 44, KEEP.cy - 22));
-  g.push(makeGroup('rifle', s(60), KEEP.cx - 46, KEEP.cy - 10, V, 40));
+  g.push(makeGroup('mortar', s(8), PO.courtMortars[0], PO.courtMortars[1], 0, 40));
+  g.push(makeGroup('cache', 1, PO.courtCache[0], PO.courtCache[1]));
+  g.push(makeGroup('rifle', s(60), PO.courtRifles[0], PO.courtRifles[1], V, 40));
   // the Deep, behind the wall
-  g.push(makeGroup('mortar', s(16), 1090, 480, V, 110));
-  g.push(makeGroup('howitzer', s(4), 1220, 490, V, 70));
+  g.push(makeGroup('mortar', s(16), PO.deepMortars[0], PO.deepMortars[1], V, 110));
+  g.push(makeGroup('howitzer', s(4), PO.deepHowitzers[0], PO.deepHowitzers[1], V, 70));
   for (const t of [0.22, 0.5, 0.78]) { const p = map.wallAt(t); g.push(makeGroup('cache', 1, p.x + 26, p.y)); }
-  g.push(makeGroup('rifle', s(90), 1030, 460, V, 130));
+  g.push(makeGroup('rifle', s(90), PO.deepRifles[0], PO.deepRifles[1], V, 130));
   return g;
 }
 
@@ -302,10 +306,10 @@ export const PRESETS = [
       groups: [
         ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
         ...alongRing('rifle', 10, 175, 215), ...alongRing('at', 3, 175, 205),
-        makeGroup('mortar', 3, 1070, 460, Math.PI / 2, 16), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('mortar', 3, PO.mortarsEasy[0], PO.mortarsEasy[1], Math.PI / 2, 16), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         // a platoon kept below the wall: the enemy cannot count it, and it can be sent up wherever the ladders land
-        makeGroup('rifle', 16, 1030, 450, Math.PI / 2, 30),
+        makeGroup('rifle', 16, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30),
         ...alongWall(map, 'wire', 44, 0.28, 0.72, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
         ...horde(3200, { waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
       ],
@@ -316,7 +320,7 @@ export const PRESETS = [
     key: 'garrison', name: 'The Hornburg Garrison', level: 'Medium',
     blurb: 'Five hundred behind wire and mines, against eighteen thousand Uruk-hai in four waves with towers, trolls and catapults.',
     build: (map, sb) => ({
-      groups: [...garrison(map, 0.6), makeGroup('tank', 1, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 2, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map),
+      groups: [...garrison(map, 0.6), makeGroup('tank', 1, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 30), makeGroup('ifv', 2, PO.ifvDeep[0], PO.ifvDeep[1], Math.PI / 2, 50), ...fieldWorks(map),
         ...horde(18000, { waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
       options: { dawn: 1200, cpRate: 2 / 60 },
     }),
@@ -328,8 +332,8 @@ export const PRESETS = [
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
         ...alongRing('rifle', 60, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
-        makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
-        makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
+        makeGroup('mortar', 6, PO.mortarsHard[0], PO.mortarsHard[1], Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('rifle', 20, PO.courtPlatoon[0], PO.courtPlatoon[1], Math.PI / 2, 24), makeGroup('rifle', 24, PO.reserve[0], PO.reserve[1], Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(10000, { waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
       ],
@@ -343,9 +347,9 @@ export const PRESETS = [
     build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),
-        makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
-        makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
-        makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
+        makeGroup('tank', 4, PO.tanksForward[0], PO.tanksForward[1], Math.PI / 2, 110), makeGroup('ifv', 6, PO.ifvsForward[0], PO.ifvsForward[1], Math.PI / 2, 90),
+        makeGroup('tank', 2, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 30), makeGroup('howitzer', 4, PO.howitzersBench[0], PO.howitzersBench[1], Math.PI / 2, 60),
+        makeGroup('mortar', 12, PO.mortarsBench[0], PO.mortarsBench[1], Math.PI / 2, 90), makeGroup('cache', 1, PO.cacheBench[0], PO.cacheBench[1]),
         ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
       options: { dawn: 1200, cpStart: 10, cpRate: 3 / 60 },

@@ -15,6 +15,7 @@ import { Fx } from './render/fx.js';
 import { Audio } from './audio.js';
 import { buildUI, fmt } from './ui/ui.js';
 import { loadPortraits } from './ui/portraits.js';
+import { LAYOUT } from './layout.js';
 
 const $ = (id) => document.getElementById(id);
 const glCanvas = $('gl'), overlay = $('overlay'), octx = overlay.getContext('2d');
@@ -756,7 +757,7 @@ function drawOverlay(dtReal) {
     // what is still to come
     const wi = sim.waveInfo();
     if (wi && wi.reserve > 0) {
-      const p = S(26, 480, heightAt(26, 480) + 2), txt = `◀  ${wi.W - 1} more wave${wi.W > 2 ? 's' : ''} beyond the valley mouth · ${fmt(wi.reserve)}`;
+      const p = S(LAYOUT.approach.mouth[0], LAYOUT.approach.mouth[1], heightAt(LAYOUT.approach.mouth[0], LAYOUT.approach.mouth[1]) + 2), txt = `◀  ${wi.W - 1} more wave${wi.W > 2 ? 's' : ''} beyond the valley mouth · ${fmt(wi.reserve)}`;
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       const tw = c.measureText(txt).width + 16, bx = Math.max(insets().l + 8, p[0] - 8);
       c.fillStyle = 'rgba(10,13,16,0.85)'; c.beginPath(); c.roundRect(bx, p[1] - 11, tw, 22, 6); c.fill();

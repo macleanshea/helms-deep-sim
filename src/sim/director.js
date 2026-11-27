@@ -10,12 +10,14 @@
 // own "advance after" delay exactly as before.
 
 import { WORLD_W, WORLD_H, DEF, ORC, UNITS, U, C } from '../config.js';
+import { LAYOUT } from '../layout.js';
 import { groupBounds, waveSummary } from '../scenarios.js';
 import { G_ROUT } from './morale.js';
 
 const TAIL = 330;        // the final wave steps off this long before dawn (s)
 const MARCH = 3.2;       // pace at which a wave's ranks come over the map edge (m/s)
-const EDGE = 8;          // where they appear (m from the west edge)
+const AP = LAYOUT.approach;
+const EDGE = AP.edge;    // where they appear (m from the west edge)
 const WARN = 35;         // notice given before a wave steps off (s)
 const MIN_GAP = 90;      // least time between two releases (s)
 const EARLY = 60;        // how far ahead of schedule a wave may be sent in when the last is spent (s)
@@ -88,7 +90,7 @@ export const directorMethods = {
         next.sector = plan.main;
         const note = this._wlAdapt(next);
         const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
-        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${where}${note}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
+        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${where}${note}`, 'warn', AP.alertX, next.sector >= 0 ? this.sectors[next.sector].y : AP.centre, true);
       }
     } else if (next.state === FORMING && this.time >= next.relT) {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
@@ -98,10 +100,10 @@ export const directorMethods = {
       // each rank comes over the edge when it would have marched that far; the warlord also holds the
       // quicker formations back so that the wave reaches the wall together
       let hold = null;
-      if (!allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < 344 ? 0 : g.y < 616 ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
+      if (!allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < AP.split[0] ? 0 : g.y < AP.split[1] ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
       next.pend = groups.map((g, k) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH + (hold ? hold[k] : 0) })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (hold ? hold.slice().sort((a, b) => a - b)[hold.length >> 1] : 0);
-      this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
+      this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', AP.alertX, AP.centre, true);
     }
   },
 
@@ -146,10 +148,10 @@ export const directorMethods = {
     const cw = WORLD_W / 16, ch = WORLD_H / 16;
     for (let cy = 0; cy < ch; cy++) {
       const q = Math.max(0, Math.min(2, Math.floor((((cy + 0.5) * 16 - y0) / (y1 - y0)) * 3)));
-      for (let cx = (600 / 16) | 0; cx < cw; cx++) {
+      for (let cx = (AP.bled[0] / 16) | 0; cx < cw; cx++) {
         const c = cy * cw + cx;
         fell[q] += lo[DEF][c];
-        if (cx * 16 < 980) bled[q] += lo[ORC][c] - (mark ? mark[c] : 0);
+        if (cx * 16 < AP.bled[1]) bled[q] += lo[ORC][c] - (mark ? mark[c] : 0);
       }
     }
     const mx = (a) => Math.max(1, a[0], a[1], a[2]);

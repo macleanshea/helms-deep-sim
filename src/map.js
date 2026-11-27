@@ -8,6 +8,7 @@
 // structure so the renderer can raise it in 3D.
 
 import { WORLD_W, WORLD_H, CELL, GW, GH, T, WALL_H, PLATEAU_Z, RING_TOP } from './config.js';
+import { LAYOUT } from './layout.js';
 
 export const MARGIN = 256;                 // rendered terrain beyond the playable world (m)
 export const HM_RES = 2;                   // metres per height texel
@@ -16,19 +17,16 @@ export const HM_H = (WORLD_H + 2 * MARGIN) / HM_RES;
 export const GZ_W = WORLD_W / HM_RES;
 export const GZ_H = WORLD_H / HM_RES;
 
-export const KEEP = {
-  cx: 960, cy: 710, r: 72, half: 4.5,
-  // the inner ward climbs the rock in two terraces; the outer court is the band left between them and the curtain wall
-  t1: { x: 968, y: 724, r: 48, z: PLATEAU_Z + 8 },
-  t2: { x: 990, y: 742, r: 27, z: PLATEAU_Z + 17 },
-  tower: { x: 997, y: 746, r: 12 },
-};
-export const WALL_HALF = 5;
-export const N_WALL = 38;
-export const N_RING = 36;
+// The shapes come from src/layout.js; the names below are how the rest of the code has always known them.
+const L = LAYOUT;
+// the inner ward climbs the rock in two terraces; the outer court is the band left between them and the curtain wall
+export const KEEP = L.keep;
+export const WALL_HALF = L.wall.half;
+export const N_WALL = L.wall.sections;
+export const N_RING = L.ring.sections;
 const RING_STEP = 360 / N_RING;
-const GATE_K = 19, POSTERN_K = 34, DOOR_K = 28;
-const CULVERT_T = 0.5;
+const GATE_K = L.ring.gate, POSTERN_K = L.ring.postern, DOOR_K = L.ring.door;
+const CULVERT_T = L.wall.culvert;
 const DEG = Math.PI / 180;
 
 function hash(ix, iy) {
@@ -52,15 +50,16 @@ const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a)
 const lerp = (a, b, t) => a + (b - a) * t;
 
 // the gorge narrows sharply where the Hornburg's spur juts out from the southern cliff
+const RN = L.rim.north, RS = L.rim.south, RE = L.rim.east;
 function yTop(x) {
-  return lerp(64, 260, sstep(520, 960, x)) + lerp(0, 150, sstep(1000, 1400, x)) - (fbm(x / 80, 9.1, 3) - 0.5) * 44;
+  return lerp(RN.a0, RN.a1, sstep(RN.x0, RN.x1, x)) + lerp(0, RN.deep, sstep(RN.dx0, RN.dx1, x)) - (fbm(x / 80, RN.seed, 3) - 0.5) * RN.noise;
 }
 function yBot(x) {
-  return WORLD_H - lerp(64, 205, sstep(520, 900, x)) - lerp(0, 190, sstep(1000, 1400, x)) - (fbm(x / 80, 3.7, 3) - 0.5) * 44;
+  return WORLD_H - lerp(RS.a0, RS.a1, sstep(RS.x0, RS.x1, x)) - lerp(0, RS.deep, sstep(RS.dx0, RS.dx1, x)) - (fbm(x / 80, RS.seed, 3) - 0.5) * RS.noise;
 }
 /** Signed distance into the mountain: positive inside rock. */
 function cliffDist(x, y) {
-  return Math.max(yTop(x) - y, y - yBot(x), x - 1394 + (fbm(y / 50, 1.3, 2) - 0.5) * 26);
+  return Math.max(yTop(x) - y, y - yBot(x), x - RE.x + (fbm(y / 50, RE.seed, 2) - 0.5) * RE.noise);
 }
 
 /** Resample a polyline into evenly spaced points carrying arclength fraction `t`. */
@@ -99,11 +98,12 @@ export function buildMap() {
 
   // ---- Deeping Wall --------------------------------------------------
   const J = ringPt(DOOR_K * RING_STEP + RING_STEP / 2, KEEP.r + KEEP.half);
-  const Tp = { x: 992, y: yTop(992) - 12 };
+  const BOW = L.wall.bow;
+  const Tp = { x: L.wall.endX, y: yTop(L.wall.endX) - L.wall.inset };
   const wallAt = (t) => {
-    const x = lerp(J.x, Tp.x, t) - 26 * Math.sin(Math.PI * t);
+    const x = lerp(J.x, Tp.x, t) - BOW * Math.sin(Math.PI * t);
     const y = lerp(J.y, Tp.y, t);
-    const dx = (Tp.x - J.x) - 26 * Math.PI * Math.cos(Math.PI * t), dy = Tp.y - J.y, l = Math.hypot(dx, dy);
+    const dx = (Tp.x - J.x) - BOW * Math.PI * Math.cos(Math.PI * t), dy = Tp.y - J.y, l = Math.hypot(dx, dy);
     return { x, y, tx: dx / l, ty: dy / l, ang: Math.atan2(dy, dx) };
   };
   let wallLen = 0;
@@ -134,11 +134,11 @@ export function buildMap() {
 
   // ---- ramps ----------------------------------------------------------
   // the causeway curls down from the gate to the valley floor
-  const cause = sampleLine(smooth([[gate.x + gate.nx * 2, gate.y + gate.ny * 2], [852, 679], [806, 654], [762, 622], [724, 584], [702, 546]]), 120);
-  const CAUSE_HALF = 7;
+  const cause = sampleLine(smooth([[gate.x + gate.nx * 2, gate.y + gate.ny * 2], ...L.causeway.via]), 120);
+  const CAUSE_HALF = L.causeway.half;
   // a stair from the Deep up to the postern at the rear of the keep
-  const rear = sampleLine(smooth([[post.x + post.nx * 2, post.y + post.ny * 2], [1052, 664], [1066, 634], [1074, 602]]), 60);
-  const REAR_HALF = 4.5;
+  const rear = sampleLine(smooth([[post.x + post.nx * 2, post.y + post.ny * 2], ...L.rear.via]), 60);
+  const REAR_HALF = L.rear.half;
   const nearLine = (line, x, y) => {
     let best = 1e9, bt = 0;
     for (let i = 0; i < line.length; i++) { const dx = x - line[i].x, dy = y - line[i].y, d = dx * dx + dy * dy; if (d < best) { best = d; bt = line[i].t; } }
@@ -148,13 +148,13 @@ export function buildMap() {
 
   // ---- stairs up to the wall walks -------------------------------------
   const stairs = [];
-  for (const [t, dir] of [[0.2, 1], [0.44, -1], [0.62, 1], [0.84, -1]]) {
+  for (const [t, dir] of L.stairs.wall) {
     const p = wallAt(t);
     let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
     const sx = p.x - nx * (WALL_HALF + 3), sy = p.y - ny * (WALL_HALF + 3);
     stairs.push({ x: sx - p.tx * dir * 9, y: sy - p.ty * dir * 9, dx: p.tx * dir, dy: p.ty * dir, len: 18, half: 3, z0: 0, z1: WALL_H });
   }
-  for (const [deg, dir] of [[248, -1], [160, 1]]) {
+  for (const [deg, dir] of L.stairs.court) {
     const a = deg * DEG, r = KEEP.r - KEEP.half - 3;
     const tx = -Math.sin(a) * dir, ty = Math.cos(a) * dir;
     stairs.push({ x: KEEP.cx + r * Math.cos(a) - tx * 7, y: KEEP.cy + r * Math.sin(a) - ty * 7, dx: tx, dy: ty, len: 14, half: 3, z0: PLATEAU_Z, z1: RING_TOP });
@@ -168,11 +168,12 @@ export function buildMap() {
   };
 
   // ---- terrain ----------------------------------------------------------
-  const streamY = (x) => culv.y - 26 * Math.sin((x - culv.x) / 120) + Math.max(0, x - culv.x) * 0.1;
+  const ST = L.stream;
+  const streamY = (x) => culv.y - ST.swing * Math.sin((x - culv.x) / ST.wave) + Math.max(0, x - culv.x) * ST.drift;
   const WS = 300, wsx = new Float32Array(WS + 1), wsy = new Float32Array(WS + 1);
   for (let i = 0; i <= WS; i++) { const p = wallAt(i / WS); wsx[i] = p.x; wsy[i] = p.y; }
   const wallNearest = (x, y) => {
-    if (x < 930 || x > 1010 || y < Math.min(J.y, Tp.y) - 8 || y > Math.max(J.y, Tp.y) + 8) return null;
+    if (x < L.wall.span[0] || x > L.wall.span[1] || y < Math.min(J.y, Tp.y) - 8 || y > Math.max(J.y, Tp.y) + 8) return null;
     let best = 1e9, bi = 0;
     for (let i = 0; i <= WS; i++) { const dx = x - wsx[i], dy = y - wsy[i], d = dx * dx + dy * dy; if (d < best) { best = d; bi = i; } }
     return { d: Math.sqrt(best), t: bi / WS };
@@ -200,7 +201,8 @@ export function buildMap() {
       if (wn) dirt = Math.max(dirt, sstep(30, 9, wn.d) * 0.65);
       const cn = nearLine(cause, x, y);
       dirt = Math.max(dirt, sstep(16, 6, cn.d) * 0.7);
-      if (x < 702) { const ry = 546 - 46 * Math.sin((702 - x) / 210) * sstep(0, 160, 702 - x); dirt = Math.max(dirt, sstep(9, 3, Math.abs(y - ry)) * 0.7); }
+      const RD = L.road;
+      if (x < RD.x) { const ry = RD.y - RD.swing * Math.sin((RD.x - x) / RD.wave) * sstep(0, RD.ease, RD.x - x); dirt = Math.max(dirt, sstep(9, 3, Math.abs(y - ry)) * 0.7); }
     }
     return { z, rock, dirt, water, cd };
   }
@@ -329,13 +331,14 @@ export function buildMap() {
   return {
     type, seg, segments, hm, gz, cz, portal, wallAt, wallLen, keepSlots, stairs, causeway: cause, rear, causeHalf: CAUSE_HALF, rearHalf: REAR_HALF,
     GATE, POSTERN, DOOR, CULVERT: culvertSeg, wallTop: Tp, wallJoin: J, streamY, rampZ,
+    layout: L,
     labels: [
-      { x: culv.x + 46, y: culv.y + 90, text: 'DEEPING WALL' },
-      { x: KEEP.cx - 30, y: KEEP.cy - 30, text: 'THE HORNBURG' },
-      { x: 770, y: 642, text: 'CAUSEWAY' },
-      { x: culv.x - 40, y: culv.y - 12, text: 'CULVERT' },
-      { x: 1180, y: 470, text: 'THE DEEP' },
-      { x: 380, y: 480, text: 'DEEPING-COOMB' },
+      { x: culv.x + L.labels.wall[0], y: culv.y + L.labels.wall[1], text: 'DEEPING WALL' },
+      { x: KEEP.cx + L.labels.hornburg[0], y: KEEP.cy + L.labels.hornburg[1], text: 'THE HORNBURG' },
+      { x: L.labels.causeway[0], y: L.labels.causeway[1], text: 'CAUSEWAY' },
+      { x: culv.x + L.labels.culvert[0], y: culv.y + L.labels.culvert[1], text: 'CULVERT' },
+      { x: L.labels.deep[0], y: L.labels.deep[1], text: 'THE DEEP' },
+      { x: L.labels.coomb[0], y: L.labels.coomb[1], text: 'DEEPING-COOMB' },
     ],
     cellOf, terrZ, airFloor,
     /** Walking-surface height at a point (ground level; wall walks are handled per unit). */

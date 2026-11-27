@@ -5,7 +5,7 @@
 //           before they reach the wall, shells the thickest of the press, holds a reserve for resupply
 //   dump    the old crude one: whatever is available goes on the densest cell
 import { UNITS, U, DEF, SUPPORT } from '../src/config.js';
-import { KEEP } from '../src/map.js';
+import { LAYOUT } from '../src/layout.js';
 import { LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH } from '../src/sim/sim.js'; // the sim's coarse attacker grid
 
 export function autopilot(sim, policy = 'auto') {
@@ -85,7 +85,7 @@ export function autopilot(sim, policy = 'auto') {
       const s = siegeTarget();
       if (s) { for (const k of ['air', 'gunship']) if (can(k) && call(k, s.x, s.y)) { lastSiege = sim.time; return; } }
     }
-    if (sim.defCombat < sim.initial[0] * 0.55 && can('reinforce') && call('reinforce', KEEP.cx - 24, KEEP.cy - 34)) return;
+    if (sim.defCombat < sim.initial[0] * 0.55 && can('reinforce') && call('reinforce', LAYOUT.posts.court[0], LAYOUT.posts.court[1])) return;
     const b = densestBlock();
     if (!b) return;
     const thresh = Math.max(60, sim.onField() * 0.03);

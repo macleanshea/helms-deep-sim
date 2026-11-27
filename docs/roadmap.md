@@ -77,7 +77,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | # | Milestone | Status |
 | --- | --- | --- |
 | 1 | Sync with main, baseline and guard rails | done, bar the owner's benchmark table |
-| 2 | Layout extraction (no visible change) | |
+| 2 | Layout extraction (no visible change) | 2a done; 2b lands with milestone 5 |
 | 3 | Perspective camera and engine foundation | |
 | 4 | Simulation decoupled from rendering (still on the main thread) | |
 | 5 | Map redesign in greybox, owner signs off | |
@@ -102,17 +102,30 @@ map's measurements, and the hashes. Still wanted: a `?bench` table from the owne
 
 ### 2. Layout extraction
 
-`src/layout.js` becomes the one description of the battlefield: valley rims, wall curve, the
-Hornburg's outline as a closed curve, gate, postern and door, heights, causeway arc, rear ramp, stair
-flights, stream, the Deep, spawn lanes, the approach axis, garrison anchors, sectors, labels, bounds
-and benchmark views. `buildMap(layout)` also emits `region`, `sector`, `ringT` and side-of-wall
-grids. Every fixed coordinate elsewhere is replaced by a derived one: `src/sim/sim.js`,
-`warlord.js` (lane splits at y 344/616, `RES_X`, `RALLY_X`, the x < 500 and x < 945 tests),
-`engines.js`, `posts.js`, `director.js`, `morale.js`, `support.js`, `src/scenarios.js`,
-`tools/checks.js`, `tools/autopilot.js`, `src/main.js`, `src/render/renderer.js`,
-`src/render/structures.js`.
+Done in two steps, so that the first can be proved to change nothing.
 
-Done when: `npm run golden` is identical, `npm run checks` passes, screenshots are identical.
+**2a, done: every number about this map in one file.** `src/layout.js` now holds the valley rims,
+the Hornburg and its ring sections, the Deeping Wall, the causeway and rear ramp, the stairs, the
+stream and road, the labels, the horde's lines and lanes (`approach`: where waves appear, where the
+reserve waits and a beaten force rallies, the lane split into sectors, the line that counts as "in
+front of the wall") and the garrison's places (`posts`: court, guns, reserve, vehicles).
+`src/map.js` is built from it, and the presets, the simulation (`sim.js`, `warlord.js`,
+`director.js`), the tools and the renderer's shadow box read from it. `npm run golden` is identical
+across the map, the fortress mesh and seven whole battles.
+
+**2b, with the redesign (milestone 5): shapes instead of numbers.** What still assumes the present
+shape, and must become a question asked of the map rather than arithmetic on the layout:
+
+- the Hornburg as a circle: `KEEP.r` tests for "inside the keep" (`sim.js` `sectorAt`, retreat and
+  `_toKeep`; `morale.js`; `warlord.js` `_wlSurvey`; `tools/checks.js`), steering round the ring
+  about its centre (`sim.js` `_def`), `alongRing` in `scenarios.js`, the fall-back slots and keep
+  sectors binned by bearing, `ringSection` and the terraces in `structures.js`;
+- the wall running north-south with the horde to the west: every `approach` line is an x and every
+  lane a y; `sectorAt` splits the wall by y; the warlord's "outside" is `x < wallJoin.x + 12`;
+  held and beaten forces move along -x; aircraft enter from the east edge (`support.js`);
+- ladders climb to the Deeping Wall's height (`segTop[0]`), and the ladder and tower models are
+  built for a 12 m wall;
+- the postern's approach is `map.rear[2]`, and the door is the only `T.DOOR` cell group.
 
 ### 3. Camera and engine foundation
 

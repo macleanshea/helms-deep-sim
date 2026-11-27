@@ -13,7 +13,9 @@ import { directorMethods } from './director.js';
 import { warlordMethods } from './warlord.js';
 import { engineMethods } from './engines.js';
 import { postMethods } from './posts.js';
+import { LAYOUT } from '../layout.js';
 
+const AP = LAYOUT.approach, PO = LAYOUT.posts; // the horde's lines and the garrison's places on this map
 export const MAX_UNITS = 1 << 16;
 const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast grid
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
@@ -142,7 +144,7 @@ export class Sim {
     // the defence is reported on by sector: three stretches of the Deeping Wall and the Hornburg
     // named by landmark rather than compass point, so the names hold whichever way the map is drawn
     this.sectors = [['the wall by the keep', 'keep end'], ['the centre of the wall', 'centre'], ['the cliff end of the wall', 'cliff end'], ['the Hornburg', 'Hornburg']].map(([name, short], k) => {
-      if (k === 3) return { name, short, x: KEEP.cx - KEEP.r, y: KEEP.cy };
+      if (k === 3) return { name, short, x: PO.hornburgFront[0], y: PO.hornburgFront[1] };
       const sg = this.segs[Math.floor(((k + 0.5) * N_WALL) / 3)];
       return { name, short, x: sg.x, y: sg.y };
     });
@@ -810,7 +812,7 @@ export class Sim {
     const el = this.elev[c] ? 1 : 0;
     this.el[i] = el;
     const g = this.grp[i], gs = this.gState[g];
-    if (st === S_FLEE || (gs >= 2 && !el && x < 930)) {
+    if (st === S_FLEE || (gs >= 2 && !el && x < AP.rout)) {
       // broken: run for the valley mouth
       if (st === S_DONE) return;
       if (crewed) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return; } // nobody carries timber in a rout
@@ -822,7 +824,7 @@ export class Sim {
         return;
       }
       this._move(i, -1, ((i % 9) - 4) * 0.05, d.speed * 1.15, d.sz, 0, 1);
-      if (x < 10) { if (st === S_FLEE || gs === 3) { this.stats.fled++; this.kill(i, null, true); } else { this.vx[i] = 0; this.vy[i] = 0; } }
+      if (x < AP.exit) { if (st === S_FLEE || gs === 3) { this.stats.fled++; this.kill(i, null, true); } else { this.vx[i] = 0; this.vy[i] = 0; } }
       return;
     }
     let speed = d.speed;
@@ -1787,7 +1789,7 @@ export class Sim {
     if (!this._keepField || this.time - this._keepField.t > 2) {
       const ring = [];
       for (let c = 0; c < GW * GH; c++) if (this.elev[c] === 2) ring.push(c);
-      this._keepField = { t: this.time, court: this._orderField(KEEP.cx - 24, KEEP.cy - 34, false, 6), ring: this._orderField(ring, 0, false, 6) };
+      this._keepField = { t: this.time, court: this._orderField(PO.court[0], PO.court[1], false, 6), ring: this._orderField(ring, 0, false, 6) };
     }
     const kf = this._keepField, slots = this.map.keepSlots;
     // the court runs round the inner rock: one path field for each twelfth of it, so that a man is led round the rock to his own place
@@ -1802,7 +1804,7 @@ export class Sim {
         for (let j = this.dcHead[c]; j >= 0; j = this.cnext[j]) { const dx = this.x[j] - q.x, dy = this.y[j] - q.y; if (dx * dx + dy * dy < 1.2) { occ = true; break; } }
         if (!occ) slot = q;
       }
-      if (!slot) slot = { x: KEEP.cx - 30 + (this.rand() - 0.5) * 40, y: KEEP.cy - 34 + (this.rand() - 0.5) * 30 };
+      if (!slot) slot = { x: PO.courtMuster[0] + (this.rand() - 0.5) * 40, y: PO.courtMuster[1] + (this.rand() - 0.5) * 30 };
       this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1; this.ax[i] = slot.x; this.ay[i] = slot.y;
       this.ord[i] = this.elev[this.map.cellOf(slot.x, slot.y)] === 2 ? kf.ring : kf.court;
       if (sect && this.ord[i] === kf.court) { const o = sect[(((Math.atan2(slot.y - rk.y, slot.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0]; if (o >= 0) this.ord[i] = o; }
