@@ -251,6 +251,11 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   by position: stone, ground and soldiers are all lit by it for one texture read. Faint by day, most of the light
   there is at night. Pictures: `docs/progress/fortress-art/`.
 
+- **After the owner's second look:** a roofed gallery over the postern and the wall door as well as the gate; every
+  stair's landing closed across its far end to the wall; the hall's arches rebuilt as real openings (piers, round
+  heads, a room behind lit from the floor up or left a dim hollow) with the hall's body run back into the mountain
+  and rock lumps closed round its front; night mist lying low in the valley; stair treads no longer striped.
+
 **Still to do toward the references:** painted stone textures with arc-length coordinates on the curved walls,
 baked ambient occlusion, weathering relative to each wall's foot, the square gatehouse's hoarding and deep arch,
 the horn tower's crown and the two-tier hall front (as sculpted pieces from Meshy), rock outcrops under the

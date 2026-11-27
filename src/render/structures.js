@@ -358,7 +358,7 @@ function stairs(m, map) {
       const P = (a, r, z) => [st.cx + Math.cos(a) * r, st.cy + Math.sin(a) * r, z], ang = (d) => st.a0 + (da * d) / st.len;
       for (let i = 0; i <= steps; i++) {
         const a0 = ang(i < steps ? (i * run) / steps : run), a1 = ang(i < steps ? ((i + 1) * run) / steps : st.len), zt = i < steps ? st.z0 + (rise * (i + 1)) / steps : st.z1, zb = st.z0 - 2;
-        m.prism([P(a0, ri, zb), P(a1, ri, zb), P(a1, ro, zb), P(a0, ro, zb)], [P(a0, ri, zt), P(a1, ri, zt), P(a1, ro, zt), P(a0, ro, zt)], i === steps ? PAVE : i & 1 ? STONE : STONE_LT);
+        m.prism([P(a0, ri, zb), P(a1, ri, zb), P(a1, ro, zb), P(a0, ro, zb)], [P(a0, ri, zt), P(a1, ri, zt), P(a1, ro, zt), P(a0, ro, zt)], i === steps ? PAVE : dim(STONE, 0.94 + (i % 3) * 0.04)); // (treads of one stone, a shade apart: not stripes)
         // the parapet on the open side, stepping up with the flight
         m.prism([P(a0, ro - 0.5, zt), P(a1, ro - 0.5, zt), P(a1, ro, zt), P(a0, ro, zt)], [P(a0, ro - 0.5, zt + 1.15), P(a1, ro - 0.5, zt + 1.15), P(a1, ro, zt + 1.15), P(a0, ro, zt + 1.15)], STONE_LT);
       }
@@ -373,7 +373,7 @@ function stairs(m, map) {
     for (let i = 0; i < steps; i++) {
       const a0 = i * run, zt = st.z0 + (rise * (i + 1)) / steps;
       const cx = st.x + st.dx * (a0 + run / 2), cy = st.y + st.dy * (a0 + run / 2);
-      m.frameBox([cx, cy, (zt + st.z0 - 4) / 2], [st.dx * run / 2, st.dy * run / 2, 0], [px * st.half, py * st.half, 0], [0, 0, (zt - st.z0 + 4) / 2], i & 1 ? STONE : STONE_LT);
+      m.frameBox([cx, cy, (zt + st.z0 - 4) / 2], [st.dx * run / 2, st.dy * run / 2, 0], [px * st.half, py * st.half, 0], [0, 0, (zt - st.z0 + 4) / 2], dim(STONE, 0.94 + (i % 3) * 0.04));
     }
     // the landing at the head, level with the walk
     const hx = st.x + st.dx * (st.len - 1), hy = st.y + st.dy * (st.len - 1);
