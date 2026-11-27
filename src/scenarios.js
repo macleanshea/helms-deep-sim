@@ -64,6 +64,21 @@ export function wallPoint(map, wall, u) {
 export const wallRunLength = (map, wall, a, b) => (wall === 1 ? (Math.abs(b - a) * Math.PI / 180) * KEEP.r : Math.abs(b - a) * map.wallLen);
 
 /**
+ * Where the front rank stands, measured out from a wall walk's centre line at (x, y) along its outward normal: a pace
+ * inside the parapet, and where a bastion swells out from the Hornburg's wall there, a pace inside the bastion's own
+ * parapet. Men line the battlements as built, not the line the wall would take without its bastions.
+ */
+export function parapetAt(map, wall, x, y, nx, ny, half) {
+  let o = half - 1.0;
+  if (wall === 1) for (const b of map.bastions) {
+    // the far crossing of the line (x, y) + o n with the bastion's circle
+    const dx = x - b.x, dy = y - b.y, r = b.r - 1.1, B = dx * nx + dy * ny, C = dx * dx + dy * dy - r * r, D = B * B - C;
+    if (D > 0) { const far = -B + Math.sqrt(D); if (far > o) o = far; }
+  }
+  return o;
+}
+
+/**
  * Places along a stretch of wall walk (`g.run = { wall, a, b }`), following its curve: the front rank at the parapet,
  * spread over the whole stretch, then the ranks behind it as far as the walk is wide.
  */
@@ -71,13 +86,17 @@ function runPositions(map, def, g) {
   const { wall, a, b } = g.run, half = wall === 1 ? KEEP.half : WALL_HALF, len = wallRunLength(map, wall, a, b), out = [];
   const st = Math.min(def.spacing * (g.spread || 1), 1.5), cap = Math.max(1, Math.floor(len / st) + 1);
   let left = g.count;
-  for (let o = half - 1.0; o > -half + 0.8 && left > 0; o -= 1.6) {
+  for (let rank = 0; rank < 14 && left > 0; rank++) {
     const n = Math.min(left, cap);
+    let any = false;
     for (let k = 0; k < n; k++) {
       // (a rank that is not full is spread over the whole stretch, not bunched at one end)
-      const f = n > 1 ? k / (n - 1) : 0.5, p = wallPoint(map, wall, a + (b - a) * f), x = p.x + p.nx * o, y = p.y + p.ny * o;
-      if (canPlace(map, def, x, y, true)) { out.push(x, y); left--; }
+      const f = n > 1 ? k / (n - 1) : 0.5, p = wallPoint(map, wall, a + (b - a) * f), o = parapetAt(map, wall, p.x, p.y, p.nx, p.ny, half) - rank * 1.6;
+      if (o <= -half + 0.8) continue;
+      const x = p.x + p.nx * o, y = p.y + p.ny * o;
+      if (canPlace(map, def, x, y, true)) { out.push(x, y); left--; any = true; }
     }
+    if (!any) break;
   }
   return out;
 }
@@ -107,12 +126,17 @@ export function groupPositions(map, g, strict = false) {
   if (g.parapet && onWall) {
     // along a wall walk, front to back: the first rank kneels at the parapet, the second stands behind it
     const { s, half } = g.parapet, st = Math.min(sp, 1.5), nc = g.w > 0 ? Math.max(1, Math.floor(g.w / st) + 1) : g.count;
-    for (let o = half - 1.0; o > -half + 0.8 && out.length < g.count * 2; o -= 1.6) {
+    const ring = Math.abs(Math.hypot(g.x - KEEP.cx, g.y - KEEP.cy) - KEEP.r) < KEEP.half + 1 ? 1 : 0;
+    for (let rk = 0; rk < 14 && out.length < g.count * 2; rk++) {
+      let any = false;
       for (let c = 0; c < nc && out.length < g.count * 2; c++) {
-        const a = (c - (nc - 1) / 2) * st + (r() - 0.5) * 0.2;
-        const x = g.x + ux * a + px * o * s, y = g.y + uy * a + py * o * s;
-        if (canPlace(map, def, x, y, true)) out.push(x, y);
+        const a = (c - (nc - 1) / 2) * st + (r() - 0.5) * 0.2, bx = g.x + ux * a, by = g.y + uy * a;
+        const o = parapetAt(map, ring, bx, by, px * s, py * s, half) - rk * 1.6;
+        if (o <= -half + 0.8) continue;
+        const x = bx + px * o * s, y = by + py * o * s;
+        if (canPlace(map, def, x, y, true)) { out.push(x, y); any = true; }
       }
+      if (!any) break;
     }
     if (out.length >= g.count * 2) return out;
   }

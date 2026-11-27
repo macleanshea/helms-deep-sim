@@ -3,7 +3,7 @@
 
 import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH, WALL_H, RING_TOP } from './config.js';
 import { buildMap, KEEP, WALL_HALF } from './map.js';
-import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS, wallPoint, wallRunLength } from './scenarios.js';
+import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS, wallPoint, wallRunLength, parapetAt } from './scenarios.js';
 import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { SUPPLY_R } from './sim/support.js';
@@ -241,7 +241,7 @@ function groupAt(wx, wy) {
       const r = runBand(g);
       for (let k = 0; k <= 24; k++) {
         const w = wallPoint(map, g.run.wall, g.run.a + ((g.run.b - g.run.a) * k) / 24), o = (wx - w.x) * w.nx + (wy - w.y) * w.ny, t = Math.abs(-(wx - w.x) * w.ny + (wy - w.y) * w.nx);
-        if (o < r.out + pad && o > r.inn - pad && t < r.len / 48 + 1 + pad) { const area = r.len * (r.out - r.inn) / 4; if (area < ba) { ba = area; best = g; } break; }
+        if (o < parapetAt(map, g.run.wall, w.x, w.y, w.nx, w.ny, r.out) + 1 + pad && o > r.inn - pad && t < r.len / 48 + 1 + pad) { const area = r.len * (r.out - r.inn) / 4; if (area < ba) { ba = area; best = g; } break; }
       }
       continue;
     }
@@ -891,7 +891,8 @@ function drawOverlay(dtReal) {
         // posted along a wall: the outline is their stretch of the walk, bent with the wall
         const r = runBand(g), N = Math.max(4, Math.min(48, Math.ceil(r.len / 4)));
         for (let k = 0; k <= 2 * N + 1; k++) {
-          const f = k <= N ? k / N : (2 * N + 1 - k) / N, o = k <= N ? r.out : r.inn, w = wallPoint(map, g.run.wall, g.run.a + (g.run.b - g.run.a) * f);
+          const f = k <= N ? k / N : (2 * N + 1 - k) / N, w = wallPoint(map, g.run.wall, g.run.a + (g.run.b - g.run.a) * f);
+          const o = k <= N ? parapetAt(map, g.run.wall, w.x, w.y, w.nx, w.ny, r.out) + 1 : r.inn; // (out to the parapet as built: round a bastion where there is one)
           const q = S(w.x + w.nx * o, w.y + w.ny * o, r.top + 0.3);
           if (k) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]);
           top = Math.min(top, q[1]);

@@ -13,10 +13,9 @@
       "name": "aim",
       "from": "kneel",
       "range": [
-        0.94,
-        1
-      ],
-      "loop": "pingpong"
+        0.2609,
+        0.2609
+      ]
     },
     {
       "name": "walk",

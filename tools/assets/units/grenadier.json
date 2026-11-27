@@ -81,28 +81,25 @@
       "name": "aim",
       "from": "walkfire",
       "range": [
-        0,
-        0.06
-      ],
-      "loop": "pingpong"
+        0.1328,
+        0.1328
+      ]
     },
     {
       "name": "kneel",
       "from": "kneel",
       "range": [
-        0.94,
-        1
-      ],
-      "loop": "pingpong"
+        0.2609,
+        0.2609
+      ]
     },
     {
       "name": "prone",
       "from": "prone",
       "range": [
-        0.94,
-        1
-      ],
-      "loop": "pingpong"
+        0.6322,
+        0.6322
+      ]
     },
     {
       "name": "walk",

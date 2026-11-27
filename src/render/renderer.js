@@ -1034,7 +1034,7 @@ export class Renderer {
           // standing his ground: a defender in the stance his post gives him (at the parapet kneeling, in the open prone), weapon up
           const ps = team[i] === DEF ? poseOf[i] : 0;
           cl = (ps === 2 ? C.prone : ps === 1 ? C.kneel : null) || (team[i] === DEF && C.aim) || C.idle || C.walk;
-          fr = (time * cl.fps + i * 13) % cl.frames;
+          fr = cl.frames > 1 ? (time * cl.fps + i * 13) % cl.frames : 0; // (a stance is one held frame: nobody shuffles on the spot)
         }
         // (for looking a clip over: renderer.debugClip = { name, at: 0..1 } poses every such unit in it)
         if (this.debugClip && C[this.debugClip.name]) { cl = C[this.debugClip.name]; fr = Math.min(cl.frames - 1, this.debugClip.at * cl.frames); }

@@ -423,6 +423,14 @@ gathered to the culvert arch's width at the Deeping Wall; banners stand along th
 section; and the ground is repainted toward the film's valley: bleached tawny tussock over pale grey river
 gravel, cooler slate rock, a cooler daylight.
 
+**Battlements as built, and stances held.** Men posted on the Hornburg's wall stand a pace inside the parapet
+that is actually there: where a bastion swells out they line its curve and fill it rank behind rank
+(`scenarios.js parapetAt()`, used by the presets and by a group dragged along the wall; the group's outline bulges
+with it). A defender standing, kneeling or prone holds one settled frame of the action instead of looping a
+few: the standing stance had been the first steps of a walk, so men shuffled on the spot, and the phases ran
+along a rank as a wave. `tools/assets` picks the frame by measurement (both feet down and least travel for the
+standing aim; low and still for the other two).
+
 **The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
 one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 
