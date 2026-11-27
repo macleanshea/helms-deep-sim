@@ -376,7 +376,7 @@ ${LIGHT}
 void main(){
   if (uShadowPass > 0.5) { o = vec4(0.,0.,0.,0.34); return; }
   // the paintings these come from are dark: lift them so a figure reads against the ground at a soldier's size on screen
-  vec3 n = normalize(vN), c = min(texture(uTex, vUV).rgb*1.5 + 0.035, 1.)*vC;
+  vec3 n = normalize(vN), c = min(texture(uTex, vUV).rgb*1.38 + 0.03, 1.)*vC;
   vec3 col = shade(c, n, vW, 0.56, 0.42, 1.);
   col += (c + 0.05)*uLift*(0.9+0.7*n.z);             // keep figures readable at night
   col = mix(col, vec3(1.), vFlash*0.8);

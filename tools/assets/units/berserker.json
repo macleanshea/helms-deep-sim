@@ -1,0 +1,74 @@
+{
+  "height": 2.1,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "idle": 89,
+    "attack": 242,
+    "die": 8,
+    "climb": 438
+  },
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "sword",
+      "length": 1.35
+    }
+  ],
+  "rig": "assets-src/berserker/rigged.glb",
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/berserker/idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/berserker/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/berserker/run.glb",
+      "loop": true
+    },
+    {
+      "name": "attack",
+      "file": "assets-src/berserker/attack.glb",
+      "loop": false
+    },
+    {
+      "name": "die",
+      "file": "assets-src/berserker/die.glb",
+      "loop": false
+    },
+    {
+      "name": "climb",
+      "file": "assets-src/berserker/climb.glb",
+      "loop": true,
+      "gait": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/berserker.jpg",
+    "prompt": "tools/assets/concepts/berserker.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b5c-7495-b417-7b5e171cf520",
+      "remesh": "01a21b49-e964-759d-bf91-f4fa9ff207c7",
+      "rigging": "01a21b4b-7fc7-763e-a1f7-a35d682497f1",
+      "animations": {
+        "idle": "01a21b4c-1100-7049-9ee4-61f2d314ebf3",
+        "attack": "01a21b4c-15a5-769f-a41f-2c48bd8bcc83",
+        "die": "01a21b4c-1bd9-75c4-91ff-849d29a192e4",
+        "climb": "01a21b4c-1fd6-7576-8355-27be01d6be4b"
+      }
+    }
+  }
+}

@@ -108,6 +108,18 @@ function buildUnit(name) {
       box(bone, SW.wood, c, along(n, 0.022), along(f, w), [0, 0, t], true);
       box(bone, SW.iron, [c[0] + n[0] * 0.04, c[1] + n[1] * 0.04, c[2]], along(n, 0.03), along(f, 0.08), [0, 0, 0.08]);
       box(bone, SW.paint, [c[0] + n[0] * 0.026, c[1] + n[1] * 0.026, c[2] + t * 0.5], along(n, 0.006), along(f, w * 0.45), [0, 0, t * 0.22]);
+    } else if (it.kind === 'crossbow') {
+      // carried across the body: a stock, and the bow's limb set across its head
+      const d = [0.9, 0.3, 0.3], l = Math.hypot(...d), f = d.map((q) => q / l), sd = [-0.3, 0.95, 0], up = [0, 0, 1];
+      const along = (a, k) => a.map((q) => q * k), at = (k) => [h[0] + f[0] * k, h[1] + f[1] * k, h[2] + f[2] * k - 0.03];
+      box(bone, SW.wood, at(0.2), along(f, 0.36), along(sd, 0.025), along(up, 0.035), true);
+      box(bone, SW.iron, at(0.5), along(f, 0.02), along(sd, 0.34), along(up, 0.02), true);
+    } else if (it.kind === 'club') {
+      // a troll's club: a tree trunk shod with iron, as long as the troll's arm
+      const L = recipe.height * 0.42, d = [0.55, 0, 0.83], side = [0, 1, 0], up = [-0.83, 0, 0.55];
+      const along = (a, k) => a.map((q) => q * k), at = (k) => [h[0] + d[0] * k, h[1] + d[1] * k, h[2] + d[2] * k];
+      box(bone, SW.wood, at(L * 0.45), along(d, L * 0.55), along(side, L * 0.06), along(up, L * 0.06), true);
+      box(bone, SW.iron, at(L * 0.88), along(d, L * 0.14), along(side, L * 0.085), along(up, L * 0.085));
     } else throw new Error(`${name}: unknown gear "${it.kind}"`);
   }
 

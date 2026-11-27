@@ -1,9 +1,34 @@
 {
   "units": {
     "uruk": {
-      "pack": "uruk.93262325e1.bin",
+      "pack": "uruk.99132308eb.bin",
       "texture": "uruk.5335191da0.webp",
-      "bytes": 1169832
+      "bytes": 1169880
+    },
+    "archer": {
+      "pack": "archer.cda42414a8.bin",
+      "texture": "archer.91d506014e.webp",
+      "bytes": 688656
+    },
+    "berserker": {
+      "pack": "berserker.77cab71fb9.bin",
+      "texture": "berserker.64599ac049.webp",
+      "bytes": 586176
+    },
+    "chief": {
+      "pack": "chief.3cb333b91c.bin",
+      "texture": "chief.23f16a9ba6.webp",
+      "bytes": 635676
+    },
+    "sapper": {
+      "pack": "sapper.1718ae80ac.bin",
+      "texture": "sapper.d58bc81505.webp",
+      "bytes": 673584
+    },
+    "troll": {
+      "pack": "troll.42a9c52576.bin",
+      "texture": "troll.f3894c78e7.webp",
+      "bytes": 510364
     }
   }
 }

@@ -1,0 +1,120 @@
+{
+  "unit": "archer",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/archer.jpg",
+    "prompt": "tools/assets/concepts/archer.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b24-77c5-ba1a-5b73201bfca5",
+      "remesh": "01a21b4a-385d-7094-a8af-23eecd46d93d",
+      "rigging": "01a21b4c-1b10-71e7-ad89-13f99fb58c1f",
+      "animations": {
+        "idle": "01a21b4c-807c-7457-8f2c-dafb4f02e212",
+        "attack": "01a21b4c-84ad-7531-b7d3-7553a3fda44c",
+        "die": "01a21b4c-87ed-77b8-8b2e-4cfa0d5b368f",
+        "climb": "01a21b4c-8b6e-7312-a891-2c941e497b04"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 60441
+    },
+    "nrm": {
+      "offset": 241764,
+      "length": 60441
+    },
+    "uv": {
+      "offset": 483528,
+      "length": 40294
+    },
+    "joints": {
+      "offset": 644704,
+      "length": 80588
+    },
+    "weights": {
+      "offset": 725292,
+      "length": 80588
+    },
+    "index": {
+      "offset": 1047644,
+      "length": 29925
+    },
+    "ibm": {
+      "offset": 1167344,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 50,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.67706,
+      "offset": 76800
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.8017,
+      "offset": 124416
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 151,
+      "stride": 0,
+      "offset": 153600
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 90,
+      "stride": 0,
+      "offset": 385536
+    },
+    {
+      "name": "climb",
+      "loop": true,
+      "frames": 48,
+      "stride": 0.20359,
+      "offset": 523776
+    }
+  ]
+}

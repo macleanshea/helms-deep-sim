@@ -226,7 +226,9 @@ loading art: cold rain, mist, fire glow. Budgets: shadows ≤ 1.5 ms, post ≤ 1
    (Meshy task ids).
 5. `node tools/assets/build.js <unit>` writes `assets/game/<unit>.<hash>.bin` (four levels of detail,
    every clip baked to bone matrices at 30 fps) and a 512 px WebP, and lists them in
-   `assets/game/manifest.json`. Gear (a blade, a shield) is plain boxes bound to one bone each.
+   `assets/game/manifest.json`. Gear (a blade, a shield, a crossbow, a club) is plain boxes bound to one
+   bone each. `node tools/assets/generate.js <unit>` runs steps 1 to 5 in one go, keeping every paid
+   task's id so that a second run never pays twice.
 6. The game loads the manifest after start-up (`src/render/assets.js`); a unit with a pack is drawn by
    the skinned path, one without keeps its built-in model. `?assets=0` turns the packs off.
 
@@ -240,9 +242,12 @@ against 1,013k at zoom 60, all inside the 2.5 M budget.
 **Still to do for the Uruk:** a second and third body, the texture's normal map, blending between
 clips, frames interpolated at the closest level.
 
-**The rest of the roster,** in this order: crossbow Uruk, berserker, captain, sapper, troll (all
-humanoid: the same six steps); the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but
-Meshy rigs only humanoids: it needs bones assigned by region in the build); defender infantry;
+**In the game so far:** Uruk-hai, crossbow Uruk, berserker, captain, sapper and troll, each from its
+own concept sheet (`tools/assets/concepts/`), generated end to end by `node tools/assets/generate.js
+<unit>` (about 50 Meshy credits a unit; the six cost 350 in all, with the first unit's trials).
+
+**The rest of the roster,** in this order: the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but
+Meshy rigs only humanoids: it needs bones assigned by region in the build, and its rider); defender infantry;
 vehicles and siege engines (rigid parts, a bone each); aircraft.
 
 ### 10. Fortress art pass

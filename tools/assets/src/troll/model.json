@@ -1,0 +1,112 @@
+{
+  "unit": "troll",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/troll.jpg",
+    "prompt": "tools/assets/concepts/troll.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b25-704a-852a-4244727566d0",
+      "remesh": "01a21b49-eae1-74d6-9987-239df48eb33d",
+      "rigging": "01a21b4b-3009-722b-8c9e-3e1990b549d3",
+      "animations": {
+        "idle": "01a21b4b-bef6-71cb-88ec-0d816322b874",
+        "attack": "01a21b4b-c334-74fe-926a-0e94f3198f98",
+        "die": "01a21b4b-c73e-7575-800b-b2bc97fe2482"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 59754
+    },
+    "nrm": {
+      "offset": 239016,
+      "length": 59754
+    },
+    "uv": {
+      "offset": 478032,
+      "length": 39836
+    },
+    "joints": {
+      "offset": 637376,
+      "length": 79672
+    },
+    "weights": {
+      "offset": 717048,
+      "length": 79672
+    },
+    "index": {
+      "offset": 1035736,
+      "length": 31014
+    },
+    "ibm": {
+      "offset": 1159792,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 50,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 3.85915,
+      "offset": 76800
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 4.19188,
+      "offset": 124416
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 56,
+      "stride": 0,
+      "offset": 153600
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 90,
+      "stride": 0,
+      "offset": 239616
+    }
+  ]
+}
