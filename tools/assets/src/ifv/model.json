@@ -1,0 +1,63 @@
+{
+  "unit": "ifv",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/ifv.jpg",
+    "prompt": "tools/assets/concepts/ifv.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c7f2-758c-98d7-0f1867892ae5",
+      "remesh": "01a21b91-b1f1-7640-acc4-79fb9e20c873"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "turret"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 59574
+    },
+    "nrm": {
+      "offset": 238296,
+      "length": 59574
+    },
+    "uv": {
+      "offset": 476592,
+      "length": 39716
+    },
+    "joints": {
+      "offset": 635456,
+      "length": 79432
+    },
+    "weights": {
+      "offset": 714888,
+      "length": 79432
+    },
+    "index": {
+      "offset": 1032616,
+      "length": 29637
+    },
+    "ibm": {
+      "offset": 1151164,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "turret",
+      "loop": true,
+      "frames": 180,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

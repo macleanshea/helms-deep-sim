@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { readGlb, skinnedMesh, sampleClip, mul } from './glb.js';
 import { writeSource } from './source.js';
 import { quadruped } from './quadruped.js';
+import { rigid } from './rigid.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url)), root = path.resolve(here, '../..'), FPS = 30;
 /** A model's colour texture as a JPEG worth keeping (1024 px at most). */
@@ -34,6 +35,13 @@ for (const name of process.argv.slice(2)) {
   if (recipe.quadruped) {
     // a beast the generator could not rig: its skeleton and clips are made here (see quadruped.js)
     const g = readGlb(src(recipe.quadruped.file)), q = quadruped(g, recipe.quadruped);
+    writeSource(name, { mesh: q.mesh, clips: q.clips, fps: q.fps, colour: colourOf(g, q.image), note: recipe.source || null });
+    report(name, q.mesh, q.mesh.skin.names.length, q.clips);
+    continue;
+  }
+  if (recipe.rigid) {
+    // a machine: a hull, and a turret if the recipe says where it begins (see rigid.js)
+    const g = readGlb(src(recipe.rigid.file)), q = rigid(g, recipe.rigid);
     writeSource(name, { mesh: q.mesh, clips: q.clips, fps: q.fps, colour: colourOf(g, q.image), note: recipe.source || null });
     report(name, q.mesh, q.mesh.skin.names.length, q.clips);
     continue;

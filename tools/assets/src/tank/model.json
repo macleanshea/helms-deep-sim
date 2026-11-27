@@ -1,0 +1,63 @@
+{
+  "unit": "tank",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/tank.jpg",
+    "prompt": "tools/assets/concepts/tank.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c87d-7289-b96b-9b5cb2899fb3",
+      "remesh": "01a21b91-b2bb-761d-b861-e222b1ff0293"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "turret"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 60657
+    },
+    "nrm": {
+      "offset": 242628,
+      "length": 60657
+    },
+    "uv": {
+      "offset": 485256,
+      "length": 40438
+    },
+    "joints": {
+      "offset": 647008,
+      "length": 80876
+    },
+    "weights": {
+      "offset": 727884,
+      "length": 80876
+    },
+    "index": {
+      "offset": 1051388,
+      "length": 29538
+    },
+    "ibm": {
+      "offset": 1169540,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "turret",
+      "loop": true,
+      "frames": 180,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

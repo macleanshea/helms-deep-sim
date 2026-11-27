@@ -1,0 +1,24 @@
+{
+  "length": 9,
+  "texture": 512,
+  "lods": [
+    12000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "rigid": {
+    "file": "assets-src/howitzer/model.glb",
+    "nose": "-x"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/howitzer.jpg",
+    "prompt": "tools/assets/concepts/howitzer.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c87d-7501-a351-3c55d9eea5ee",
+      "remesh": "01a21b91-14fb-71bd-86d1-0b18d8ba4b19"
+    }
+  }
+}

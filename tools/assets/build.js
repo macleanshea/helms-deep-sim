@@ -70,7 +70,8 @@ function buildUnit(name) {
   let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
   const nOwn = S.mesh.pos.length / 3;
   for (let v = 0; v < nOwn; v++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], m.pos[v * 3 + k]); hi[k] = Math.max(hi[k], m.pos[v * 3 + k]); }
-  const s = recipe.height / (hi[1] - lo[1]), o = [(lo[0] + hi[0]) / 2, lo[1], (lo[2] + hi[2]) / 2];
+  // (a machine is given by its length, a figure by its height)
+  const s = recipe.length ? recipe.length / (hi[2] - lo[2]) : recipe.height / (hi[1] - lo[1]), o = [(lo[0] + hi[0]) / 2, lo[1], (lo[2] + hi[2]) / 2];
   const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3);
   for (let v = 0; v < nv; v++) for (let e = 0; e < 3; e++) { P[v * 3 + e] = (m.pos[v * 3 + AX[e]] - o[AX[e]]) * s; N[v * 3 + e] = m.nrm[v * 3 + AX[e]]; }
 
@@ -280,7 +281,7 @@ function buildUnit(name) {
     fs.writeFileSync(path.join(OUT, texFile), bytes);
     fs.unlinkSync(outTmp);
   }
-  const header = Buffer.from(JSON.stringify({ name, height: recipe.height, bones: nb, boneNames: props ? [...m.skin.names, 'prop'] : m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
+  const header = Buffer.from(JSON.stringify({ name, height: +((hi[1] - lo[1]) * s).toFixed(3), ...(recipe.length ? { span: +(Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * s).toFixed(2) } : {}), bones: nb, boneNames: props ? [...m.skin.names, 'prop'] : m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
   const pre = Buffer.alloc(8); pre.write('HDU1', 0, 'latin1'); pre.writeUInt32LE(header.length, 4);
   const headPad = Buffer.alloc((4 - ((8 + header.length) & 3)) & 3);
   const pack = Buffer.concat([pre, header, headPad, ...sections]);

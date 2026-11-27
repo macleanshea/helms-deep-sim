@@ -255,7 +255,7 @@ export class Renderer {
   addUnitAsset(name, pack, image) {
     const gl = this.gl, unit = UNITS.findIndex((d) => d.key === name);
     if (unit < 0 || !pack.lods.length || !image) return;
-    const a = { name, clip: pack.clip, height: pack.height, n: 0, gcap: 0, ibuf: gl.createBuffer(), lods: [],
+    const a = { name, clip: pack.clip, height: pack.height, big: Math.max(1, (pack.span || 0) / 2.4), n: 0, gcap: 0, ibuf: gl.createBuffer(), lods: [],
       lists: [0, 1, 2, 3].map(() => { const idata = new ArrayBuffer(64 * ISTRIDE); return { cap: 64, n: 0, f: new Float32Array(idata), u8: new Uint8Array(idata) }; }) };
     // every frame of every clip: a row a frame, three texels a bone
     a.bones = gl.createTexture();
@@ -866,7 +866,10 @@ export class Renderer {
         // a model from files: pick the clip that fits what he is doing, and the frame of it he has reached
         const C = A.clip, ft = time - fireT[i];
         let cl, fr;
-        if (st === S_CLIMB) { cl = C.climb || C.walk; fr = (time * cl.fps * 1.4 + i * 7) % cl.frames; }
+        if (C.turret) {
+          // a machine: its one clip is the turret's full turn, and the frame is the angle between the gun and the hull
+          cl = C.turret; let a = (trot[i] - yaw) / 6.283185307; a -= Math.floor(a); fr = Math.min(cl.frames - 1, a * cl.frames);
+        } else if (st === S_CLIMB) { cl = C.climb || C.walk; fr = (time * cl.fps * 1.4 + i * 7) % cl.frames; }
         else if (C.attack && ft < 0.9 && sp < 1.5) { cl = C.attack; fr = Math.min(cl.frames - 1, (ft / 0.9) * cl.frames); }
         else if (sp > 0.3) {
           const eng = crewOf[i] >= 0 ? UNITS[type[crewOf[i]]] : null;
@@ -885,7 +888,9 @@ export class Renderer {
         if (this.debugClip && C[this.debugClip.name]) { cl = C[this.debugClip.name]; fr = Math.min(cl.frames - 1, this.debugClip.at * cl.frames); }
         const js = um_i.jitter ? 0.95 + ((h2 >> 4) & 31) * 0.0034 : 1;
         // four levels of detail: the finest only where a soldier stands tall on screen, the coarsest where the built-in models are boxes
-        this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
+        // (a machine several times a man's size earns each level from that much further off)
+        if (A.big > 1) { const zb = zc * A.big; this._tier = zb >= zClose ? 0 : zb >= zHero ? 1 : zb >= zBox ? 2 : 3; }
+        else this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
         // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
         if (tier >= 1 && team[i] === DEF) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, tier === 2 ? 150 : 205, tier === 2 ? 210 : 230, 255, flash, 0, 0, 0);
         else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, sh ? 240 : tier === 2 ? 150 : 205, sh ? 235 : tier === 2 ? 130 : 190, flash, 0, 0, 0);

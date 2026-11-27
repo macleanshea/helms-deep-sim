@@ -1,0 +1,32 @@
+{
+  "length": 7,
+  "texture": 512,
+  "lods": [
+    12000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "rigid": {
+    "turret": {
+      "above": 0.67,
+      "pivot": [
+        0.38,
+        0
+      ],
+      "reach": 0.2
+    },
+    "file": "assets-src/ifv/model.glb",
+    "nose": "-x"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/ifv.jpg",
+    "prompt": "tools/assets/concepts/ifv.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c7f2-758c-98d7-0f1867892ae5",
+      "remesh": "01a21b91-b1f1-7640-acc4-79fb9e20c873"
+    }
+  }
+}

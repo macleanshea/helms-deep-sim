@@ -78,8 +78,10 @@ if (!fs.existsSync(concept)) {
 if (process.argv.includes('--concept-only')) process.exit(0);
 
 // ---- 2. Meshy
+// (a beast or a machine gets no rig from Meshy, which rigs only two-legged figures: its bones are made in the import)
+const fixed = recipe.quadruped ? 'quadruped' : recipe.rigid ? 'rigid' : null;
 if (!state.tasks.model) {
-  const r = meshy(['image-to-3d', 'create', '--image-url', concept, '--model-type', 'standard', '--should-texture', 'true', '--enable-pbr', 'true', '--texture-resolution', '2k', '--pose-mode', 'a-pose', '--target-formats', 'glb', '--async']);
+  const r = meshy(['image-to-3d', 'create', '--image-url', concept, '--model-type', 'standard', '--should-texture', 'true', '--enable-pbr', 'true', '--texture-resolution', '2k', ...(fixed ? [] : ['--pose-mode', 'a-pose']), '--target-formats', 'glb', '--async']);
   state.tasks.model = r.submission.task_id; save();
   log(`image-to-3d: issued ${state.tasks.model}`);
 }
@@ -88,6 +90,18 @@ if (!state.project) {
 }
 const model = task('model', 'image-to-3d', []);
 const remesh = task('remesh', 'remesh', ['--input-task-id', model, '--topology', 'triangle', '--target-polycount', '10000', '--target-formats', 'glb', '--project', state.project, '--stage', 'remesh', '--workspace', work]);
+if (fixed) {
+  const file = path.join(work, 'model.glb');
+  download(remesh, ['--asset', 'model.glb'], file);
+  download(model, ['--asset', 'thumbnail.primary'], path.join(work, 'preview.png'));
+  recipe[fixed].file = path.relative(root, file);
+  recipe.source = { generator: 'meshy', concept: path.relative(root, keep), prompt: `tools/assets/concepts/${unit}.prompt.txt`, tasks: { 'image-to-3d': model, remesh } };
+  fs.writeFileSync(recipeFile, JSON.stringify(recipe, null, 2) + '\n');
+  execFileSync(process.execPath, [path.join(here, 'import.js'), unit], { stdio: 'inherit' });
+  if (!process.argv.includes('--no-build')) execFileSync(process.execPath, [path.join(here, 'build.js'), unit], { stdio: 'inherit' });
+  log(`finished: ${Object.values(state.done).reduce((a, d) => a + (d.credits || 0), 0)} Meshy credits in all`);
+  process.exit(0);
+}
 const rig = task('rig', 'rigging', ['--input-task-id', remesh, '--height-meters', String(recipe.height), '--project', state.project, '--stage', 'rig', '--workspace', work]);
 const files = { rig: path.join(work, 'rigged.glb'), walk: path.join(work, 'walk.glb'), run: path.join(work, 'run.glb') };
 download(rig, ['--asset', 'result.rigged_character_glb_url'], files.rig);

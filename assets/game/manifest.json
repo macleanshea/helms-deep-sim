@@ -69,6 +69,21 @@
       "pack": "warg.972209ba4b.bin",
       "texture": "warg.688df5b10f.webp",
       "bytes": 347816
+    },
+    "tank": {
+      "pack": "tank.bfb3004942.bin",
+      "texture": "tank.252477242b.webp",
+      "bytes": 791400
+    },
+    "ifv": {
+      "pack": "ifv.f01e312c47.bin",
+      "texture": "ifv.d3bc666ae2.webp",
+      "bytes": 777264
+    },
+    "howitzer": {
+      "pack": "howitzer.d0e51473f9.bin",
+      "texture": "howitzer.ee04fe3ebb.webp",
+      "bytes": 825324
     }
   }
 }

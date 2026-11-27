@@ -84,7 +84,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
-| 9 | Asset pipeline and unit production | pipeline done; every soldier and beast in the game has a model (seven kinds of the horde, seven of the garrison); vehicles, engines and aircraft to come |
+| 9 | Asset pipeline and unit production | pipeline done; every soldier, beast and vehicle in the game has a model (seven kinds of the horde, ten of the garrison); siege engines and aircraft to come |
 | 10 | Fortress art pass | |
 | 11 | Cliffs, ground, backdrop | |
 | 12 | Caching and polish | |
@@ -287,9 +287,23 @@ death: a few sines each) are made by `tools/assets/quadruped.js`; the rider is t
 astride in one fixed pose by `tools/assets/rider.js` and fastened to the bones of the back, the two
 textures side by side in one picture. Trolls and wargs now lie where they fall, as the soldiers do.
 
-**The rest of the roster,** in this order: vehicles (tank, IFV, howitzer: rigid parts, a bone each, the
-turret's heading as a clip whose frame is the angle); siege engines (ladder, ram, catapult, tower: bare
-and crewed forms); aircraft.
+The tank, the fighting vehicle and the howitzer are machines: one shell from Meshy with no parts, so
+`tools/assets/rigid.js` makes the turret out of whatever stands above a height the recipe gives (and, for
+the fighting vehicle, within reach of the turret's middle, so the aerials at the back stay put); the
+triangles that straddle the two go with the turret as a skirt. The turret's one clip is a full turn in
+180 frames, and the game picks the frame from the angle between gun and hull. A machine is sized by its
+`length`, and earns each level of detail from as much further off as it is bigger than a man. Their
+finest level is the generator's own 10,000 triangles: the reducer scrambles the texture of a hard-edged
+model (its texture is cut into thousands of islands), which shows close up and not at the lower levels'
+distances. About 810 Meshy credits spent in all so far.
+
+**Known rough edges:** the lower levels of the machines have smeared textures (above); where a turret has
+turned, the hull under it is open; the image model refused the first wording of the howitzer's concept
+(it reads talk of guns "emplaced and ready to fire" as a request it should not serve) and took a plainer one.
+
+**The rest of the roster,** in this order: siege engines (ladder, ram, catapult, tower: they have bare and
+crewed forms, and the ladder and tower must fit the wall, so the built-in ones stay until that is worked
+through); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 
 ### 10. Fortress art pass
 
