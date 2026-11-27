@@ -181,6 +181,10 @@ button.mini:hover { color: var(--text); }
 button.mini.open { color: var(--accent); border-color: rgba(240, 179, 74, 0.5); }
 button.mini .chev { display: inline-block; margin-left: 3px; transition: transform 0.15s; }
 button.mini.open .chev { transform: rotate(90deg); }
+/* Advanced (a challenge's order of battle): outlined in the accent colour, filled with it while open */
+#btnAdvanced { color: var(--accent); border-color: var(--accent); }
+#btnAdvanced:hover { color: var(--accent); background: rgba(240, 179, 74, 0.12); }
+#btnAdvanced.open { background: var(--accent); border-color: var(--accent); color: #1b1407; }
 #oobNote { margin: 0; line-height: 1.45; }
 #attackList .wrow:first-child { padding-top: 0; }
 #inspector .btns { display: flex; gap: 6px; margin-top: 8px; }

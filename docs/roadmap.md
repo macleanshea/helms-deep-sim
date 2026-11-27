@@ -431,6 +431,19 @@ few: the standing stance had been the first steps of a walk, so men shuffled on 
 along a rank as a wave. `tools/assets` picks the frame by measurement (both feet down and least travel for the
 standing aim; low and still for the other two).
 
+**Wire and obstacles (rules).** The horde used to wade through wire at a crawl, and its paths priced a wired
+cell at three times open ground, so it queued in files through whatever gaps there were. Now: a belt of wire
+or a row of obstacles is one piece in every 4 m cell its drawn line crosses, corners filled, so nothing slips
+between two pieces (`scenarios.js obstacleRow()`); standing wire bars every attacker; those held up at it tear
+it down (1,000 a section: a man 1 a tick, a troll 14, an engine 40; a shell 450), so the horde masses along
+the belt and breaks through section by section, about 25 s for the first gaps under no fire; obstacles have
+1,500 and go to an engine's crew (6 a tick) or a troll among them (30). A path through wire costs seven cells
+of open ground, through obstacles (for engines) fifteen. Damaged sections show a small bar. Wire is 5 points a
+section (was 2 for a 3 m piece that only slowed); obstacles stay at 3. A challenge's budget is still exactly
+its garrison's cost. Also: the Advanced button is outlined in the accent colour and filled when open, and
+opens itself when a defender is added in a challenge; an air strike is always twelve bombs, laid further
+apart on a longer run.
+
 **The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
 one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 

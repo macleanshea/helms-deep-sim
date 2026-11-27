@@ -93,7 +93,7 @@ export const supportMethods = {
     if (kind === 'air') {
       let dx = x2 - x, dy = y2 - y, L = Math.hypot(dx, dy), cx = x, cy = y;
       if (L < 20) { dx = 0; dy = -1; L = 230; } else { cx = (x + x2) / 2; cy = (y + y2) / 2; dx /= L; dy /= L; L = Math.max(170, L); }
-      const speed = 230, sd = 1250, N = Math.max(8, Math.min(18, Math.round(L / 20)));
+      const speed = 230, sd = 1250, N = 12; // (the same load whatever the length of the run: a longer line is the same bombs laid further apart)
       const rot = Math.atan2(dy, dx);
       for (let j = 0; j < 2; j++) {
         const off = j ? 14 : -14, back = j * 70;

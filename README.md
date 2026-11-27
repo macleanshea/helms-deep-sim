@@ -140,8 +140,11 @@ Orders can be given while paused. The battle waits while a dialog is open.
 **Rules worth knowing.**
 
 - Units walk up and down stairs and climb ladders and siege towers; nobody floats over the wall.
-- The culvert, water, rubble, wire and obstacles all slow movement. Heavy engines can't
-  cross anti-vehicle obstacles.
+- The culvert, water and rubble slow movement. Barbed wire is laid as an unbroken belt and stops
+  the horde until a way is cut: the men held up at it tear it down section by section (a troll or
+  an engine far faster), and shellfire blows it apart. Anti-vehicle obstacles stop rams,
+  catapults and siege towers until their crews, or a troll, drag them aside. Damaged sections
+  show what is left of them.
 - Troops pressed against the foot of the wall are hard to hit from the battlements above.
 - Ammunition is the garrison's real limit. Shots at close range hit far more often than at long
   range, so holding fire (`H`) stretches it; an amber pip marks a soldier who is out.

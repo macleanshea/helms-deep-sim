@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, WAY_STEP, UNITS, U, WEAPONS, ARMOR_MULT, A, K, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, WIRE_HP, AV_HP, STEP, WAY_STEP, UNITS, U, WEAPONS, ARMOR_MULT, A, K, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { mulberry } from '../rng.js';
@@ -28,6 +28,7 @@ export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 
 export const S_IDLE = 0, S_MOVE = 1, S_ACT = 2, S_DONE = 3, S_FLEE = 4, S_WAIT = 5, S_CLIMB = 6;
 export const LADDER_TIME = 4, TOWER_TIME = 5;
+export const WIRE_COST = 70; // what a section of standing wire adds to the cost of a path through its cell (open ground is 10)
 // direction index for a (dy+1)*3+(dx+1) neighbour offset
 const KDIR = [5, 6, 7, 4, -1, 0, 3, 2, 1];
 
@@ -103,7 +104,7 @@ export class Sim {
     this.ladderAt = new Int32Array(NC).fill(-1); this.lad = new Uint8Array(NC);
     for (let c = 0; c < NC; c++) if (this.mtype[c] === T.DOOR) this.orcBlock[c] = 1;
     // field works
-    this.ob = new Uint8Array(NC); this.wireHp = new Int16Array(NC); this.mines = new Uint8Array(NC);
+    this.ob = new Uint8Array(NC); this.wireHp = new Int16Array(NC); this.avHp = new Int16Array(NC); this.mines = new Uint8Array(NC);
     this.cover = new Uint8Array(NC); this.dyn = new Uint8Array(NC);
     this.propAt = new Int32Array(NC).fill(-1);
     this.props = []; this.clays = []; this.propVersion = 0;
@@ -347,7 +348,8 @@ export class Sim {
     const mt = this.mtype[ct];
     if (mt === T.CLIFF) return false;
     let et, ef;
-    if (orc) { if (this.orcBlock[ct]) return false; et = this.elev[ct]; ef = this.elev[cf]; } else { et = this.elevD[ct]; ef = this.elevD[cf]; }
+    // (standing wire bars the horde, whatever its size, until a way is cut; the garrison knows the paths through its own)
+    if (orc) { if (this.orcBlock[ct] || ((this.ob[ct] & OB.WIRE) && !(this.ob[cf] & OB.WIRE))) return false; et = this.elev[ct]; ef = this.elev[cf]; } else { et = this.elevD[ct]; ef = this.elevD[cf]; }
     if (et === ef) {
       if (et) return true;
       const dz = this.cz[ct] - this.cz[cf];
@@ -366,8 +368,8 @@ export class Sim {
   _addWork(kind, x, y, ang) {
     const c = this.map.cellOf(x, y);
     const prop = { kind, x, y, ang, alive: 1 };
-    if (kind === 'wire') { if (this.ob[c] & OB.WIRE) return; this.ob[c] |= OB.WIRE; this.wireHp[c] = 520; this.propAt[c] = this.props.length; }
-    else if (kind === 'av') { if (this.ob[c] & OB.AV) return; this.ob[c] |= OB.AV; this.cover[c] = 1; this.propAt[c] = this.props.length; }
+    if (kind === 'wire') { if (this.ob[c] & OB.WIRE) return; this.ob[c] |= OB.WIRE; this.wireHp[c] = WIRE_HP; this.propAt[c] = this.props.length; }
+    else if (kind === 'av') { if (this.ob[c] & OB.AV) return; this.ob[c] |= OB.AV; this.avHp[c] = AV_HP; this.cover[c] = 1; this.propAt[c] = this.props.length; }
     else if (kind === 'mine') { if (this.mines[c] > 200) return; this.mines[c]++; }
     else if (kind === 'claymore') {
       // face the enemy: the perpendicular to the laid line that points down the valley
@@ -443,11 +445,11 @@ export class Sim {
       if (o & OB.WIRE) {
         if (mode) speed *= 0.5;
         else {
-          speed *= sz ? 0.6 : 0.3;
-          if ((this.wireHp[c0] -= sz === 2 ? 40 : sz ? 10 : 1) <= 0) this._clearOb(c0, OB.WIRE);
+          speed *= sz ? 0.6 : 0.3; // (caught in it: dropped among them, or still standing in it)
+          if ((this.wireHp[c0] -= sz === 2 ? 40 : sz ? 14 : 1) <= 0) this._clearOb(c0, OB.WIRE);
         }
       }
-      if (o & OB.AV) { speed *= 0.8; if (!mode && sz === 1 && this.rand() < 0.04) this._clearOb(c0, OB.AV); }
+      if (o & OB.AV) { speed *= 0.8; if (!mode && sz === 1 && (this.avHp[c0] -= 30) <= 0) this._clearOb(c0, OB.AV); } // (a troll among the obstacles wrenches them loose)
     }
     const k = 1.7 * (speed > 1 ? speed : 1);
     let vx = this.vx[i], vy = this.vy[i];
@@ -470,6 +472,12 @@ export class Sim {
       // (someone shoved onto the edge of a rock face may always step off it onto open ground)
       if (!this.canEnter(c0, c1, sz, orc) && !(t0 === T.CLIFF && this.mtype[c1] !== T.CLIFF && !this.elev[c1])) {
         blocked = c1;
+        if (orc) {
+          // held up by wire or an obstacle: those at the front tear at it (it shows in its health, and goes when that is spent)
+          const ob1 = this.ob[c1];
+          if ((ob1 & OB.WIRE) && (this.wireHp[c1] -= sz === 2 ? 40 : sz ? 14 : 1) <= 0) this._clearOb(c1, OB.WIRE);
+          if ((ob1 & OB.AV) && sz === 2 && (this.avHp[c1] -= 6) <= 0) this._clearOb(c1, OB.AV);
+        }
         const ca = ((y / CELL) | 0) * GW + ((nx / CELL) | 0);
         if (ca === c0 || this.canEnter(c0, ca, sz, orc)) { ny = y; vy *= 0.3; }
         else {
@@ -674,7 +682,7 @@ export class Sim {
       if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR ? DOOR_COST : 0; continue; } // (a door to batter down: a way through, at a price)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
-      if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
+      if (o) v += (o & OB.WIRE ? WIRE_COST : 0) + (o & OB.AV ? 6 : 0); // (wire is a way through at a price: the time it takes to cut)
       const k = cnt[c];
       cost[c] = v + (k > 20 ? 100 : k * 5);
     }
@@ -682,7 +690,7 @@ export class Sim {
     if (this.gateDirty) {
       this.gateDirty = false;
       const g = this.segs[this.map.GATE];
-      for (let c = 0, n = GW * GH; c < n; c++) cost[c] = mt[c] === T.CLIFF || mt[c] === T.STAIR || this.orcBlock[c] || elev[c] || (ob[c] & OB.AV) ? 0 : 10;
+      for (let c = 0, n = GW * GH; c < n; c++) cost[c] = mt[c] === T.CLIFF || mt[c] === T.STAIR || this.orcBlock[c] || elev[c] ? 0 : (ob[c] & OB.AV) ? 150 : (ob[c] & OB.WIRE) ? 40 : 10; // (obstacles: a way for an engine at a price, the time its crew takes to drag them aside)
       src[0] = this.map.cellOf(g.ox, g.oy);
       this.solver.solve(cost, src, 1, this.gateDir, this.navHeavy);
     }
@@ -1029,7 +1037,7 @@ export class Sim {
         }
         if (tower) {
           // the crew drag anti-vehicle obstacles aside, slowly
-          if (bc >= 0 && (this.ob[bc] & OB.AV) && this.rand() < 0.025) { this._clearOb(bc, OB.AV); this.fx.dust((bc % GW) * CELL + 2, ((bc / GW) | 0) * CELL + 2, this.cz[bc], 3); }
+          if (bc >= 0 && (this.ob[bc] & OB.AV) && (this.tick & 15) === 0) this.fx.dust((bc % GW) * CELL + 2, ((bc / GW) | 0) * CELL + 2, this.cz[bc], 3); // (see _move: being held up is what wears the obstacle down)
           // a tower that cannot get forward lets its company out where it stands
           if (Math.abs(this.x[i] - this.bx[i]) + Math.abs(this.y[i] - this.by[i]) > 1.5) { this.bx[i] = this.x[i]; this.by[i] = this.y[i]; this.linkT[i] = this.time; }
           else if (this.time - this.linkT[i] > (crewed ? 40 : 9)) {
@@ -1685,7 +1693,7 @@ export class Sim {
     if (r >= 5) {
       // blast clears wire
       const gx0 = Math.max(0, ((x - r) / CELL) | 0), gx1 = Math.min(GW - 1, ((x + r) / CELL) | 0), gy0 = Math.max(0, ((y - r) / CELL) | 0), gy1 = Math.min(GH - 1, ((y + r) / CELL) | 0);
-      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) { const c = gy * GW + gx; if ((this.ob[c] & OB.WIRE) && (this.wireHp[c] -= 300) <= 0) this._clearOb(c, OB.WIRE); }
+      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) { const c = gy * GW + gx; if ((this.ob[c] & OB.WIRE) && (this.wireHp[c] -= 450) <= 0) this._clearOb(c, OB.WIRE); }
     }
   }
 

@@ -662,7 +662,7 @@ export const warlordMethods = {
       if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR ? 310 : 0; continue; } // (as in _nav)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
-      if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
+      if (o) v += (o & OB.WIRE ? 70 : 0) + (o & OB.AV ? 6 : 0);
       cost[c] = v;
     }
     const src = this.srcBuf;

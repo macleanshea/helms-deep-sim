@@ -1,7 +1,7 @@
 // Application glue: state machine (setup -> battle -> debrief), the camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH, WALL_H, RING_TOP } from './config.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH, WALL_H, RING_TOP, WIRE_HP, AV_HP } from './config.js';
 import { buildMap, KEEP, WALL_HALF } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS, wallPoint, wallRunLength, parapetAt } from './scenarios.js';
 import { scoreBattle } from './score.js';
@@ -573,13 +573,16 @@ overlay.addEventListener('pointerup', (e) => {
   } else if (d.kind === 'place') {
     const def = UNITS[U[app.tool.type]], q = placement(d);
     const g = makeGroup(def.key, app.brushCount, q.x, q.y, q.ang, q.w, q.extra);
-    if (q.line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(q.w / def.spacing) + 1); // a drawn line of wire/obstacles is always filled end to end
+    if (q.line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.ceil(q.w / 2) + 4; // a drawn line of wire/obstacles is always filled end to end
     const n = groupPositions(map, g).length / 2;
     if (!n) { ui.toast(`${def.name} can't be placed there.`, 'warn'); audio.play('deny'); return; }
     if (n < g.count) { if (def.cls !== C.OBST) ui.toast(`Only room for ${fmt(n)} of ${fmt(g.count)} here.`, 'warn'); g.count = n; }
     app.setup.groups.push(g);
     audio.play('click');
+    // (adding to a challenge's garrison opens its order of battle: what was added, and what it costs, is there to see)
+    const opened = !app.isSandbox() && !app.oobOpen; if (opened) app.oobOpen = true;
     groupsChanged();
+    if (opened) { ui.refreshRoster(); ui.refreshPalette(); ui.refreshInspector(); }
   } else if (d.kind === 'moveGroup') {
     if (d.moved) groupsChanged(false);
   } else if (d.kind === 'tool') {
@@ -936,7 +939,7 @@ function drawOverlay(dtReal) {
       const d = app.drag && app.drag.kind === 'place' ? app.drag : null;
       const def = UNITS[U[app.tool.type]], q = placement(d), line = q.line;
       const g = { id: 0, type: def.key, team: def.team, count: app.brushCount, x: q.x, y: q.y, ang: q.ang, w: q.w, ...q.extra };
-      if (line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(q.w / def.spacing) + 1);
+      if (line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.ceil(q.w / 2) + 4;
       const pos = groupPositions(map, g), n = Math.min(g.count, pos.length / 2);
       const col = def.team === DEF ? '94,200,242' : '232,87,61';
       c.fillStyle = `rgba(${col},0.8)`;
@@ -1140,6 +1143,15 @@ function drawOverlay(dtReal) {
     const p = S(s.x, s.y, s.top + 7);
     bar(p[0], p[1], 54, s.hp / s.maxHp, '#f0b34a');
     c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : k === map.POSTERN ? 'POSTERN' : 'DOOR', p[0], p[1] - 5);
+  }
+  // wire and obstacles the horde is tearing at: what is left of each section
+  if (z > 2.2) for (const pr of sim.props) {
+    if (!pr.alive || (pr.kind !== 'wire' && pr.kind !== 'av')) continue;
+    const cc = map.cellOf(pr.x, pr.y), f = pr.kind === 'wire' ? sim.wireHp[cc] / WIRE_HP : sim.avHp[cc] / AV_HP;
+    if (f >= 0.995 || f <= 0) continue;
+    const p = S(pr.x, pr.y, heightAt(pr.x, pr.y) + 2.2);
+    if (p[0] < -20 || p[1] < -20 || p[0] > innerWidth + 20 || p[1] > innerHeight + 20) continue;
+    bar(p[0], p[1], Math.max(12, Math.min(30, z * 3.2)), f, f > 0.5 ? '#c9cdd2' : '#f0b34a');
   }
   drawBreaches(c);
   // drag visuals

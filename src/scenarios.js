@@ -107,8 +107,34 @@ const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Ma
  * Positions for every unit of a group: rows of `spacing` laid along the group's line.
  * `strict`: attackers are not stood on ground they could never walk off.
  */
+/**
+ * A belt of wire, or a row of anti-vehicle obstacles: one piece in every 4 m cell the drawn line passes through, and where
+ * the line steps across a corner between two cells, one in a cell beside the corner too. Nothing on foot or on wheels
+ * can slip between two pieces. (With a width it fills the whole width; without, `count` pieces in a row.)
+ */
+function obstacleRow(map, def, g) {
+  const ux = Math.cos(g.ang), uy = Math.sin(g.ang), L = g.w > 0 ? g.w : Math.max(0, (g.count - 1) * 4);
+  const ax = g.x - (ux * L) / 2, ay = g.y - (uy * L) / 2, out = [], seen = new Set();
+  const off = (gx, gy) => Math.abs((gx * 4 + 2 - ax) * uy - (gy * 4 + 2 - ay) * ux);
+  const put = (gx, gy) => {
+    const k = gy * 4096 + gx; if (seen.has(k) || out.length >= g.count * 2) return; seen.add(k);
+    // the piece lies on the drawn line where the line crosses its cell, or as near the line as its cell allows
+    const cx = gx * 4 + 2, cy = gy * 4 + 2, t = Math.max(0, Math.min(L, (cx - ax) * ux + (cy - ay) * uy));
+    const x = Math.max(cx - 1.7, Math.min(cx + 1.7, ax + ux * t)), y = Math.max(cy - 1.7, Math.min(cy + 1.7, ay + uy * t));
+    if (canPlace(map, def, x, y, false)) out.push(x, y);
+  };
+  let pgx = null, pgy = null;
+  for (let t = 0; t <= L + 1e-6; t += 0.5) {
+    const gx = Math.floor((ax + ux * t) / 4), gy = Math.floor((ay + uy * t) / 4);
+    if (pgx !== null && gx !== pgx && gy !== pgy) { if (off(pgx, gy) < off(gx, pgy)) put(pgx, gy); else put(gx, pgy); }
+    put(gx, gy); pgx = gx; pgy = gy;
+  }
+  return out;
+}
+
 export function groupPositions(map, g, strict = false) {
   const def = UNITS[U[g.type]];
+  if (def.cls === C.OBST && (def.ob === 'wire' || def.ob === 'av')) return obstacleRow(map, def, g);
   if (g.run && def.team === DEF && def.cls === C.INF) return runPositions(map, def, g);
   const sp = def.spacing * (g.spread || 1);
   const out = [];
@@ -440,6 +466,8 @@ export function buildPreset(map, key, sandbox = false) {
   twoDeep = !p.hidden;
   const s = p.build(map, sandbox);
   twoDeep = false;
+  // (a belt of wire or a row of obstacles is as many pieces as the cells its line crosses: counted here, so it is paid for as laid)
+  for (const g of s.groups) { const d = UNITS[U[g.type]]; if (d.cls === C.OBST && (d.ob === 'wire' || d.ob === 'av') && g.w > 0) { g.count = 1e4; g.count = groupPositions(map, g).length / 2; } }
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
   if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);
   return { groups: s.groups, options, budget: forceCost(s.groups) };
