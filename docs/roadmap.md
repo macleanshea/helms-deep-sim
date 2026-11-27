@@ -84,7 +84,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
-| 9 | Asset pipeline and unit production | pipeline done; Uruk-hai in game; the rest of the roster to come |
+| 9 | Asset pipeline and unit production | pipeline done; twelve kinds of foot soldier in the game (six of the horde, six of the garrison); mortar, warg, vehicles, engines and aircraft to come |
 | 10 | Fortress art pass | |
 | 11 | Cliffs, ground, backdrop | |
 | 12 | Caching and polish | |
@@ -262,13 +262,26 @@ against 1,013k at zoom 60, all inside the 2.5 M budget.
 **Still to do for the Uruk:** a second and third body, the texture's normal map, blending between
 clips, frames interpolated at the closest level.
 
-**In the game so far:** Uruk-hai, crossbow Uruk, berserker, captain, sapper and troll, each from its
-own concept sheet (`tools/assets/concepts/`), generated end to end by `node tools/assets/generate.js
-<unit>` (about 50 Meshy credits a unit; the six cost 350 in all, with the first unit's trials).
+**In the game so far:** on the horde's side Uruk-hai, crossbow Uruk, berserker, captain, sapper and troll;
+on the garrison's the rifleman, machine gunner, marksman, grenadier, anti-armour gunner and commander. Each
+comes from its own concept sheet (`tools/assets/concepts/`), generated end to end by `node
+tools/assets/generate.js <unit>` (40 Meshy credits for a rigged model, 3 a clip; about 700 spent in all,
+trials included).
 
-**The rest of the roster,** in this order: the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but
-Meshy rigs only humanoids: it needs bones assigned by region in the build, and its rider); defender infantry;
-vehicles and siege engines (rigid parts, a bone each); aircraft.
+The defenders hold a weapon the build gives them (`gear` kinds `rifle`, `mg`, `sniper`, `launcher`, `tube`:
+boxes that lie in the right hand along the line to the left hand in the aiming frame) and stand as their
+posts tell them: upright with the weapon up, kneeling at the parapet, prone in the open. Meshy's library
+has no held aim, so those stances are cut out of longer actions by the recipe (`derive`: the last
+moments of "Kneeling Reload" and "Prone Reload", the first of "Walk Forward While Shooting", played there
+and back). Clip ids that were bought, looked over and not used are listed under `tried` in
+`tools/assets/units/rifle.json`. Meshy's preview pictures cannot be reached from the cloud session
+(`cdn.meshy.ai` is not an allowed host); a clip is judged by buying it for 3 credits and looking at it in
+the game.
+
+**The rest of the roster,** in this order: the mortar gunner (the rifleman's body with a tube beside
+him); the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but Meshy rigs only humanoids:
+it needs bones assigned by region in the build, and its rider); vehicles and siege engines (rigid parts,
+a bone each); aircraft.
 
 ### 10. Fortress art pass
 

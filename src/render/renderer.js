@@ -875,14 +875,20 @@ export class Renderer {
           const nat = cl.fps / cl.frames, rate = Math.max(nat * 0.6, Math.min(nat * 1.9, cl.stride > 0.2 ? sp / cl.stride : nat));
           let ph = this.animPhase[i] + this.animDt * rate; ph -= Math.floor(ph); this.animPhase[i] = ph;
           fr = ph * cl.frames;
-        } else { cl = C.idle || C.walk; fr = (time * cl.fps + i * 13) % cl.frames; }
+        } else {
+          // standing his ground: a defender in the stance his post gives him (at the parapet kneeling, in the open prone), weapon up
+          const ps = team[i] === DEF ? poseOf[i] : 0;
+          cl = (ps === 2 ? C.prone : ps === 1 ? C.kneel : null) || (team[i] === DEF && C.aim) || C.idle || C.walk;
+          fr = (time * cl.fps + i * 13) % cl.frames;
+        }
         // (for looking a clip over: renderer.debugClip = { name, at: 0..1 } poses every such unit in it)
         if (this.debugClip && C[this.debugClip.name]) { cl = C[this.debugClip.name]; fr = Math.min(cl.frames - 1, this.debugClip.at * cl.frames); }
         const js = um_i.jitter ? 0.95 + ((h2 >> 4) & 31) * 0.0034 : 1;
         // four levels of detail: the finest only where a soldier stands tall on screen, the coarsest where the built-in models are boxes
         this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
         // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
-        if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, sh ? 240 : tier === 2 ? 150 : 205, sh ? 235 : tier === 2 ? 130 : 190, flash, 0, 0, 0);
+        if (tier >= 1 && team[i] === DEF) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, tier === 2 ? 150 : 205, tier === 2 ? 210 : 230, 255, flash, 0, 0, 0);
+        else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, sh ? 240 : tier === 2 ? 150 : 205, sh ? 235 : tier === 2 ? 130 : 190, flash, 0, 0, 0);
         else if (sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 244, 226, flash, 0, 0, 0);
         else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, 0, 0, 0);
         continue;

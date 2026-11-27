@@ -1,0 +1,160 @@
+{
+  "height": 1.78,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "walkfire": 234,
+    "kneel": 165,
+    "prone": 168,
+    "charge": 511,
+    "die": 183
+  },
+  "rig": "assets-src/marksman/rigged.glb",
+  "clips": [
+    {
+      "name": "walk",
+      "file": "assets-src/marksman/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/marksman/run.glb",
+      "loop": true
+    },
+    {
+      "name": "walkfire",
+      "file": "assets-src/marksman/walkfire.glb",
+      "loop": true
+    },
+    {
+      "name": "kneel",
+      "file": "assets-src/marksman/kneel.glb",
+      "loop": false
+    },
+    {
+      "name": "prone",
+      "file": "assets-src/marksman/prone.glb",
+      "loop": false
+    },
+    {
+      "name": "charge",
+      "file": "assets-src/marksman/charge.glb",
+      "loop": true
+    },
+    {
+      "name": "die",
+      "file": "assets-src/marksman/die.glb",
+      "loop": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/marksman.jpg",
+    "prompt": "tools/assets/concepts/marksman.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b71-44c5-70da-b861-1809cd494243",
+      "remesh": "01a21b72-e794-706c-adcd-bce670fa7b6f",
+      "rigging": "01a21b75-1ab9-71a9-8be6-a22216ad1f0c",
+      "animations": {
+        "walkfire": "01a21b79-dfcc-7041-82ca-1169c756eaa4",
+        "kneel": "01a21b79-e401-7652-880c-f51b3fad95fb",
+        "prone": "01a21b79-e800-7410-b254-87d442d5a8a3",
+        "charge": "01a21b79-ebd7-7460-9f48-252174d13852",
+        "die": "01a21b79-efd2-7461-b358-4396b127f182"
+      }
+    }
+  },
+  "loops": [
+    "idle",
+    "walk",
+    "run",
+    "charge",
+    "walkfire"
+  ],
+  "derive": [
+    {
+      "name": "aim",
+      "from": "walkfire",
+      "range": [
+        0,
+        0.06
+      ],
+      "loop": "pingpong"
+    },
+    {
+      "name": "kneel",
+      "from": "kneel",
+      "range": [
+        0.94,
+        1
+      ],
+      "loop": "pingpong"
+    },
+    {
+      "name": "prone",
+      "from": "prone",
+      "range": [
+        0.94,
+        1
+      ],
+      "loop": "pingpong"
+    },
+    {
+      "name": "walk",
+      "from": "walkfire",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "run",
+      "from": "charge",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "drop": [
+    "walkfire",
+    "charge"
+  ],
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "sniper",
+      "align": {
+        "clip": "aim",
+        "at": 0
+      }
+    }
+  ],
+  "swatches": {
+    "iron": [
+      40,
+      42,
+      44
+    ],
+    "wood": [
+      70,
+      72,
+      60
+    ],
+    "leather": [
+      50,
+      48,
+      42
+    ],
+    "paint": [
+      80,
+      86,
+      60
+    ]
+  }
+}

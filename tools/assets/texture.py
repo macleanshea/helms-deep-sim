@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Shrink a model's colour texture to the size the game ships and write it as WebP.
 
-    python3 tools/assets/texture.py <image in> <webp out> <size>
+    python3 tools/assets/texture.py <image in> <webp out> <size> [swatches [colours]]
 
 Called by tools/assets/build.js. Needs Pillow.
 """
@@ -15,6 +15,8 @@ if im.size != (size, size):
 # A strip of plain swatches under the picture, a sixteenth of its height, for the gear the build adds
 # (weapons, shields): iron, wood, leather, pale paint. tools/assets/build.js knows the order.
 SWATCHES = [(112, 114, 120), (96, 66, 40), (66, 44, 30), (205, 198, 182)]
+if len(sys.argv) > 5:  # a recipe's own colours for them: "r,g,b;r,g,b;r,g,b;r,g,b"
+    SWATCHES = [tuple(int(v) for v in c.split(",")) for c in sys.argv[5].split(";")]
 if len(sys.argv) > 4 and sys.argv[4] == "swatches":
     strip = size // 16
     out = Image.new("RGB", (size, size + strip))

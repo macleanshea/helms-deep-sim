@@ -29,6 +29,36 @@
       "pack": "troll.42a9c52576.bin",
       "texture": "troll.f3894c78e7.webp",
       "bytes": 510364
+    },
+    "rifle": {
+      "pack": "rifle.32bb26f5aa.bin",
+      "texture": "rifle.a31304622f.webp",
+      "bytes": 539360
+    },
+    "mg": {
+      "pack": "mg.dc82c73f7c.bin",
+      "texture": "mg.0187410770.webp",
+      "bytes": 554360
+    },
+    "marksman": {
+      "pack": "marksman.3718cb4c9c.bin",
+      "texture": "marksman.bba0b66d66.webp",
+      "bytes": 559608
+    },
+    "grenadier": {
+      "pack": "grenadier.7e5849f15b.bin",
+      "texture": "grenadier.b49391b4d8.webp",
+      "bytes": 557444
+    },
+    "at": {
+      "pack": "at.0c2b411a26.bin",
+      "texture": "at.27043c1831.webp",
+      "bytes": 553060
+    },
+    "cmd": {
+      "pack": "cmd.6ebb3b113e.bin",
+      "texture": "cmd.baed3a30bb.webp",
+      "bytes": 542196
     }
   }
 }

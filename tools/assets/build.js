@@ -47,24 +47,43 @@ function buildUnit(name) {
   // ---- clips: bone matrices per frame, into the game's space
   const frames = [], clips = [];
   const jointIndex = (re) => m.skin.names.findIndex((n) => re.test(n));
+  const bake = (c, f) => {
+    const out = new Float32Array(nj * 12);
+    for (let j = 0; j < nj; j++) {
+      const M = c.mats.subarray((f * nj + j) * 16, (f * nj + j) * 16 + 16);
+      // t' = s C (R o + t - o); R' = C R C^-1
+      const Ro = [M[0] * o[0] + M[4] * o[1] + M[8] * o[2], M[1] * o[0] + M[5] * o[1] + M[9] * o[2], M[2] * o[0] + M[6] * o[1] + M[10] * o[2]];
+      for (let e = 0; e < 3; e++) {
+        const ge = AX[e];
+        for (let e2 = 0; e2 < 3; e2++) out[j * 12 + e * 4 + e2] = M[AX[e2] * 4 + ge];
+        out[j * 12 + e * 4 + 3] = s * (Ro[ge] + M[12 + ge] - o[ge]);
+      }
+    }
+    return out;
+  };
+  const baked = new Map(); // every clip of the source, by name: { rows, loop, stride }
   for (const c of S.clips) {
     const over = (recipe.clips || []).find((q) => q.name === c.name) || {};
-    clips.push({ name: c.name, start: frames.length, frames: c.frames, loop: c.loop, fps: S.fps, stride: +((over.stride != null ? over.stride : c.stride * s)).toFixed(3) });
-    for (let f = 0; f < c.frames; f++) {
-      const out = new Float32Array(nj * 12);
-      for (let j = 0; j < nj; j++) {
-        const M = c.mats.subarray((f * nj + j) * 16, (f * nj + j) * 16 + 16);
-        // t' = s C (R o + t - o); R' = C R C^-1
-        const Ro = [M[0] * o[0] + M[4] * o[1] + M[8] * o[2], M[1] * o[0] + M[5] * o[1] + M[9] * o[2], M[2] * o[0] + M[6] * o[1] + M[10] * o[2]];
-        for (let e = 0; e < 3; e++) {
-          const ge = AX[e];
-          for (let e2 = 0; e2 < 3; e2++) out[j * 12 + e * 4 + e2] = M[AX[e2] * 4 + ge];
-          out[j * 12 + e * 4 + 3] = s * (Ro[ge] + M[12 + ge] - o[ge]);
-        }
-      }
-      frames.push(out);
-    }
+    const rows = []; for (let f = 0; f < c.frames; f++) rows.push(bake(c, f));
+    baked.set(c.name, { rows, loop: c.loop, stride: over.stride != null ? over.stride : c.stride * s });
   }
+  // a recipe may cut clips of its own out of the source's (`derive`: a held stance is a second of a longer action, played
+  // there and back so it has no seam) and leave source clips out of the game (`drop`)
+  const drop = new Set(recipe.drop || []);
+  for (const d of recipe.derive || []) drop.add(d.name); // (a cut takes the place of a source clip of the same name)
+  const final = [...baked].filter(([n]) => !drop.has(n)).map(([n, b]) => ({ name: n, ...b }));
+  for (const d of recipe.derive || []) {
+    const src = baked.get(d.from); if (!src) throw new Error(`${name}: clip "${d.name}" is cut from "${d.from}", which the source does not have`);
+    const n = src.rows.length, a = Math.max(0, Math.min(n - 1, Math.round(d.range[0] * n))), b = Math.max(a + 1, Math.min(n, Math.round(d.range[1] * n)));
+    let rows = src.rows.slice(a, b);
+    if (d.loop === 'pingpong' && rows.length > 2) rows = rows.concat(rows.slice(1, -1).reverse());
+    final.push({ name: d.name, rows, loop: d.loop !== false, stride: d.stride != null ? d.stride : a === 0 && b === n ? src.stride : 0 });
+  }
+  for (const c of final) {
+    clips.push({ name: c.name, start: frames.length, frames: c.rows.length, loop: !!c.loop, fps: S.fps, stride: +c.stride.toFixed(3) });
+    frames.push(...c.rows);
+  }
+  const clipRow = (cname, at) => { const c = clips.find((q) => q.name === cname); if (!c) throw new Error(`${name}: no clip "${cname}"`); return frames[c.start + Math.min(c.frames - 1, Math.floor(at * c.frames))]; };
 
   // ---- gear: plain boxes that ride on one bone each (a blade in the hand, a shield on the forearm). They are added
   // to every level of detail after it is reduced, and coloured from the swatch strip the texture step appends.
@@ -89,6 +108,14 @@ function buildUnit(name) {
     gear.push({ bone, swatch, verts, tris, far });
   };
   const SW = { iron: 0, wood: 1, leather: 2, paint: 3 };
+  // (metres, for a man: the grip is in the right hand, the barrel runs forward of it and the stock back to the shoulder)
+  const FIREARMS = {
+    rifle: [['iron', 0.1, 0.07, 0.2, 0.022, 0.035, 1], ['iron', 0.45, 0.085, 0.17, 0.012, 0.012, 1], ['leather', -0.22, 0.05, 0.13, 0.02, 0.04], ['iron', 0.12, -0.04, 0.025, 0.014, 0.07], ['iron', 0.1, 0.125, 0.05, 0.014, 0.014]],
+    mg: [['iron', 0.12, 0.07, 0.26, 0.03, 0.045, 1], ['iron', 0.62, 0.085, 0.26, 0.016, 0.016, 1], ['leather', -0.24, 0.05, 0.12, 0.024, 0.05], ['wood', 0.14, -0.06, 0.07, 0.05, 0.06, 1], ['iron', 0.8, -0.06, 0.012, 0.012, 0.12]],
+    sniper: [['iron', 0.1, 0.07, 0.22, 0.02, 0.032, 1], ['iron', 0.6, 0.082, 0.3, 0.011, 0.011, 1], ['leather', -0.24, 0.045, 0.14, 0.02, 0.045], ['iron', 0.12, 0.135, 0.13, 0.02, 0.02, 1], ['iron', 0.78, -0.05, 0.01, 0.01, 0.1]],
+    launcher: [['iron', 0.08, 0.07, 0.16, 0.022, 0.035, 1], ['iron', 0.22, 0.04, 0.07, 0.05, 0.05, 1], ['iron', 0.4, 0.075, 0.1, 0.024, 0.024, 1], ['leather', -0.2, 0.05, 0.11, 0.02, 0.04]],
+    tube: [['paint', 0.05, 0.14, 0.52, 0.055, 0.055, 1], ['iron', -0.5, 0.14, 0.05, 0.07, 0.07, 1], ['iron', 0.6, 0.14, 0.04, 0.065, 0.065, 1], ['iron', 0.05, 0.03, 0.03, 0.02, 0.07]],
+  };
   for (const it of recipe.gear || []) {
     const bone = jointIndex(new RegExp(`^${it.bone}$`, 'i'));
     if (bone < 0) throw new Error(`${name}: no bone "${it.bone}" for its ${it.kind}`);
@@ -120,6 +147,24 @@ function buildUnit(name) {
       const along = (a, k) => a.map((q) => q * k), at = (k) => [h[0] + d[0] * k, h[1] + d[1] * k, h[2] + d[2] * k];
       box(bone, SW.wood, at(L * 0.45), along(d, L * 0.55), along(side, L * 0.06), along(up, L * 0.06), true);
       box(bone, SW.iron, at(L * 0.88), along(d, L * 0.14), along(side, L * 0.085), along(up, L * 0.085));
+    } else if (FIREARMS[it.kind]) {
+      // a firearm lies in the right hand as the clip named by `align` holds it: its barrel runs from that hand toward the
+      // other (which carries the fore-end), its top is whatever was up at that moment
+      const al = it.align || { clip: 'aim', at: 0 }, row = clipRow(al.clip, al.at || 0);
+      const posed = (j, p) => [0, 1, 2].map((e) => row[j * 12 + e * 4] * p[0] + row[j * 12 + e * 4 + 1] * p[1] + row[j * 12 + e * 4 + 2] * p[2] + row[j * 12 + e * 4 + 3]);
+      const back = (j, v) => [0, 1, 2].map((e) => row[j * 12 + e] * v[0] + row[j * 12 + 4 + e] * v[1] + row[j * 12 + 8 + e] * v[2]); // by the bone's rotation, transposed
+      const other = jointIndex(new RegExp(`^${al.to || 'LeftHand'}$`, 'i')), pr = posed(bone, h), pl = posed(other, restOf(other));
+      const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((q) => q / l); }, cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      let dW = norm([pl[0] - pr[0], pl[1] - pr[1], pl[2] - pr[2]]);
+      if (al.level) dW = norm([dW[0], dW[1], dW[2] * (1 - al.level)]); // (flattened toward the horizon when the hands do not sit on one line with the bore)
+      const sW = norm(cross(dW, [0, 0, 1])), uW = cross(sW, dW);
+      const d = back(bone, dW), up = back(bone, uW), side = back(bone, sW);
+      const along = (a, k) => a.map((q) => q * k);
+      // parts: [swatch, along the barrel from the grip, above the grip, half-length, half-width, half-height, seen from afar]
+      for (const [sw, fwd, rise, hl, hw, hh, far] of FIREARMS[it.kind]) {
+        const c = [0, 1, 2].map((e) => h[e] + d[e] * fwd + up[e] * rise);
+        box(bone, SW[sw], c, along(d, hl), along(side, hw), along(up, hh), !!far);
+      }
     } else throw new Error(`${name}: unknown gear "${it.kind}"`);
   }
 
@@ -170,7 +215,7 @@ function buildUnit(name) {
   let texFile = null;
   if (S.colour) {
     const tmp = S.colour, outTmp = path.join(os.tmpdir(), `hd-${name}-${process.pid}.webp`);
-    execFileSync('python3', ['-I', path.join(here, 'texture.py'), tmp, outTmp, String(recipe.texture || 512), strip ? 'swatches' : 'plain'], { stdio: ['ignore', 'inherit', 'inherit'] });
+    execFileSync('python3', ['-I', path.join(here, 'texture.py'), tmp, outTmp, String(recipe.texture || 512), strip ? 'swatches' : 'plain', ...(recipe.swatches ? [['iron', 'wood', 'leather', 'paint'].map((k) => recipe.swatches[k].join(',')).join(';')] : [])], { stdio: ['ignore', 'inherit', 'inherit'] });
     const bytes = fs.readFileSync(outTmp);
     texFile = `${name}.${hash(bytes)}.webp`;
     fs.writeFileSync(path.join(OUT, texFile), bytes);
