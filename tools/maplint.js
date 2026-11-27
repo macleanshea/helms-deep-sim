@@ -132,7 +132,7 @@ const footDef = courtCell < 0 ? new Uint8Array(NC) : solve([courtCell], sim.navD
   }
   // and the road itself must be gentle enough for wheels
   let grade = 0; const cw = map.causeway;
-  for (let i = 1; i < cw.length; i++) { const d = Math.hypot(cw[i].x - cw[i - 1].x, cw[i].y - cw[i - 1].y); grade = Math.max(grade, (Math.abs(map.rampZ(cw[i].t) - map.rampZ(cw[i - 1].t)) / d) * CELL); }
+  for (let i = 1; i < cw.length; i++) { const d = Math.hypot(cw[i].x - cw[i - 1].x, cw[i].y - cw[i - 1].y); grade = Math.max(grade, (Math.abs(map.causeZ(cw[i].t) - map.causeZ(cw[i - 1].t)) / d) * CELL); }
   if (grade > 1.6) ok = false;
   check('a ram can reach the gate from where it starts', ok, `${rows.join(' · ')} · steepest causeway step ${grade.toFixed(2)} m per cell (limit 1.6)`);
 }

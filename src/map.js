@@ -136,7 +136,8 @@ export function buildMap() {
   // the causeway curls down from the gate to the valley floor
   // (each starts at the wall's outer face and runs straight out along the opening's own axis before it turns, so the
   // arch, the leaves and the roadway are all square to one another)
-  const lead = (s, d) => { const f = KEEP.half + 0.5; return [[s.x + s.nx * f, s.y + s.ny * f], [s.x + s.nx * (f + d * 0.6), s.y + s.ny * (f + d * 0.6)], [s.x + s.nx * (f + d), s.y + s.ny * (f + d)]]; };
+  const lead = (s, d) => { const f = KEEP.half - 1.5; // (it starts a little inside the wall's face, so the roadway and its parapets meet the masonry with no gap)
+    return [[s.x + s.nx * f, s.y + s.ny * f], [s.x + s.nx * (f + d * 0.6), s.y + s.ny * (f + d * 0.6)], [s.x + s.nx * (f + d), s.y + s.ny * (f + d)]]; };
   const cause = sampleLine(smooth([...lead(gate, L.causeway.lead), ...L.causeway.via]), 120);
   const CAUSE_HALF = L.causeway.half;
   // a stair from the Deep up to the postern at the rear of the keep
@@ -147,7 +148,11 @@ export function buildMap() {
     for (let i = 0; i < line.length; i++) { const dx = x - line[i].x, dy = y - line[i].y, d = dx * dx + dy * dy; if (d < best) { best = d; bt = line[i].t; } }
     return { d: Math.sqrt(best), t: bt };
   };
-  const rampZ = (t) => PLATEAU_Z * (1 - sstep(0.02, 0.98, t));
+  // a ramp comes down from the court's level to the ground as it actually lies at its own foot (`foot`), not to a
+  // nominal zero: the roadway ends on the ground, with no step up or down at its end
+  const rampZ = (t, foot = 0) => PLATEAU_Z + (foot - PLATEAU_Z) * sstep(0.02, 0.98, t);
+  let causeFoot = 0, rearFoot = 0;
+  const causeZ = (t) => rampZ(t, causeFoot), rearZ = (t) => rampZ(t, rearFoot);
 
   // ---- stairs up to the wall walks -------------------------------------
   const stairs = [];
@@ -237,6 +242,7 @@ export function buildMap() {
     const i = Math.min(HM_W - 1, Math.max(0, ((x + MARGIN) / HM_RES) | 0)), j = Math.min(HM_H - 1, Math.max(0, ((y + MARGIN) / HM_RES) | 0));
     return hm[(j * HM_W + i) * 4];
   };
+  causeFoot = terrZ(cause[cause.length - 1].x, cause[cause.length - 1].y); rearFoot = terrZ(rear[rear.length - 1].x, rear[rear.length - 1].y);
   // the highest ground within ~70 m of each 16 m cell, so aircraft can climb over ridges before they reach them
   const AF = 16, AFW = Math.ceil((HM_W * HM_RES) / AF), AFH = Math.ceil((HM_H * HM_RES) / AF), AFR = 4;
   const afRaw = new Float32Array(AFW * AFH).fill(-1e9), airF = new Float32Array(AFW * AFH);
@@ -278,7 +284,7 @@ export function buildMap() {
   const baseZ = (x, y) => { const tr = tierAt(x, y); return tr ? TIERS[tr].z : terrZ(x, y); };
   const rampAt = (x, y) => {
     const c = nearLine(cause, x, y), r = nearLine(rear, x, y);
-    return c.d - CAUSE_HALF < r.d - REAR_HALF ? { d: c.d - CAUSE_HALF, z: rampZ(c.t) } : { d: r.d - REAR_HALF, z: rampZ(r.t) };
+    return c.d - CAUSE_HALF < r.d - REAR_HALF ? { d: c.d - CAUSE_HALF, z: causeZ(c.t) } : { d: r.d - REAR_HALF, z: rearZ(r.t) };
   };
   const walkZ = (x, y) => {
     const st = stairAt(x, y); if (st >= 0) return st;
@@ -419,7 +425,7 @@ export function buildMap() {
 
   return {
     type, seg, segments, hm, gz, cz, portal, wallAt, wallLen, keepSlots, stairs, alongStair, tierAt, tier, bastions, flanks, posternHead: rear[2], causeway: cause, rear, causeHalf: CAUSE_HALF, rearHalf: REAR_HALF,
-    GATE, POSTERN, DOOR, CULVERT: culvertSeg, wallTop: Tp, wallJoin: J, streamY, rampZ,
+    GATE, POSTERN, DOOR, CULVERT: culvertSeg, wallTop: Tp, wallJoin: J, streamY, rampZ, causeZ, rearZ,
     layout: L,
     labels: [
       { x: culv.x + L.labels.wall[0], y: culv.y + L.labels.wall[1], text: 'DEEPING WALL' },

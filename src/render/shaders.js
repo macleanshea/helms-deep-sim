@@ -152,7 +152,8 @@ void main(){
   // water: a dark, moving surface that catches what light there is
   if (m.a > 0.3) {
     float w = smoothstep(0.3, 0.7, m.a);
-    float r1 = noise(vec2(vW.x*0.5, vW.y*1.6 - uTime*1.7)), r2 = noise(vec2(vW.x*1.3 + uTime*0.6, vW.y*0.7));
+    // (the stream runs out of the Deep and down the valley, westward: its ripples travel that way, their crests across it)
+    float r1 = noise(vec2(vW.x*1.6 + uTime*2.1, vW.y*0.45)), r2 = noise(vec2(vW.x*0.7 + uTime*1.0, vW.y*1.2 + 3.));
     vec3 wc = vec3(0.08,0.11,0.12) + uFog*1.2;
     c = mix(c, wc, w*0.88);
     nd = normalize(mix(nd, vec3((r1-.5)*0.5, (r2-.5)*0.5, 1.), w));

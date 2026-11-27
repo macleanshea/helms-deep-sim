@@ -129,27 +129,29 @@ function rubble(m, map, s) {
   m.mat = MAT.ASHLAR;
 }
 
-/** Raised roadway along a sampled path, with retaining walls, a coped parapet and piers. */
-function ramp(m, line, half, zOf, base, rail) {
+/** Raised roadway along a sampled path, with retaining walls, a coped parapet and piers; it ends on the ground at its foot. */
+function ramp(m, map, line, half, zOf, base, rail) {
   const pts = [];
   for (let i = 0; i < line.length; i += 3) pts.push(line[i]);
   if (pts[pts.length - 1] !== line[line.length - 1]) pts.push(line[line.length - 1]);
   const edge = pts.map((p, i) => {
     const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
     const dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
-    return { c: [p.x, p.y], l: [p.x + nx * half, p.y + ny * half], r: [p.x - nx * half, p.y - ny * half], nx, ny, tx: dx / l, ty: dy / l, z: zOf(p.t) };
+    // (where the ground under an edge stands higher than the roadway would, the roadway lies on the ground)
+    const z = zOf(p.t), L = [p.x + nx * half, p.y + ny * half], R = [p.x - nx * half, p.y - ny * half];
+    return { c: [p.x, p.y], l: L, r: R, nx, ny, tx: dx / l, ty: dy / l, z, zl: Math.max(z, map.terrZ(L[0], L[1]) + 0.05), zr: Math.max(z, map.terrZ(R[0], R[1]) + 0.05) };
   });
   const BAT = 0.9;
   for (let i = 0; i < edge.length - 1; i++) {
     const a = edge[i], b = edge[i + 1], cen = [(a.c[0] + b.c[0]) / 2, (a.c[1] + b.c[1]) / 2, (a.z + b.z) / 2 - 2];
-    m.quadOut([a.l[0], a.l[1], a.z], [a.r[0], a.r[1], a.z], [b.r[0], b.r[1], b.z], [b.l[0], b.l[1], b.z], [cen[0], cen[1], cen[2] - 50], PAVE);
-    if (Math.min(a.z, b.z) <= WAY_STEP) continue; // (below this the roadway is stepped onto from the ground: no wall there)
+    m.quadOut([a.l[0], a.l[1], a.zl], [a.r[0], a.r[1], a.zr], [b.r[0], b.r[1], b.zr], [b.l[0], b.l[1], b.zl], [cen[0], cen[1], cen[2] - 50], PAVE);
     for (const sd of [1, -1]) {
-      const p = sd > 0 ? a.l : a.r, q = sd > 0 ? b.l : b.r;
+      const p = sd > 0 ? a.l : a.r, q = sd > 0 ? b.l : b.r, za = sd > 0 ? a.zl : a.zr, zb = sd > 0 ? b.zl : b.zr;
       const dk = dim(STONE_DK, 0.62);
-      // battered retaining wall
-      m.quadC([p[0] + a.nx * sd * BAT, p[1] + a.ny * sd * BAT, base], [q[0] + b.nx * sd * BAT, q[1] + b.ny * sd * BAT, base], [q[0], q[1], b.z], [p[0], p[1], a.z], cen, dk, dk, STONE_DK, STONE_DK);
-      if (!rail) continue;
+      // battered retaining wall, all the way down the roadway: its edge never hangs in the air, however little it stands above the ground
+      m.quadC([p[0] + a.nx * sd * BAT, p[1] + a.ny * sd * BAT, base], [q[0] + b.nx * sd * BAT, q[1] + b.ny * sd * BAT, base], [q[0], q[1], zb], [p[0], p[1], za], cen, dk, dk, STONE_DK, STONE_DK);
+      // (below WAY_STEP the roadway is stepped onto from the ground: no parapet there)
+      if (!rail || Math.min(a.z - map.terrZ(p[0], p[1]), b.z - map.terrZ(q[0], q[1])) <= WAY_STEP) continue;
       const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy), ox = (-dy / L), oy = dx / L;
       const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], zm = (a.z + b.z) / 2, dz = (b.z - a.z) / 2;
       m.frameBox([mid[0], mid[1], zm + 0.5], [dx / 2, dy / 2, dz], [ox * 0.32, oy * 0.32, 0], [0, 0, 0.5], STONE_LT);
@@ -469,7 +471,12 @@ function hallArcade(m, map, t) {
   }
   if (best[1] - best[0] < 30) return;
   const am = ((best[0] + best[1]) / 720) * Math.PI, span = Math.min(1.25, ((best[1] - best[0]) / 360) * Math.PI * 0.62);
-  const L = 2 * (t.r - 2) * Math.sin(span / 2), d = (t.r - 2) * Math.cos(span / 2) - 1.5, H = 13, bays = Math.max(3, Math.round(L / 6.4)), bw = L / bays;
+  const L = 2 * (t.r - 2) * Math.sin(span / 2), H = 13, bays = Math.max(3, Math.round(L / 6.4)), bw = L / bays;
+  // the front stands as far forward on the court as it must for the rock to be behind it and none of it before its
+  // arches: step out from the rim until the ground along the whole front, and a few metres before it, is the court's
+  let d = (t.r - 2) * Math.cos(span / 2) - 1.5;
+  const rockBefore = (dd) => { for (let y = -L / 2 - 1; y <= L / 2 + 1; y += 2) for (const x of [0.5, 2.5, 4.5]) { const px = t.x + Math.cos(am) * (dd - x) - Math.sin(am) * -y, py = t.y + Math.sin(am) * (dd - x) + Math.cos(am) * -y; if (map.terrZ(px, py) > t.z - 0.3) return true; } return false; };
+  while (d > 4 && rockBefore(d)) d -= 1;
   // a frame standing on the ward at the middle of the front: +x out of the cliff (toward the ward), +y along the front
   m.frame([t.x + Math.cos(am) * d, t.y + Math.sin(am) * d, t.z], [-Math.cos(am), -Math.sin(am)], [Math.sin(am), -Math.cos(am)], () => {
     const H2 = 7.5, HR0 = H + H2, D = 1.6;
@@ -500,7 +507,7 @@ function hallArcade(m, map, t) {
     m.box(0.12, 0, H - 0.3, 0.5, L + 3.2, 0.5, STONE_LT);                    // string course between the storeys
     // the upper storey: a gallery of smaller arches under the eaves
     const nb2 = bays * 2, bw2 = L / nb2;
-    for (let k = 0; k < nb2; k++) opening((k + 0.5 - nb2 / 2) * bw2, bw2 * 0.52, bw2, H + 0.6, 3.0, HR0, k % 4 !== 3);
+    for (let k = 0; k < nb2; k++) opening((k + 0.5 - nb2 / 2) * bw2, bw2 * 0.52, bw2, H + 0.6, 3.0, HR0, true);
     m.box(0.3, 0, HR0 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                  // cornice
     for (const sd of [-1, 1]) m.box(0.2, sd * (L / 2 + 0.75), HR0 / 2, 1.6, 1.5, HR0 + 1.5, STONE_LT);     // end piers
     const HR = H + H2;
@@ -630,7 +637,7 @@ export function buildStructures(map, segs, cache = new Map()) {
   piece('fires', '', (m) => { for (const t of torchSites(map)) brazier(m, t); });
   piece('stairs', '', (m) => stairs(m, map));
   piece('ward', '', (m) => innerWard(m, map));
-  piece('ramps', '', (m) => { ramp(m, map.causeway, map.causeHalf, map.rampZ, -3, true); ramp(m, map.rear, map.rearHalf, map.rampZ, -3, true); });
+  piece('ramps', '', (m) => { ramp(m, map, map.causeway, map.causeHalf, map.causeZ, -3, true); ramp(m, map, map.rear, map.rearHalf, map.rearZ, -3, true); });
   for (const s of segs) if (s.breached) piece('x' + s.id, '', (m) => rubble(m, map, s));
   let bytes = 0;
   for (const p of pieces) bytes += p.data.byteLength;

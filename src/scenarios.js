@@ -21,7 +21,8 @@ export function canPlace(map, def, x, y, onWall = null) {
   const wall = map.seg[c] >= 0;
   if (def.team === ORC) return !wall && t !== T.COURT;
   if (def.cls === C.OBST) return !wall && t !== T.COURT;
-  if (def.cls !== C.INF) return !wall && !map.tier[c]; // (nothing on wheels or tracks climbs the stairs to the inner courts)
+  // (nothing on wheels or tracks climbs the stairs to the inner courts; an ammunition cache is carried up and can stand there)
+  if (def.cls !== C.INF) return !wall && (!map.tier[c] || def.key === 'cache');
   return onWall === null ? true : wall === onWall;
 }
 

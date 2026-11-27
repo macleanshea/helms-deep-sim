@@ -40,7 +40,7 @@ function mapHashes() {
     causeHalf: map.causeHalf, rearHalf: map.rearHalf })]);
   // sampled, as the callers use them: the wall curve, the stream, the ramp profile, the aircraft floor
   const fn = [];
-  for (let i = 0; i <= 200; i++) { const p = map.wallAt(i / 200); fn.push(p.x, p.y, p.tx, p.ty, p.ang, map.rampZ(i / 200), map.streamY(i * 7.2)); }
+  for (let i = 0; i <= 200; i++) { const p = map.wallAt(i / 200); fn.push(p.x, p.y, p.tx, p.ty, p.ang, map.causeZ(i / 200), map.rearZ(i / 200), map.streamY(i * 7.2)); }
   for (let y = -200; y <= 1160; y += 40) for (let x = -200; x <= 1640; x += 40) fn.push(map.airFloor(x, y), map.terrZ(x, y));
   const sampled = sha([plain(fn)]);
   const segs = map.segments.map((s) => ({ ...s, breached: false }));

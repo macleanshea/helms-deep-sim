@@ -57,6 +57,8 @@ const SETUP = [
   ['culvert-from-the-deep', [985, 452, 12, YAW + Math.PI, 0]],
   ['gatehouse', [872, 684, 12, YAW, 0]],
   ['hall-front', [984, 752, 11, 2.6, 0]],
+  ['causeway-foot', [776, 580, 13, 0.3, 0]],
+  ['gate-threshold', [880, 688, 26, YAW + 0.5, 0.15]],
   ['stair-head', [966, 556, 22, 1.9, 0.1]],
   ['low-toward-the-wall', [840, 470, 16, YAW, -0.14]],
   ['low-down-the-valley', [958, 430, 22, YAW + Math.PI, -0.12]],
