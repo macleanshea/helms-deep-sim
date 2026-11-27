@@ -13,10 +13,31 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readGlb, skinnedMesh, sampleClip, mul } from './glb.js';
 import { writeSource } from './source.js';
+import { quadruped } from './quadruped.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url)), root = path.resolve(here, '../..'), FPS = 30;
+/** A model's colour texture as a JPEG worth keeping (1024 px at most). */
+function colourOf(g, image) {
+  if (image == null) return null;
+  const tmp = path.join(os.tmpdir(), `hd-import-${process.pid}`), out = `${tmp}.jpg`;
+  fs.writeFileSync(tmp, g.image(image).bytes);
+  execFileSync('python3', ['-I', '-c', 'import sys\nfrom PIL import Image\nim = Image.open(sys.argv[1]).convert("RGB")\nif max(im.size) > 1024: im = im.resize((1024, 1024), Image.LANCZOS)\nim.save(sys.argv[2], "JPEG", quality=90)', tmp, out]);
+  const bytes = fs.readFileSync(out); fs.unlinkSync(tmp); fs.unlinkSync(out);
+  return bytes;
+}
+const report = (name, m, nj, clips) => {
+  const dir = path.join(here, 'src', name), size = fs.readdirSync(dir).reduce((a, f) => a + fs.statSync(path.join(dir, f)).size, 0);
+  console.log(`${name}: ${m.pos.length / 3} vertices, ${m.index.length / 3} triangles, ${nj} bones, ${clips.length} clips (${clips.map((c) => `${c.name} ${c.frames}`).join(', ')}) -> tools/assets/src/${name}/ ${(size / 1e6).toFixed(1)} MB`);
+};
 for (const name of process.argv.slice(2)) {
   const recipe = JSON.parse(fs.readFileSync(path.join(here, 'units', `${name}.json`), 'utf8')), src = (f) => path.resolve(root, f);
+  if (recipe.quadruped) {
+    // a beast the generator could not rig: its skeleton and clips are made here (see quadruped.js)
+    const g = readGlb(src(recipe.quadruped.file)), q = quadruped(g, recipe.quadruped);
+    writeSource(name, { mesh: q.mesh, clips: q.clips, fps: q.fps, colour: colourOf(g, q.image), note: recipe.source || null });
+    report(name, q.mesh, q.mesh.skin.names.length, q.clips);
+    continue;
+  }
   const g = readGlb(src(recipe.rig)), m = skinnedMesh(g), nj = m.skin.joints.length;
   const jointIndex = (re) => m.skin.names.findIndex((n) => re.test(n));
   const hips = Math.max(0, jointIndex(/hips|pelvis|root/i)), foot = jointIndex(/left.*foot|foot.*l$/i);
@@ -43,15 +64,6 @@ for (const name of process.argv.slice(2)) {
     rows.forEach((row, f) => row.forEach((M, j) => mats.set(M, (f * nj + j) * 16)));
     clips.push({ name: c.name, loop: !!c.loop, frames: nf, stride, mats });
   }
-  // the colour texture, at a size worth keeping
-  let colour = null;
-  if (m.baseColorImage != null) {
-    const tmp = path.join(os.tmpdir(), `hd-import-${process.pid}`), out = `${tmp}.jpg`;
-    fs.writeFileSync(tmp, g.image(m.baseColorImage).bytes);
-    execFileSync('python3', ['-I', '-c', 'import sys\nfrom PIL import Image\nim = Image.open(sys.argv[1]).convert("RGB")\nif max(im.size) > 1024: im = im.resize((1024, 1024), Image.LANCZOS)\nim.save(sys.argv[2], "JPEG", quality=90)', tmp, out]);
-    colour = fs.readFileSync(out); fs.unlinkSync(tmp); fs.unlinkSync(out);
-  }
-  writeSource(name, { mesh: m, clips, fps: FPS, colour, note: recipe.source || null });
-  const dir = path.join(here, 'src', name), size = fs.readdirSync(dir).reduce((a, f) => a + fs.statSync(path.join(dir, f)).size, 0);
-  console.log(`${name}: ${m.pos.length / 3} vertices, ${m.index.length / 3} triangles, ${nj} bones, ${clips.length} clips (${clips.map((c) => `${c.name} ${c.frames}`).join(', ')}) -> tools/assets/src/${name}/ ${(size / 1e6).toFixed(1)} MB`);
+  writeSource(name, { mesh: m, clips, fps: FPS, colour: colourOf(g, m.baseColorImage), note: recipe.source || null });
+  report(name, m, nj, clips);
 }

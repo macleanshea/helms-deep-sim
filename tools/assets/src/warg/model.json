@@ -1,0 +1,94 @@
+{
+  "unit": "warg",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/warg-side.jpg",
+    "tasks": {
+      "image-to-3d": "01a21b15-7c5a-722b-a58c-097bcb332e2a",
+      "remesh": "01a21b18-9fd1-70de-8ff8-6c99c5b92414"
+    },
+    "rig": "made by tools/assets/quadruped.js: Meshy rigs only two-legged figures"
+  },
+  "fps": 30,
+  "bones": [
+    "pelvis",
+    "chest",
+    "head",
+    "tail",
+    "foreL",
+    "foreLowL",
+    "foreR",
+    "foreLowR",
+    "hindL",
+    "hindLowL",
+    "hindR",
+    "hindLowR"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 70284
+    },
+    "nrm": {
+      "offset": 281136,
+      "length": 70284
+    },
+    "uv": {
+      "offset": 562272,
+      "length": 46856
+    },
+    "joints": {
+      "offset": 749696,
+      "length": 93712
+    },
+    "weights": {
+      "offset": 843408,
+      "length": 93712
+    },
+    "index": {
+      "offset": 1218256,
+      "length": 30744
+    },
+    "ibm": {
+      "offset": 1341232,
+      "length": 192
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 72,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 32,
+      "stride": 1.04543,
+      "offset": 55296
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 16,
+      "stride": 3.32638,
+      "offset": 79872
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 27,
+      "stride": 0,
+      "offset": 92160
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 42,
+      "stride": 0,
+      "offset": 112896
+    }
+  ]
+}

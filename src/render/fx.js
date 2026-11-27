@@ -289,7 +289,12 @@ export class Fx {
       return;
     }
     if (d.team === ORC) {
-      if (d.role === R.TROLL || d.key === 'warg') { this.decal(SPR.blood, x, y, d.size, a, 30, 8, 8, 170); this.decal(d.role === R.TROLL ? SPR.corpseTroll : SPR.corpseOrc, x, y, d.size * (d.role === R.TROLL ? 0.95 : 0.8), a, 255, 255, 255, 255); this.dust(x, y, z, 5); if (d.role === R.TROLL) { this.addShake(x, y, 0.2); this.sound('thud', x, y, 0.9); } return; }
+      if (d.role === R.TROLL || d.key === 'warg') {
+        this.decal(SPR.blood, x, y, d.size, a, 30, 8, 8, 170);
+        // (a beast with a model that can fall lies where it dropped, like the soldiers; otherwise its mark on the ground)
+        if (this.model3d && this.model3d[type] && this.model3d[type].clip.die) this.fallen.push({ type, x, y, z, rot, t: this.now, v: 200, s: 1 });
+        else this.decal(d.role === R.TROLL ? SPR.corpseTroll : SPR.corpseOrc, x, y, d.size * (d.role === R.TROLL ? 0.95 : 0.8), a, 255, 255, 255, 255);
+        this.dust(x, y, z, 5); if (d.role === R.TROLL) { this.addShake(x, y, 0.2); this.sound('thud', x, y, 0.9); } return; }
       // siege engines come apart
       const n = d.role === R.TOWER ? 34 : d.role === R.LADDER ? 8 : 14, hgt = d.role === R.TOWER ? 13 : 2;
       for (let k = 0; k < n; k++) { const an = this.rnd() * 6.28, sp = 2 + this.rnd() * (blast ? 11 : 5); this.chunk('plank', x + (this.rnd() - 0.5) * 3, y + (this.rnd() - 0.5) * 3, z + this.rnd() * hgt, Math.cos(an) * sp, Math.sin(an) * sp, 2 + this.rnd() * 7, 0.8 + this.rnd() * 0.9, 200, 200, 200, 8 + this.rnd() * 20, { flat: 1 }); }

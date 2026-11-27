@@ -64,6 +64,11 @@
       "pack": "mortar.4fffab3150.bin",
       "texture": "mortar.e077b063d7.webp",
       "bytes": 512144
+    },
+    "warg": {
+      "pack": "warg.972209ba4b.bin",
+      "texture": "warg.688df5b10f.webp",
+      "bytes": 347816
     }
   }
 }

@@ -23,6 +23,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { seated } from './rider.js';
 import { readSource } from './source.js';
 import { simplify } from './simplify.js';
 
@@ -33,13 +34,42 @@ const AX = [2, 0, 1]; // the game's x, y, z are the model file's z, x, y (it fac
 
 function buildUnit(name) {
   const recipe = JSON.parse(fs.readFileSync(path.join(here, 'units', `${name}.json`), 'utf8'));
-  const S = readSource(recipe.use || name), m = S.mesh; // (`use`: another unit's body and clips, with gear and a choice of clips of its own)
+  const S = readSource(recipe.use || name); // (`use`: another unit's body and clips, with gear and a choice of clips of its own)
+  let m = S.mesh, colour = S.colour;
+  if (recipe.rider) {
+    // a rider: another unit's figure, seated, made part of this mesh and carried by the bones of the back. The two
+    // textures go side by side, so each model's texture coordinates are squeezed into its own half.
+    const R = recipe.rider, rs = readSource(R.unit), fig = seated(rs, R.pose), n0 = m.pos.length / 3, n1 = fig.pos.length / 3;
+    let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (let v = 0; v < n0; v++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], m.pos[v * 3 + k]); hi[k] = Math.max(hi[k], m.pos[v * 3 + k]); }
+    const L = hi[2] - lo[2], H = hi[1] - lo[1], k = (R.height / fig.height) / (recipe.height / H), zs = lo[2] + R.seat * L;
+    let top = -1e9; // the top of the back where he sits
+    for (let v = 0; v < n0; v++) if (Math.abs(m.pos[v * 3 + 2] - zs) < 0.03 * L && Math.abs(m.pos[v * 3] - (lo[0] + hi[0]) / 2) < 0.1 * (hi[0] - lo[0])) top = Math.max(top, m.pos[v * 3 + 1]);
+    const seat = [(lo[0] + hi[0]) / 2, top + (R.rise != null ? R.rise : 0.06) * H, zs];
+    const bones = (R.bones || [['pelvis', 0.5], ['chest', 0.5]]).map(([b, w]) => [m.skin.names.indexOf(b), w]);
+    const pos = new Float32Array((n0 + n1) * 3), nrm = new Float32Array((n0 + n1) * 3), uv = new Float32Array((n0 + n1) * 2), joints = new Uint8Array((n0 + n1) * 4), weights = new Float32Array((n0 + n1) * 4);
+    pos.set(m.pos); nrm.set(m.nrm); joints.set(m.joints); weights.set(m.weights);
+    const wrap = (q) => q - Math.floor(q);
+    for (let v = 0; v < n0; v++) { uv[v * 2] = wrap(m.uv[v * 2]) * 0.5; uv[v * 2 + 1] = wrap(m.uv[v * 2 + 1]); }
+    for (let v = 0; v < n1; v++) {
+      const o = (n0 + v) * 3;
+      for (let e = 0; e < 3; e++) { pos[o + e] = (fig.pos[v * 3 + e] - fig.hips[e]) * k + seat[e]; nrm[o + e] = fig.nrm[v * 3 + e]; }
+      uv[(n0 + v) * 2] = 0.5 + wrap(fig.uv[v * 2]) * 0.5; uv[(n0 + v) * 2 + 1] = wrap(fig.uv[v * 2 + 1]);
+      bones.forEach(([b, w], q) => { joints[(n0 + v) * 4 + q] = b; weights[(n0 + v) * 4 + q] = w; });
+    }
+    const index = new Uint32Array(m.index.length + fig.index.length);
+    index.set(m.index); for (let q = 0; q < fig.index.length; q++) index[m.index.length + q] = fig.index[q] + n0;
+    m = { ...m, pos, nrm, uv, joints, weights, index, saddleTop: top };
+    colour = `${S.colour}+${rs.colour}`;
+  }
   const nv = m.pos.length / 3, nj = m.skin.names.length;
   if (nj > 64) throw new Error(`${name}: ${nj} bones (64 at most)`);
 
   // ---- rest pose into the game's space: upright, feet on the ground, the height the recipe asks for
+  // (the height is the beast's own, to the top of its back, whoever sits on it)
   let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
-  for (let v = 0; v < nv; v++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], m.pos[v * 3 + k]); hi[k] = Math.max(hi[k], m.pos[v * 3 + k]); }
+  const nOwn = S.mesh.pos.length / 3;
+  for (let v = 0; v < nOwn; v++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], m.pos[v * 3 + k]); hi[k] = Math.max(hi[k], m.pos[v * 3 + k]); }
   const s = recipe.height / (hi[1] - lo[1]), o = [(lo[0] + hi[0]) / 2, lo[1], (lo[2] + hi[2]) / 2];
   const P = new Float32Array(nv * 3), N = new Float32Array(nv * 3);
   for (let v = 0; v < nv; v++) for (let e = 0; e < 3; e++) { P[v * 3 + e] = (m.pos[v * 3 + AX[e]] - o[AX[e]]) * s; N[v * 3 + e] = m.nrm[v * 3 + AX[e]]; }
@@ -242,8 +272,8 @@ function buildUnit(name) {
   fs.mkdirSync(OUT, { recursive: true });
   for (const f of fs.readdirSync(OUT)) if (f.startsWith(`${name}.`)) fs.unlinkSync(path.join(OUT, f));
   let texFile = null;
-  if (S.colour) {
-    const tmp = S.colour, outTmp = path.join(os.tmpdir(), `hd-${name}-${process.pid}.webp`);
+  if (colour) {
+    const tmp = colour, outTmp = path.join(os.tmpdir(), `hd-${name}-${process.pid}.webp`);
     execFileSync('python3', ['-I', path.join(here, 'texture.py'), tmp, outTmp, String(recipe.texture || 512), strip ? 'swatches' : 'plain', ...(recipe.swatches ? [['iron', 'wood', 'leather', 'paint'].map((k) => recipe.swatches[k].join(',')).join(';')] : [])], { stdio: ['ignore', 'inherit', 'inherit'] });
     const bytes = fs.readFileSync(outTmp);
     texFile = `${name}.${hash(bytes)}.webp`;

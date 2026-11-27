@@ -84,7 +84,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
-| 9 | Asset pipeline and unit production | pipeline done; twelve kinds of foot soldier in the game (six of the horde, six of the garrison); mortar, warg, vehicles, engines and aircraft to come |
+| 9 | Asset pipeline and unit production | pipeline done; every soldier and beast in the game has a model (seven kinds of the horde, seven of the garrison); vehicles, engines and aircraft to come |
 | 10 | Fortress art pass | |
 | 11 | Cliffs, ground, backdrop | |
 | 12 | Caching and polish | |
@@ -278,10 +278,18 @@ and back). Clip ids that were bought, looked over and not used are listed under 
 (`cdn.meshy.ai` is not an allowed host); a clip is judged by buying it for 3 credits and looking at it in
 the game.
 
-**The rest of the roster,** in this order: the mortar gunner (the rifleman's body with a tube beside
-him); the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but Meshy rigs only humanoids:
-it needs bones assigned by region in the build, and its rider); vehicles and siege engines (rigid parts,
-a bone each); aircraft.
+The mortar gunner is the rifleman's body (`"use": "rifle"`) with a mortar that has a bone to itself: it
+stands beside him while he serves it and when he falls, and rides on his back when he moves.
+
+The warg rider is two models in one. Meshy rigs only two-legged figures, so the warg's skeleton (twelve
+bones, placed by the recipe as shares of its length and height) and its clips (idle, walk, gallop, lunge,
+death: a few sines each) are made by `tools/assets/quadruped.js`; the rider is the Uruk's figure set
+astride in one fixed pose by `tools/assets/rider.js` and fastened to the bones of the back, the two
+textures side by side in one picture. Trolls and wargs now lie where they fall, as the soldiers do.
+
+**The rest of the roster,** in this order: vehicles (tank, IFV, howitzer: rigid parts, a bone each, the
+turret's heading as a clip whose frame is the angle); siege engines (ladder, ram, catapult, tower: bare
+and crewed forms); aircraft.
 
 ### 10. Fortress art pass
 
