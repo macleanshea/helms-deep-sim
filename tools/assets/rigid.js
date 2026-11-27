@@ -6,6 +6,7 @@
 //   "rigid": { "file": "<model.glb>", "nose": "+z" | "-z" | "+x" | "-x", "turret": { "above": 0.55, "pivot": [along, across]?, "reach": 0.2? } }
 // The model is turned so that its nose is at +z (the generator's figures face that way), +y up.
 import { ident, mul } from './glb.js';
+import { simplify } from './simplify.js';
 
 const TURN = 180; // frames in the turret's full turn: two degrees a frame
 
@@ -31,7 +32,25 @@ export function staticMesh(g, nose = '+z', scale = null) {
 }
 
 export function rigid(g, opts = {}) {
-  const M = staticMesh(g, opts.nose, opts.scale), { pos, nv, lo, hi } = M, H = hi[1] - lo[1], L = hi[2] - lo[2], Wd = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
+  let M = staticMesh(g, opts.nose, opts.scale);
+  if (opts.repeat > 1) {
+    // the same piece laid end to end along its length (a long ladder is made of short ones lashed together)
+    {
+      // (each copy is first reduced, so that the whole is about as heavy as one piece was)
+      const idx = simplify(M.pos, M.uv, M.index, Math.round(12000 / opts.repeat)), map = new Int32Array(M.nv).fill(-1), keep = [];
+      for (const v of idx) if (map[v] < 0) { map[v] = keep.length; keep.push(v); }
+      const pick = (A, w) => { const B = new A.constructor(keep.length * w); keep.forEach((v, q) => B.set(A.subarray(v * w, v * w + w), q * w)); return B; };
+      M = { ...M, pos: pick(M.pos, 3), nrm: pick(M.nrm, 3), uv: pick(M.uv, 2), index: Uint32Array.from(idx, (v) => map[v]), nv: keep.length };
+    }
+    const n = M.nv, k = opts.repeat, step = (M.hi[2] - M.lo[2]) * 0.985, pos = new Float32Array(n * k * 3), nrm = new Float32Array(n * k * 3), uv = new Float32Array(n * k * 2), index = new Uint32Array(M.index.length * k);
+    for (let r = 0; r < k; r++) {
+      pos.set(M.pos, r * n * 3); nrm.set(M.nrm, r * n * 3); uv.set(M.uv, r * n * 2);
+      for (let v = 0; v < n; v++) pos[(r * n + v) * 3 + 2] += r * step;
+      for (let q = 0; q < M.index.length; q++) index[r * M.index.length + q] = M.index[q] + r * n;
+    }
+    M = { ...M, pos, nrm, uv, index, nv: n * k, hi: [M.hi[0], M.hi[1], M.hi[2] + (k - 1) * step] };
+  }
+  const { pos, nv, lo, hi } = M, H = hi[1] - lo[1], L = hi[2] - lo[2], Wd = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
   const names = ['hull'], joints = new Uint8Array(nv * 4), weights = new Float32Array(nv * 4);
   for (let v = 0; v < nv; v++) weights[v * 4] = 1;
   const pivots = [[mid, lo[1], (lo[2] + hi[2]) / 2]], clips = [{ name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from(ident()) }];
@@ -93,6 +112,18 @@ export function rigid(g, opts = {}) {
     }
     clips[0] = { name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from([...ident(), ...ident()]) };
     clips.push({ name: 'attack', loop: false, frames: F, stride: 0, mats });
+  }
+  // A scaling ladder: carried level at shoulder height (its "idle"), and stood against the wall with its foot where the
+  // crew set it down (its "up"). `lean`: { carry: height as a share of its length, angle: degrees from the ground }.
+  if (opts.lean) {
+    const a = (-opts.lean.angle * Math.PI) / 180, c = Math.cos(a), s2 = Math.sin(a), mz = (lo[2] + hi[2]) / 2, o = [mid, lo[1], mz];
+    const r = ident(); r[5] = c; r[6] = s2; r[9] = -s2; r[10] = c; // about the across axis: its forward end rises
+    const to = ident(); to[12] = o[0]; to[13] = o[1]; to[14] = o[2];
+    const back = ident(); back[12] = -o[0]; back[13] = -o[1]; back[14] = -o[2];
+    const foot = ident(); foot[13] = -(L / 2) * s2; foot[14] = (L / 2) * c; // (what brings the rear end, turned, back to the ground at the middle)
+    const lift = ident(); lift[13] = opts.lean.carry * L;
+    clips[0] = { name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from(lift) };
+    clips.push({ name: 'up', loop: false, frames: 1, stride: 0, mats: Float32Array.from(mul(to, mul(foot, mul(r, back)))) });
   }
   // The shell is one piece, so some triangles have corners on both the hull and the turret, and would be stretched
   // into sheets as it turns. They go with the turret, as a skirt round its foot: their hull corners are copied for it.

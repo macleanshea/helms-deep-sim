@@ -458,8 +458,14 @@ written description instead (`concepts/<name>.text.txt`, the generator's text-to
 path when the file is there). The mortar the generator made is a stout emplaced piece, not a tube and bipod.
 Pictures: `docs/progress/gear/`.
 
-**The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
-one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
+**The scaling ladder** is a generated model too: five of the generator's short ladders laid end to end and
+lashed (`rigid.repeat`), with two poses made at import (`rigid.lean`): carried level at shoulder height, and
+stood against the wall from the foot the rules give it to the parapet.
+
+**Rain** falls in the scene itself when the view is close (`fx.rain()`: streaks on the wind that end where they
+meet whatever surface is below them); the streaks drawn over the picture carry it from further out.
+
+**The rest of the roster:** supply caches and obstacles.
 
 ### 10. Fortress art pass
 

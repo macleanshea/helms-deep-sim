@@ -119,6 +119,11 @@
       "pack": "transport.9efe06f07f.bin",
       "texture": "transport.24fac8f65f.webp",
       "bytes": 459368
+    },
+    "ladder": {
+      "pack": "ladder.ebce044ca3.bin",
+      "texture": "ladder.78310e1689.webp",
+      "bytes": 454672
     }
   },
   "props": {

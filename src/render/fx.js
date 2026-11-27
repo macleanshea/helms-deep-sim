@@ -65,6 +65,24 @@ export class Fx {
     return c;
   }
 
+  /**
+   * Rain in the air round the place the camera looks at: thin pale streaks that fall on the wind from a few metres up and
+   * are gone where they reach the ground (the walk of a wall, a court, the valley floor: `heightAt` says which). `amount`
+   * 0..1; `dt` is the same step `update` is given, so the fall and the supply keep pace at any battle speed.
+   */
+  rain(cx, cy, heightAt, radius, amount, dt) {
+    const LIFE = 0.5, alive = Math.min(2400, (Math.PI * radius * radius) / 3.2) * amount;
+    this._rain = (this._rain || 0) + (alive / LIFE) * dt;
+    const vx = 4.2, vy = 1.4, vz = -25, l = Math.hypot(vx, vy, vz), len = 3;
+    while (this._rain >= 1) {
+      this._rain--;
+      const a = this.rnd() * 6.2832, r = Math.sqrt(this.rnd()) * radius, x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
+      const g = heightAt(x, y), fall = LIFE * (0.55 + 0.45 * this.rnd()), z = g - vz * fall;
+      const i = this.p(SPR.streak, x - vx * fall, y - vy * fall, z, vx, vy, vz, len, 0.07, fall, 180, 194, 218, 0.55, 1, 0);
+      this.mode[i] = 1; this.ax[i] = (vx / l) * len; this.ay[i] = (vy / l) * len; this.az[i] = (vz / l) * len;
+    }
+  }
+
   update(dt) {
     if (dt <= 0) return;
     const { px, py, pz, vx, vy, vz, grav, w, h, gw, gh, rot, vr, life, drag, del } = this;

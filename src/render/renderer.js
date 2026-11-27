@@ -1018,7 +1018,8 @@ export class Renderer {
         // a model from files: pick the clip that fits what he is doing, and the frame of it he has reached
         const C = A.clip, ft = time - fireT[i];
         let cl, fr;
-        if (C.turret) {
+        if (C.up) { cl = st === S_DONE ? C.up : C.idle; fr = 0; } // (a scaling ladder: carried, or stood against the wall)
+        else if (C.turret) {
           // a machine: its one clip is the turret's full turn, and the frame is the angle between the gun and the hull
           cl = C.turret; let a = (trot[i] - yaw) / 6.283185307; a -= Math.floor(a); fr = Math.min(cl.frames - 1, a * cl.frames);
         } else if (st === S_CLIMB) { cl = C.climb || C.walk; fr = (time * cl.fps * 1.4 + i * 7) % cl.frames; }

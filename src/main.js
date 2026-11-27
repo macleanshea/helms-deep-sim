@@ -1197,7 +1197,7 @@ function drawOverlay(dtReal) {
   if (rainA > 0.03) {
     if (!app.paused) app.rainT = (app.rainT || 0) + dtReal;
     const rt = app.rainT || 0;
-    c.strokeStyle = `rgba(196,210,232,${0.16 * rainA})`; c.lineWidth = 1;
+    c.strokeStyle = `rgba(196,210,232,${0.16 * rainA * (renderer.quality === 'low' ? 1 : 1 - 0.8 * Math.max(0, Math.min(1, (app.cam.zoom - 3.5) / 4.5)))})`; c.lineWidth = 1; // (close in, the rain is in the scene: see fx.rain)
     c.beginPath();
     for (let k = 0; k < 130; k++) {
       const sp = 0.8 + ((k * 37) % 11) * 0.05, len = 12 + (k % 5) * 4;
@@ -1330,7 +1330,11 @@ function frame(now) {
       simMs = performance.now() - t0;
       if (app.acc > DT * 2) app.acc = DT; // can't keep up: drop the backlog rather than spiral
       alpha = Math.min(1, app.acc / DT);
-      fx.update(Math.min(0.25, rdt * app.speed * scale));
+      const fdt = Math.min(0.25, rdt * app.speed * scale);
+      // rain in the scene itself where the view is close enough to see it fall (further out, the streaks over the picture carry it)
+      const rainNow = Math.max(0, Math.min(1, (0.44 - app.env.amb[0]) * 6)), nearK = Math.max(0, Math.min(1, (cam.zoom - 3.5) / 4.5));
+      if (rainNow * nearK > 0.03 && renderer.quality !== 'low') fx.rain(cam.x, cam.y, heightAt, Math.max(18, Math.min(95, (0.62 * Math.max(innerWidth, innerHeight)) / cam.zoom)), rainNow * nearK, fdt);
+      fx.update(fdt);
     } else if (sim.result) fx.update(rdt * 0.6);
     for (const e of sim.events) {
       const loc = e.x != null ? { x: e.x, y: e.y } : null;
