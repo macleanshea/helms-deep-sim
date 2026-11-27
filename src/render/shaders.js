@@ -52,7 +52,12 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
   float ndl = max(dot(n,uSun),0.);
   float sh = shadowAt(wp, ndl);
   float gl = 1.-rough, pw = 6. + gl*gl*220., sk = spec*min((pw+8.)*0.011, 1.1);
-  vec3 l = mix(uAmb*vec3(0.62,0.57,0.5), uAmb, n.z*0.5+0.5)*ao + uSunCol*ndl*mix(0.1, 1., sh);
+  // how closed in this place is by the walls and rock round it: read a pace out from the surface, so a wall's face takes the
+  // shade of the floor at its foot, fading with height above that floor (see Renderer._bakeTorches)
+  vec4 cq = texture(uTorch, (wp.xy + n.xy*1.7 - uTorchRect.xy)/uTorchRect.zw);
+  float ch = wp.z - cq.b*96., closed = cq.g*exp(-abs(ch)*0.2);
+  ao *= 1. - 0.88*closed;
+  vec3 l = mix(uAmb*vec3(0.62,0.57,0.5), uAmb, n.z*0.5+0.5)*ao + uSunCol*ndl*mix(0.1, 1., sh)*(1. - 0.5*closed);
   vec3 s = uSunCol*pow(max(dot(n, normalize(uSun+uView)),0.), pw)*sk*sh*step(1e-4, ndl);
   s += uAmb*spec*gl*0.35*pow(1.-max(dot(n,uView),0.), 3.);                 // the sky caught at grazing angles
   for (int i=0;i<6;i++){

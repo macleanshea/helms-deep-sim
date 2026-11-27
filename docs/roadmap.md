@@ -262,10 +262,19 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   splatted into a second small map (`Renderer._bakeHordeTorches()`), which the same lighting code reads. Many
   torches together saturate instead of adding without end.
 
-**Still to do toward the references:** painted stone textures with arc-length coordinates on the curved walls,
-baked ambient occlusion, the square gatehouse's hoarding and deep arch, the horn tower's crown and the two-tier
-hall front (as sculpted pieces from Meshy), rock outcrops under the walls, more dressing (barrels, carts), an HDR
-pipeline, rain as particles, a moon and directional lightning.
+- **Stone round the curve, and shade at the foot.** Round walls (the ring, both inner courts, the horn tower)
+  take their stone by arc length about their own centre (`uRound` in the fortress shader), so courses no longer
+  stretch and break every eighth of a turn. The watch-fire map's two spare channels now hold how closed in each
+  place is by what stands round it and the height of its floor; the shared lighting code dims the sky's light
+  (and a little of the moon's) by it, most at the floor and less with each metre above: wall feet, court corners
+  and stair wells sit in shade. One more texture read a fragment.
+
+**Still to do toward the references:** painted stone textures, the square gatehouse's hoarding and deep arch,
+the horn tower's crown and the two-tier hall front as sculpted pieces (the plan is the generator's shape under
+the game's own stone shader, so a sculpted piece is as sharp as the walls beside it), rock outcrops under the
+walls, more dressing (barrels, carts), an HDR pipeline, rain as particles. Lightning already lights by
+direction (it raises the moon's light and the sky's, and shadows fall with it). A moon in the sky was tried and
+taken out: the game's camera never lifts far enough to show sky.
 
 ### 6. One animated path for every unit
 

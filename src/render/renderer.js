@@ -424,6 +424,23 @@ export class Renderer {
     }
     const px = new Uint8Array(N * N * 4);
     for (let c = 0; c < N * N; c++) { px[c * 4] = Math.min(255, I[c] * 255); px[c * 4 + 3] = I[c] > 1e-4 ? Math.min(255, (Z[c] / I[c] / 64) * 255) : 0; }
+    // The same map's other two channels: how closed in each place is by what stands round it (green), and the height of
+    // its floor (blue). The lighting code dims the sky's light by the first, most at the floor and less with every metre
+    // above it: the foot of a wall, a corner of a court, the well of a stair sit in shade, and the fortress on its ground.
+    const gz = this.map.gz, at = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : gz[((y / HM_RES) | 0) * GZ_W + ((x / HM_RES) | 0)]);
+    const DIRS = 12, RING = [2.2, 4.4, 7.5, 12];
+    for (let j = 1; j < N - 1; j++) for (let i = 1; i < N - 1; i++) {
+      const x = ((i + 0.5) / N) * w + x0, y = ((j + 0.5) / N) * h + y0, f = at(x, y);
+      let occ = 0;
+      for (let d = 0; d < DIRS; d++) {
+        const a = (d / DIRS) * 6.2832 + 0.26, cx = Math.cos(a), cy = Math.sin(a);
+        let e = 0;
+        for (const r of RING) { const k = (at(x + cx * r, y + cy * r) - f) / (r + 1.5); if (k > e) e = k; }
+        occ += Math.min(1, e / 1.1);
+      }
+      const c = j * N + i;
+      px[c * 4 + 1] = Math.min(255, (occ / DIRS) * 2.1 * 255); px[c * 4 + 2] = Math.max(0, Math.min(255, (f / 96) * 255));
+    }
     this.torchTex = this._tex(gl.LINEAR);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
     this.torchRect = new Float32Array([x0, y0, w, h]);
