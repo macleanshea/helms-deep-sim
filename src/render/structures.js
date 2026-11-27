@@ -486,6 +486,42 @@ function hallArcade(m, map, t) {
 }
 
 /**
+ * Where the watch fires burn: braziers along the wall walks, on the bastions and gatehouse, round the rims of the
+ * inner courts, and at the feet of the stairs. [{ x, y, z }] with z the height of the floor each stands on. The
+ * renderer lights the stone, the ground and the men round them from the same list.
+ */
+export function torchSites(map) {
+  const out = [], R = KEEP.r, segs = map.segments;
+  for (let k = 0; k < N_RING; k++) {
+    const sg = segs[N_WALL + k];
+    if (k % 3 !== 1 || !sg.valid || sg.kind !== 'ring') continue;
+    out.push({ x: KEEP.cx + sg.nx * (R - KEEP.half + 0.9), y: KEEP.cy + sg.ny * (R - KEEP.half + 0.9), z: RING_TOP });
+  }
+  for (const b of map.bastions) out.push({ x: b.x + Math.cos(b.a) * 1.5, y: b.y + Math.sin(b.a) * 1.5, z: RING_TOP });
+  const g = segs[map.GATE];
+  for (const f of map.flanks) { const u = (f.u0 + f.u1) / 2 + 1, v = ((f.v0 + f.v1) / 2) * f.sd; out.push({ x: g.x + g.nx * u + g.tx * v, y: g.y + g.ny * u + g.ty * v, z: RING_TOP }); }
+  for (const sd of [-1, 1]) out.push({ x: g.x - g.nx * 9 + g.tx * 6 * sd, y: g.y - g.ny * 9 + g.ty * 6 * sd, z: PLATEAU_Z });   // inside the gate
+  for (let k = 1; k < N_WALL; k += 4) { const sg = segs[k]; if (sg.valid) out.push({ x: sg.x - sg.nx * (WALL_HALF - 0.9), y: sg.y - sg.ny * (WALL_HALF - 0.9), z: WALL_H }); }
+  for (const [t, step, tier] of [[KEEP.t1, 36, 1], [KEEP.t2, 60, 2]]) {
+    for (let a = 10; a < 360; a += step) {
+      const x = t.x + Math.cos(a * DEG) * (t.r - 1.6), y = t.y + Math.sin(a * DEG) * (t.r - 1.6);
+      if (map.tierAt(x, y) === tier && map.type[map.cellOf(x, y)] !== 1) out.push({ x, y, z: t.z });
+    }
+  }
+  for (const st of map.stairs) { const px = -st.dy, py = st.dx; out.push({ x: st.x - st.dx * 1.5 + px * (st.half + 1), y: st.y - st.dy * 1.5 + py * (st.half + 1), z: st.z0 }); }
+  return out.filter((t) => map.type[map.cellOf(t.x, t.y)] !== 1);
+}
+
+/** A brazier: an iron basket of coals on a post, burning. */
+function brazier(m, t) {
+  m.withMat(MAT.IRON, () => {
+    m.box(t.x, t.y, t.z + 0.65, 0.12, 0.12, 1.3, IRON);
+    m.lathe([[0.1, 1.25], [0.34, 1.55], [0.36, 1.72], [0.3, 1.72]], 8, IRON, 0, [t.x, t.y, t.z], 'z', { capA: false });
+  });
+  m.withMat(MAT.EMIT, () => m.lathe([[0.28, 1.68], [0.2, 1.95], [0.07, 2.3], [0, 2.5]], 6, [1.0, 0.56, 0.16], 0.4, [t.x, t.y, t.z], 'z', { capA: false }));
+}
+
+/**
  * Build (or refresh) the fortress mesh. `cache` carries the built pieces between calls.
  * Returns { data, count } in the 20-byte vertex layout, unindexed.
  */
@@ -506,6 +542,7 @@ export function buildStructures(map, segs, cache = new Map()) {
   for (let k = 0; k < N_WALL; k++) piece('w' + k, `${down(k)}${down(k - 1)}${down(k + 1)}`, (m) => wallSection(m, map, segs, k, bound, H, BASE));
   for (let k = 0; k < N_RING; k++) piece('r' + k, (segs[N_WALL + k].breached ? '1' : '0') + (segs[N_WALL + k].leaves ? 'L' : ''), (m) => ringSection(m, map, segs, k));
   piece('platforms', '', (m) => platforms(m, map));
+  piece('fires', '', (m) => { for (const t of torchSites(map)) brazier(m, t); });
   piece('stairs', '', (m) => stairs(m, map));
   piece('ward', '', (m) => innerWard(m, map));
   piece('ramps', '', (m) => { ramp(m, map.causeway, map.causeHalf, map.rampZ, -3, true); ramp(m, map.rear, map.rearHalf, map.rampZ, -3, true); });

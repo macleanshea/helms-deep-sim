@@ -239,6 +239,24 @@ Medium 5/5, Hard 2/5, no orders loses all fifteen (the horde wins as fast as bef
 25 with `keep` open as before. The `deep` check's head-count was loosened, with the reasoning beside it: with
 walled roadways the southern companies go round the causeway's foot and fewer are in the Deep at one moment.
 
+### 5c. Fortress art and firelight, first steps
+
+- **Stone.** The ashlar layer is half-metre courses whose blocks each have a length of their own, with ragged
+  joints, knocked corners, the odd replaced stone and broad stains across many blocks; paving is worn
+  rectangular flags. Battlements are a plain breast wall with broad merlons under weathered copings whose rhythm
+  runs on along the wall; a few are broken. (`src/render/materials.js`, `structures.js battlement()`)
+- **Watch fires.** `structures.js torchSites()` lists braziers along the wall walks, on the bastions and
+  gatehouse, round the inner courts and at the stair feet. `Renderer._bakeTorches()` turns the list into a small
+  map (how much firelight reaches each place, and how high the fires burn) which the shared lighting code reads
+  by position: stone, ground and soldiers are all lit by it for one texture read. Faint by day, most of the light
+  there is at night. Pictures: `docs/progress/fortress-art/`.
+
+**Still to do toward the references:** painted stone textures with arc-length coordinates on the curved walls,
+baked ambient occlusion, weathering relative to each wall's foot, the square gatehouse's hoarding and deep arch,
+the horn tower's crown and the two-tier hall front (as sculpted pieces from Meshy), rock outcrops under the
+walls, dressing (banners, barrels, carts), the horde's own torches lighting the ground, an HDR pipeline, rain as
+particles, mist, a moon and directional lightning.
+
 ### 6. One animated path for every unit
 
 `src/render/anim.js` and a new unit vertex shader play clips from a baked bone texture. Walking stays

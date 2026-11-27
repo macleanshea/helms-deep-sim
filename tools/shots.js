@@ -61,6 +61,8 @@ const SETUP = [
 ];
 const BATTLE = { preset: 'garrison', t: 420, views: [
   ['battle-whole-map', null],
+  ['battle-hornburg', [930, 705, 5.2, 1.35, -0.2]],
+  ['battle-gatehouse', [872, 684, 12, YAW, 0]],
   ['battle-wall-z8', [950, 440, 8]],
   ['battle-wall-foot-z20', [945, 470, 20]],
   ['battle-horde-z5', 'horde', 5],

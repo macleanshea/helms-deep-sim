@@ -13,7 +13,7 @@ import { HM_W, HM_H, MARGIN, GZ_W, HM_RES } from '../map.js';
 import { COLS, SPR } from './atlas.js';
 import { buildModels } from './models/index.js';
 import { buildMaterials } from './materials.js';
-import { buildStructures } from './structures.js';
+import { buildStructures, torchSites } from './structures.js';
 import { viewProj, orthoMatrix, camState, FOV } from './camera.js';
 import { UNIT_TRI_BUDGET } from './perf.js';
 import { S_DONE, S_CLIMB, LADDER_TIME, MAX_UNITS } from '../sim/sim.js';
@@ -138,6 +138,7 @@ export class Renderer {
     this.mats = buildMaterials(gl, compile, SH.VS_FULL, this.vaoFull, 512);
     this._bakeTerrain();
     this._buildTerrainMesh();
+    this._bakeTorches();
 
     // decal layer over the playable world
     this.decalW = WORLD_W * this.texScale; this.decalH = WORLD_H * this.texScale;
@@ -394,6 +395,29 @@ export class Renderer {
     }
   }
 
+  /**
+   * The watch fires as a map: for every place in and round the fortress, how much firelight reaches it (red channel)
+   * and how high the fires that give it burn (alpha, in units of 64 m). Every lit shader reads it by position, so
+   * dozens of fires cost one texture read. Baked once: the braziers do not move.
+   */
+  _bakeTorches() {
+    const gl = this.gl, N = 384, x0 = SB.x0 - 30, y0 = SB.y0 - 30, w = SB.x1 - SB.x0 + 60, h = SB.y1 - SB.y0 + 60, I = new Float32Array(N * N), Z = new Float32Array(N * N), R = 17;
+    for (const t of torchSites(this.map)) {
+      const ci = ((t.x - x0) / w) * N, cj = ((t.y - y0) / h) * N, ri = Math.ceil((R / w) * N), rj = Math.ceil((R / h) * N);
+      for (let j = Math.max(1, Math.floor(cj - rj)); j <= Math.min(N - 2, cj + rj); j++) for (let i = Math.max(1, Math.floor(ci - ri)); i <= Math.min(N - 2, ci + ri); i++) {
+        const dx = ((i + 0.5) / N) * w + x0 - t.x, dy = ((j + 0.5) / N) * h + y0 - t.y, d2 = (dx * dx + dy * dy) / (R * R);
+        if (d2 >= 1) continue;
+        const k = (1 - d2) * (1 - d2) / (1 + d2 * 6);
+        I[j * N + i] += k; Z[j * N + i] += k * (t.z + 1.7);
+      }
+    }
+    const px = new Uint8Array(N * N * 4);
+    for (let c = 0; c < N * N; c++) { px[c * 4] = Math.min(255, I[c] * 255); px[c * 4 + 3] = I[c] > 1e-4 ? Math.min(255, (Z[c] / I[c] / 64) * 255) : 0; }
+    this.torchTex = this._tex(gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, N, N, 0, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    this.torchRect = new Float32Array([x0, y0, w, h]);
+  }
+
   _buildTerrainMesh() {
     const gl = this.gl, hm = this.map.hm;
     const nx = (HM_W * HM_RES) / GRID + 1, ny = (HM_H * HM_RES) / GRID + 1;
@@ -578,6 +602,12 @@ export class Renderer {
     if (u.uHaze) gl.uniform4fv(u.uHaze, this.haze);
     if (u.uWet) gl.uniform1f(u.uWet, env.wet || 0);
     if (u.uExposure) gl.uniform1f(u.uExposure, EXPOSURE);
+    if (u.uTorch) {
+      // the fires count for little by day and for most of the light there is at night
+      const night = Math.max(0, Math.min(1, ((env.lift || 0) - 0.03) / 0.2)), fl = 0.93 + 0.07 * Math.sin((this.clock || 0) * 11) * Math.sin((this.clock || 0) * 4.3);
+      gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.torchTex); gl.uniform1i(u.uTorch, 7);
+      gl.uniform4fv(u.uTorchRect, this.torchRect); gl.uniform1f(u.uTorchK, (0.1 + 0.9 * night) * fl);
+    }
     if (u.uFog) gl.uniform3fv(u.uFog, env.fog);
     if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 40, MARGIN - 8); // the ground is gone into the haze before the modelled terrain ends
     if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.uniform1f(u.uShadowTexel, this.shadowTexel); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
