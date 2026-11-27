@@ -231,6 +231,7 @@ precision highp float;
 in vec3 vW; in vec3 vN; in vec3 vC; flat in float vMat; out vec4 o;
 uniform sampler2D uDecal;
 ${NOISE_LITE}${LIGHT}${MATERIAL}
+uniform vec3 uBases;   // the floors walls stand on above the valley's: the court, the inner court, the upper court
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
   float id = floor(vMat + 0.5);
@@ -253,7 +254,10 @@ void main(){
     if (!top) {
       // rain streaks running down from the parapets, damp and moss at the foot
       c *= 1. - 0.2*smoothstep(0.5, 0.9, noise(vec2(u*0.9, vW.z*0.06)));
-      c = mix(c, vec3(0.2,0.24,0.15), smoothstep(3.5, 0., vW.z - 0.5*noise(vec2(u*0.5, 1.)))*0.35*smoothstep(0.4, 0.7, noise(vec2(u*0.35, 7.))));
+      // (height above the floor this wall stands on: the valley, the court, or one of the inner courts)
+      float hb = vW.z; if (vW.z > uBases.x) hb = min(hb, vW.z - uBases.x); if (vW.z > uBases.y) hb = min(hb, vW.z - uBases.y); if (vW.z > uBases.z) hb = min(hb, vW.z - uBases.z);
+      c *= 1. - 0.22*smoothstep(1.6, 0., hb);                              // damp, and the shade of the corner where wall meets floor
+      c = mix(c, vec3(0.2,0.24,0.15), smoothstep(3.2, 0., hb - 0.5*noise(vec2(u*0.5, 1.)))*0.38*smoothstep(0.4, 0.7, noise(vec2(u*0.35, 7.))));
     }
     float wet = uWet*(top ? 1. : 0.35);
     c *= 1. - 0.2*wet; rough = mix(rough, rough*0.45, wet); spec = mix(spec, max(spec, 0.45), wet);

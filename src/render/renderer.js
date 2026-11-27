@@ -656,6 +656,7 @@ export class Renderer {
     gl.drawElements(gl.TRIANGLES, this.terrain.count, gl.UNSIGNED_INT, 0);
     p = this.pStruct;
     gl.useProgram(p.p); this._common(p.u, env);
+    if (p.u.uBases) gl.uniform3f(p.u.uBases, LAYOUT.keep.t1.z - 11.2, LAYOUT.keep.t1.z - 0.2, LAYOUT.keep.t2.z - 0.2); // (the court is 11 m below the inner court)
     gl.bindVertexArray(this.struct.vao);
     gl.drawArrays(gl.TRIANGLES, 0, this.struct.count);
     gl.depthMask(true); gl.depthFunc(gl.LESS);
