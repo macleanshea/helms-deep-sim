@@ -351,7 +351,7 @@ export const skinVS = (influences) => `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in vec2 aUV; layout(location=3) in vec4 aBones; layout(location=8) in vec4 aWeights;
 layout(location=4) in vec4 iPosYaw; layout(location=5) in vec2 iSP; layout(location=6) in vec4 iColor; layout(location=7) in vec4 iAnim;
 uniform mat4 uVP; uniform float uShadowPass; uniform vec3 uSun; uniform highp sampler2D uBones;
-out vec3 vW; out vec3 vN; out vec3 vC; out float vFlash; out vec2 vUV;
+out vec3 vW; out vec3 vN; out vec3 vC; out float vFlash; out vec2 vUV; out float vWash;
 void bone(float b, int f, float w, inout vec4 r0, inout vec4 r1, inout vec4 r2){
   int x = int(b + 0.5)*3;
   r0 += texelFetch(uBones, ivec2(x, f), 0)*w; r1 += texelFetch(uBones, ivec2(x + 1, f), 0)*w; r2 += texelFetch(uBones, ivec2(x + 2, f), 0)*w;
@@ -367,19 +367,20 @@ void main(){
   p.xy = vec2(p.x*cy - p.y*sy, p.x*sy + p.y*cy); n.xy = vec2(n.x*cy - n.y*sy, n.x*sy + n.y*cy);
   vec3 w = iPosYaw.xyz + p;
   if (uShadowPass > 0.5) { w.xy -= uSun.xy/uSun.z*max(w.z - iPosYaw.z, 0.); w.z = iPosYaw.z + 0.07; }
-  vW = w; vN = n; vC = iColor.rgb; vFlash = iColor.a; vUV = aUV;
+  vW = w; vN = n; vC = iColor.rgb; vFlash = iColor.a; vUV = aUV; vWash = iAnim.w;
   gl_Position = uVP*vec4(w,1.);
 }`;
 
 export const FS_SKIN = `#version 300 es
 precision highp float;
-in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; in vec2 vUV; out vec4 o;
+in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; in vec2 vUV; in float vWash; out vec4 o;
 uniform sampler2D uTex; uniform float uShadowPass; uniform float uLift;
 ${LIGHT}
 void main(){
   if (uShadowPass > 0.5) { o = vec4(0.,0.,0.,0.34); return; }
   // the paintings these come from are dark: lift them so a figure reads against the ground at a soldier's size on screen
-  vec3 n = normalize(vN), c = min(texture(uTex, vUV).rgb*1.38 + 0.03, 1.)*vC;
+  // (far off, a figure is washed toward its side's colour, vC, so the two armies read at a glance: vWash says how far)
+  vec3 n = normalize(vN), t = min(texture(uTex, vUV).rgb*1.38 + 0.03, 1.), c = mix(t*vC, vC*(0.45 + 0.9*dot(t, vec3(0.33))), vWash);
   vec3 col = shade(c, n, vW, 0.56, 0.42, 1.);
   col += (c + 0.05)*uLift*(0.9+0.7*n.z);             // keep figures readable at night
   col = mix(col, vec3(1.), vFlash*0.8);

@@ -353,6 +353,47 @@ export class Renderer {
     gl.enable(gl.DEPTH_TEST);
   }
 
+  /**
+   * Crags: the mountainsides are cut into ledges and sheer rises, with gullies between buttresses. Only the picture
+   * changes (the battle's ground is the map's own, and nothing walks up there); the rock is only ever cut away, never
+   * built out, so the camera, which keeps clear of the map's ground, cannot end up inside it. The valley floor, the
+   * Hornburg's shelf and the rock the fortress is built into are left as they are.
+   */
+  _crags(v, nx, ny) {
+    const hm = this.map.hm, st = GRID / HM_RES, K = this.map.layout.keep;
+    const hash = (i, j) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vn = (x, y) => { const i = Math.floor(x), j = Math.floor(y), a = x - i, b = y - j, sa = a * a * (3 - 2 * a), sb = b * b * (3 - 2 * b), p = hash(i, j), q = hash(i + 1, j), r = hash(i, j + 1), t = hash(i + 1, j + 1); return p + (q - p) * sa + (r - p) * sb + (p - q - r + t) * sa * sb; };
+    const ridge = (x, y) => { const n = 1 - Math.abs(2 * vn(x, y) - 1); return n * n; };
+    const ss = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    const moved = new Uint8Array(nx * ny);
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const o = (j * nx + i) * 6, X = v[o], Y = v[o + 1], z = v[o + 2];
+      const a = Math.min(HM_W - 1, Math.max(0, Math.round(i * st))), b = Math.min(HM_H - 1, Math.max(0, Math.round(j * st))), rock = hm[(b * HM_W + a) * 4 + 1];
+      const w = ss(0.55, 0.9, rock) * ss(16, 44, z) * ss(K.r + 24, K.r + 70, Math.hypot(X - K.cx, Y - K.cy));
+      if (w < 0.01) continue;
+      // strata: each band of height is a ledge, then a sheer rise, then the slope it had (the bands wander, so no ledge runs level for long)
+      const S = 36, wob = (vn(X / 170, Y / 170) - 0.5) * 1.6, q = z / S + wob, f = q - Math.floor(q);
+      const stepped = (Math.floor(q) + ss(0.45, 0.8, f) - wob) * S;
+      let z2 = z + (Math.min(z, stepped) - z) * 0.9 * w;
+      // gullies: the face is cut back between buttresses, deepest where two scales of furrow meet
+      const cut = (1 - (ridge(X / 88, Y / 88) * 0.6 + ridge(X / 34 + 9.3, Y / 34 + 4.1) * 0.4)) * 12 * w;
+      const hl = Math.hypot(v[o + 3], v[o + 4]) || 1;
+      v[o] -= (v[o + 3] / hl) * cut * 0.4; v[o + 1] -= (v[o + 4] / hl) * cut * 0.4; v[o + 2] = z2 - cut * 0.6;
+      moved[j * nx + i] = 1;
+    }
+    // new normals where the rock was cut (and beside it), from the faces as they now stand
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const c = j * nx + i;
+      if (!(moved[c] || moved[c - 1] || moved[c + 1] || moved[c - nx] || moved[c + nx])) continue;
+      const l = (c - 1) * 6, r = (c + 1) * 6, u = (c - nx) * 6, d = (c + nx) * 6;
+      const ax = v[r] - v[l], ay = v[r + 1] - v[l + 1], az = v[r + 2] - v[l + 2], bx = v[d] - v[u], by = v[d + 1] - v[u + 1], bz = v[d + 2] - v[u + 2];
+      let x = ay * bz - az * by, y = az * bx - ax * bz, z = ax * by - ay * bx;
+      if (z < 0) { x = -x; y = -y; z = -z; }
+      const len = Math.hypot(x, y, z) || 1;
+      v[c * 6 + 3] = x / len; v[c * 6 + 4] = y / len; v[c * 6 + 5] = z / len;
+    }
+  }
+
   _buildTerrainMesh() {
     const gl = this.gl, hm = this.map.hm;
     const nx = (HM_W * HM_RES) / GRID + 1, ny = (HM_H * HM_RES) / GRID + 1;
@@ -366,6 +407,7 @@ export class Renderer {
       const dx = H(hi + 1, hj) - H(hi - 2, hj), dy = H(hi, hj + 1) - H(hi, hj - 2), l = Math.hypot(dx, dy, 3 * HM_RES);
       v[o + 3] = -dx / l; v[o + 4] = -dy / l; v[o + 5] = (3 * HM_RES) / l;
     }
+    this._crags(v, nx, ny);
     const idx = new Uint32Array((nx - 1) * (ny - 1) * 6);
     let k = 0;
     for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i; idx[k++] = a; idx[k++] = a + 1; idx[k++] = a + nx + 1; idx[k++] = a; idx[k++] = a + nx + 1; idx[k++] = a + nx; }
@@ -892,8 +934,11 @@ export class Renderer {
         if (A.big > 1) { const zb = zc * A.big; this._tier = zb >= zClose ? 0 : zb >= zHero ? 1 : zb >= zBox ? 2 : 3; }
         else this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
         // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
-        if (tier >= 1 && team[i] === DEF) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, tier === 2 ? 150 : 205, tier === 2 ? 210 : 230, 255, flash, 0, 0, 0);
-        else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, sh ? 240 : tier === 2 ? 150 : 205, sh ? 235 : tier === 2 ? 130 : 190, flash, 0, 0, 0);
+        // (the last argument is the wash: how far the figure is taken from its own colours toward its side's)
+        if (A.big > 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v, v, flash, 0, 0, 0); // (a machine is told by its size)
+        else if (tier >= 1 && team[i] === DEF) { if (d.ammo && ammo[i] < 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 178, 70, flash, 0, 0, 0, tier === 2 ? 190 : 110); else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 120, 205, 245, flash, 0, 0, 0, tier === 2 ? 190 : 110); }
+        else if (tier >= 1 && sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 236, 236, 244, flash, 0, 0, 0, tier === 2 ? 170 : 90);
+        else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 215, 84, 62, flash, 0, 0, 0, tier === 2 ? 170 : 80);
         else if (sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 244, 226, flash, 0, 0, 0);
         else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, 0, 0, 0);
         continue;

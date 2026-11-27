@@ -86,7 +86,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 8 | Lighting and atmosphere | |
 | 9 | Asset pipeline and unit production | pipeline done; every soldier, beast and vehicle in the game has a model (seven kinds of the horde, ten of the garrison); siege engines and aircraft to come |
 | 10 | Fortress art pass | |
-| 11 | Cliffs, ground, backdrop | |
+| 11 | Cliffs, ground, backdrop | the mountainsides are cut into ledges, sheer rises and gullies; the ground is stonier; scanned surfaces and distant mountains to come |
 | 12 | Caching and polish | models are kept on the device (`sw.js`) and load with no connection; the rest to come |
 
 Budgets are starting targets at 1440p on the owner's machine, to be rebased on the baseline.
@@ -297,6 +297,10 @@ finest level is the generator's own 10,000 triangles: the reducer scrambles the 
 model (its texture is cut into thousands of islands), which shows close up and not at the lower levels'
 distances. About 810 Meshy credits spent in all so far.
 
+Far off, a soldier's model is washed toward his side's colour (cyan for the garrison, amber when out of
+ammunition, red for the horde, pale steel behind locked shields), as the built-in figures were tinted.
+Pictures of the new models are in `docs/progress/m9-units/`.
+
 **Known rough edges:** the lower levels of the machines have smeared textures (above); where a turret has
 turned, the hull under it is open; the image model refused the first wording of the howitzer's concept
 (it reads talk of guns "emplaced and ready to fire" as a request it should not serve) and took a plainer one.
@@ -313,8 +317,16 @@ Budget: ≤ 400k fortress triangles in view.
 
 ### 11. Cliffs, ground, backdrop
 
-Craggy cliffs meshed offline in chunks, CC0 rock, scree and mud layers in place of bright grass,
-distant mountains. Budget: static scene GPU ≤ 3.5 ms.
+**Done so far:** `Renderer._crags` cuts the mountainsides of the terrain mesh into strata (a ledge, a sheer
+rise, then the old slope, in bands that wander) with gullies between buttresses. It changes the picture
+only: the battle's ground is the map's, nothing walks up there, and the rock is only ever cut away, so the
+camera (which keeps clear of the map's ground) cannot end up inside it. The valley floor, the Hornburg's
+shelf and the rock within 70 m of the fortress are left alone. Pictures: `docs/progress/m11-cliffs/`.
+The ground's colours were moved from pasture toward thin turf and bare stone with the map redesign.
+
+**To come:** the terrain mesh is a 4 m grid, so crags finer than about 10 m need a denser mesh on the
+faces or real cliff meshes in chunks; CC0 rock, scree and mud layers; distant mountains. Budget: static
+scene GPU ≤ 3.5 ms.
 
 ### 12. Caching and polish
 
