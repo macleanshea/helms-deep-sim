@@ -59,6 +59,11 @@
       "pack": "cmd.6ebb3b113e.bin",
       "texture": "cmd.baed3a30bb.webp",
       "bytes": 542196
+    },
+    "mortar": {
+      "pack": "mortar.4fffab3150.bin",
+      "texture": "mortar.e077b063d7.webp",
+      "bytes": 512144
     }
   }
 }

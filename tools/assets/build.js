@@ -33,7 +33,7 @@ const AX = [2, 0, 1]; // the game's x, y, z are the model file's z, x, y (it fac
 
 function buildUnit(name) {
   const recipe = JSON.parse(fs.readFileSync(path.join(here, 'units', `${name}.json`), 'utf8'));
-  const S = readSource(name), m = S.mesh;
+  const S = readSource(recipe.use || name), m = S.mesh; // (`use`: another unit's body and clips, with gear and a choice of clips of its own)
   const nv = m.pos.length / 3, nj = m.skin.names.length;
   if (nj > 64) throw new Error(`${name}: ${nj} bones (64 at most)`);
 
@@ -47,8 +47,10 @@ function buildUnit(name) {
   // ---- clips: bone matrices per frame, into the game's space
   const frames = [], clips = [];
   const jointIndex = (re) => m.skin.names.findIndex((n) => re.test(n));
+  // (a mortar is a thing of its own, not part of the man: it gets a bone of its own after his, placed clip by clip below)
+  const props = (recipe.gear || []).some((g) => g.kind === 'mortar') ? 1 : 0, nb = nj + props;
   const bake = (c, f) => {
-    const out = new Float32Array(nj * 12);
+    const out = new Float32Array(nb * 12);
     for (let j = 0; j < nj; j++) {
       const M = c.mats.subarray((f * nj + j) * 16, (f * nj + j) * 16 + 16);
       // t' = s C (R o + t - o); R' = C R C^-1
@@ -165,6 +167,33 @@ function buildUnit(name) {
         const c = [0, 1, 2].map((e) => h[e] + d[e] * fwd + up[e] * rise);
         box(bone, SW[sw], c, along(d, hl), along(side, hw), along(up, hh), !!far);
       }
+    } else if (it.kind === 'mortar') {
+      // a mortar stood on the ground beside him as he kneels (in the frame `align` names): a baseplate, the tube leaning
+      // forward, a bipod. It has the extra bone to itself: still while he serves it or falls, slung on his back when he moves.
+      const al = it.align || { clip: 'aim', at: 0 }, row = clipRow(al.clip, al.at || 0), o12 = bone * 12, P = nj;
+      const hp = [0, 1, 2].map((e) => row[o12 + e * 4] * h[0] + row[o12 + e * 4 + 1] * h[1] + row[o12 + e * 4 + 2] * h[2] + row[o12 + e * 4 + 3]);
+      const base = [hp[0] + (it.forward != null ? it.forward : 0.62), hp[1] + (it.side != null ? it.side : -0.38), 0], d = [0.42, 0, 0.907], L = it.length || 1.15;
+      const pt = (k) => [base[0] + d[0] * k, base[1] + d[1] * k, base[2] + d[2] * k];
+      box(P, SW.iron, [base[0] - 0.04, base[1], 0.03], [0.2, 0, 0], [0, 0.2, 0], [0, 0, 0.03], true);
+      box(P, SW.paint, pt(L / 2 + 0.04), d.map((q) => q * L / 2), [0, 0.05, 0], [-0.907 * 0.05, 0, 0.42 * 0.05], true);
+      for (const sg of [1, -1]) { // the bipod's two legs, from two thirds up the tube out to the ground ahead
+        const top = pt(L * 0.66), foot = [top[0] + 0.22, top[1] + sg * 0.26, 0], mid = top.map((q, e) => (q + foot[e]) / 2), half = top.map((q, e) => (q - foot[e]) / 2);
+        box(P, SW.iron, mid, half, [0.014, 0, 0], [0, 0.014, 0], false);
+      }
+      // carried: stood upright (the tube's lean turned out of it) with its middle behind his upper back
+      const spine = jointIndex(/^spine$/i), sr = restOf(spine), mid = pt(L / 2), cs = 0.907, sn = -0.42; // turn about y taking d to straight up
+      const R = [cs, 0, sn, 0, 1, 0, -sn, 0, cs], Rm = [0, 1, 2].map((e) => R[e * 3] * mid[0] + R[e * 3 + 1] * mid[1] + R[e * 3 + 2] * mid[2]);
+      const T = [sr[0] - 0.2 - Rm[0], sr[1] - Rm[1], sr[2] - 0.05 - Rm[2]];
+      for (const c of clips) for (let f = 0; f < c.frames; f++) {
+        const fr = frames[c.start + f], q = P * 12;
+        if (c.name === 'walk' || c.name === 'run') {
+          const a = spine * 12;
+          for (let e = 0; e < 3; e++) {
+            for (let e2 = 0; e2 < 3; e2++) fr[q + e * 4 + e2] = fr[a + e * 4] * R[e2] + fr[a + e * 4 + 1] * R[3 + e2] + fr[a + e * 4 + 2] * R[6 + e2];
+            fr[q + e * 4 + 3] = fr[a + e * 4] * T[0] + fr[a + e * 4 + 1] * T[1] + fr[a + e * 4 + 2] * T[2] + fr[a + e * 4 + 3];
+          }
+        } else { fr.fill(0, q, q + 12); fr[q] = fr[q + 5] = fr[q + 10] = 1; }
+      }
     } else throw new Error(`${name}: unknown gear "${it.kind}"`);
   }
 
@@ -221,13 +250,13 @@ function buildUnit(name) {
     fs.writeFileSync(path.join(OUT, texFile), bytes);
     fs.unlinkSync(outTmp);
   }
-  const header = Buffer.from(JSON.stringify({ name, height: recipe.height, bones: nj, boneNames: m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
+  const header = Buffer.from(JSON.stringify({ name, height: recipe.height, bones: nb, boneNames: props ? [...m.skin.names, 'prop'] : m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
   const pre = Buffer.alloc(8); pre.write('HDU1', 0, 'latin1'); pre.writeUInt32LE(header.length, 4);
   const headPad = Buffer.alloc((4 - ((8 + header.length) & 3)) & 3);
   const pack = Buffer.concat([pre, header, headPad, ...sections]);
   const packFile = `${name}.${hash(pack)}.bin`;
   fs.writeFileSync(path.join(OUT, packFile), pack);
-  console.log(`${name}: ${packFile} ${(pack.length / 1024).toFixed(0)} KB (${lods.map((l) => `${l.triangles} tris / ${l.vertices} verts`).join(', ')}; ${nj} bones, ${frames.length} frames in ${clips.length} clips: ${clips.map((c) => `${c.name} ${c.frames}${c.stride ? ` stride ${c.stride} m` : ''}`).join(', ')})${texFile ? `, ${texFile} ${(fs.statSync(path.join(OUT, texFile)).size / 1024).toFixed(0)} KB` : ''}`);
+  console.log(`${name}: ${packFile} ${(pack.length / 1024).toFixed(0)} KB (${lods.map((l) => `${l.triangles} tris / ${l.vertices} verts`).join(', ')}; ${nb} bones, ${frames.length} frames in ${clips.length} clips: ${clips.map((c) => `${c.name} ${c.frames}${c.stride ? ` stride ${c.stride} m` : ''}`).join(', ')})${texFile ? `, ${texFile} ${(fs.statSync(path.join(OUT, texFile)).size / 1024).toFixed(0)} KB` : ''}`);
   return { pack: packFile, texture: texFile, bytes: pack.length };
 }
 
