@@ -89,8 +89,8 @@ export const directorMethods = {
         const plan = this._wlPlan(next.k, next.kind, next.groups.some((g) => g.type === 'ram' && g.count > 0));
         next.sector = plan.main;
         const note = this._wlAdapt(next);
-        const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
-        this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${where}${note}`, 'warn', AP.alertX, next.sector >= 0 ? this.sectors[next.sector].y : AP.centre, true);
+        const where = next.sector >= 0 ? ` — ${this.sectors[next.sector].short}` : '';
+        this._alert(null, 0, `${next.name} forming up${where}${note}`, 'warn', AP.alertX, next.sector >= 0 ? this.sectors[next.sector].y : AP.centre, true);
       }
     } else if (next.state === FORMING && this.time >= next.relT) {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
@@ -103,7 +103,7 @@ export const directorMethods = {
       if (!allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < AP.split[0] ? 0 : g.y < AP.split[1] ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
       next.pend = groups.map((g, k) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH + (hold ? hold[k] : 0) })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (hold ? hold.slice().sort((a, b) => a - b)[hold.length >> 1] : 0);
-      this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', AP.alertX, AP.centre, true);
+      this._alert(null, 0, `Wave ${next.k + 1} of ${d.W}: ${next.name.toLowerCase()}`, 'bad', AP.alertX, AP.centre, true);
     }
   },
 

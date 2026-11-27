@@ -84,7 +84,7 @@ function play(setup, opts = {}) {
     sim.step();
     if (pilot) pilot.step();
     if (opts.tick) opts.tick(sim, P);
-    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/slackening/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.name)) }); }
+    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/slackening/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.short)) }); }
     sim.events.length = 0;
     // ladders: when each went up
     for (const e of sim.engines) if (sim.alive[e] && sim.type[e] === U.ladder && sim.state[e] === S_DONE) { const k = e * 65536 + sim.gen[e]; if (!P.raised.has(k)) P.raised.set(k, sim.time); }
@@ -280,7 +280,7 @@ const CHECKS = {
       per.push(b.length);
       for (let k = 0; k < b.length; k++) { let n = 0; for (let j = k; j < b.length && b[j].t < b[k].t + 60; j++) n++; if (n > worstMin) worstMin = n; }
       const cnt = {};
-      for (const a of P.alerts) { const key = a.text.replace(/the (wall by the keep|centre of the wall|cliff end of the wall|Hornburg)/gi, 'X'); cnt[key] = (cnt[key] || 0) + 1; if (cnt[key] > worstRep) { worstRep = cnt[key]; worstText = key; } }
+      for (const a of P.alerts) { const key = a.text.replace(/(keep end|centre|cliff end|Hornburg)/gi, 'X'); cnt[key] = (cnt[key] || 0) + 1; if (cnt[key] > worstRep) { worstRep = cnt[key]; worstText = key; } }
     }
     verdict('alerts', worstMin <= 8 && worstRep <= 25, `most banners in any one minute: ${worstMin} (limit 8); most repeats of one message in a battle: ${worstRep} (limit 25)`, `banners per battle: ${per.join(', ')} · most repeated: "${worstText}"`);
   }],

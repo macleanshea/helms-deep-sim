@@ -179,7 +179,7 @@ export const engineMethods = {
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
     this.stats.thrown++;
     this.fx.dust(x, y, this.map.groundZ(x, y), 3); this.fx.sound('ladder', x, y, 0.7);
-    this._alert('ladDown' + this.segSector(k), 20, `A ladder is thrown down from ${this.sectors[this.segSector(k)].name}`, 'good', x, y);
+    this._alert('ladDown' + this.segSector(k), 20, `Ladder thrown down — ${this.sectors[this.segSector(k)].short}`, 'good', x, y);
     s.ladders--; s.claimed++; this._unlink(L);
     this.state[L] = S_MOVE; this.eHalt[L] = this.time + 6; this.cd2[L] = 0; this.eEver[L] = 0; this.eIdle[L] = this.time;
     this.x[L] = this.px[L] = s.ox; this.y[L] = this.py[L] = s.oy;

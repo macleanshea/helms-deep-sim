@@ -75,7 +75,7 @@ export const moraleMethods = {
         let pin = lvl >= 1.0 ? 2 : lvl >= 0.4 ? 1 : 0;
         // men pinned flat for the best part of a minute get their heads up again for a while, whatever is coming over
         if (pin === 2) { if (++this.gPinRun[g] > 90) { pin = 1; if (this.gPinRun[g] > 140) this.gPinRun[g] = 0; } } else if (this.gPinRun[g] > 0) this.gPinRun[g]--;
-        if (pin === 2) { this.stats.pinnedDef += cnt * 0.5; if (this.gPin[g] < 2) this._alert('pinD' + this.sectorAt(cx, cy), 60, `Platoons on ${this.sectors[this.sectorAt(cx, cy)].name} are pinned down by volleys`, 'warn', cx, cy); }
+        if (pin === 2) { this.stats.pinnedDef += cnt * 0.5; if (this.gPin[g] < 2) this._alert('pinD' + this.sectorAt(cx, cy), 60, `Pinned down — ${this.sectors[this.sectorAt(cx, cy)].short}`, 'warn', cx, cy); }
         this.gPin[g] = pin;
         if (this.gSup[g] > 9 * Math.max(6, cnt)) this.gSup[g] = 9 * Math.max(6, cnt);
       }
@@ -103,7 +103,7 @@ export const moraleMethods = {
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
       } else if (st === G_ROUT && ((m >= 60 && this.time - this.gRoutT[g] > 20) || (team === ORC && insp && this.time - this.gRoutT[g] > 6))) {
         this.gState[g] = G_OK; if (m < 50) this.gMorale[g] = 50; this.stats.rallied++;
-        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 90; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
+        if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 90; this.events.push({ type: 'log', text: 'A broken company rallies', cls: '', x: cx, y: cy }); }
       }
     }
   },
@@ -122,7 +122,7 @@ export const moraleMethods = {
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {
         this._moraleLogT[0] = this.time + 45;
-        this.events.push({ type: 'log', text: this._brokeN > 1 ? `${this._brokeN} Uruk companies have broken and run` : 'An Uruk company breaks and runs!', cls: 'good', x: this.gCx[g], y: this.gCy[g] });
+        this.events.push({ type: 'log', text: this._brokeN > 1 ? `${this._brokeN} Uruk companies have broken` : 'An Uruk company breaks!', cls: 'good', x: this.gCx[g], y: this.gCy[g] });
         this._brokeN = 0;
       }
     } else {
@@ -137,7 +137,7 @@ export const moraleMethods = {
       }
       if (list.length) {
         this._toKeep(list);
-        this.events.push({ type: 'log', text: `A platoon on ${this.sectors[this.sectorAt(this.gCx[g], this.gCy[g])].name} breaks under its losses and falls back to the keep`, cls: 'bad', x: this.gCx[g], y: this.gCy[g] });
+        this.events.push({ type: 'log', text: `A platoon breaks and falls back — ${this.sectors[this.sectorAt(this.gCx[g], this.gCy[g])].short}`, cls: 'bad', x: this.gCx[g], y: this.gCy[g] });
       }
     }
   },
@@ -153,8 +153,8 @@ export const moraleMethods = {
       this.gMorale[g] = Math.max(0, this.gMorale[g] - (d < 120 ? 40 : 22) - (left ? 0 : 8));
       if (d < 240) this.gConf[g] = this.time + 4 + this.rand() * 4;
     }
-    if (team === ORC) this.events.push({ type: 'banner', text: left ? 'An Uruk captain is down — his companies waver' : 'The last Uruk captain has fallen — the horde is leaderless', cls: 'good', x, y });
-    else this.events.push({ type: 'banner', text: left ? 'A commander is down — the line is shaken' : 'The garrison has lost its commanders', cls: 'bad', x, y });
+    if (team === ORC) this.events.push({ type: 'banner', text: left ? 'Uruk captain down' : 'Last Uruk captain down — the horde is leaderless', cls: 'good', x, y });
+    else this.events.push({ type: 'banner', text: left ? 'Commander down — the line is shaken' : 'All commanders lost', cls: 'bad', x, y });
     this.fx.sound('horn', x, y, 0.6);
   },
 };
