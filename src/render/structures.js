@@ -28,28 +28,33 @@ function slit(m, x, y, z, w, h, lit = false) {
 }
 
 /**
- * Battlements along the edge from p to q (z = walkway height), facing n: a course of corbels
- * carrying a breast wall that oversails the face, with merlons, sloped copings and arrow loops.
+ * Battlements along the edge from p to q (z = walkway height), facing n. Heavy and plain, as on the Hornburg: a
+ * breast wall with a string course under it, and broad merlons with a weathered coping, each with one loop; between
+ * them narrow embrasures with a sloped sill. No two merlons are quite alike, and here and there one is broken.
  */
 function battlement(m, p, q, z, n, col = STONE_LT) {
   const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy);
   if (L < 0.2) return;
+  // (the merlons' places are counted along the world, not along this stretch, so they keep their rhythm from one
+  // stretch of wall to the next instead of starting again at every joint)
+  const PITCH = 3.6, s0 = (p[0] * 0.731 + p[1] * 0.683), h01 = (k) => { const v = Math.sin(k * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
   m.frame([p[0], p[1], z], n, [dx / L, dy / L], () => {
-    const nc = Math.max(1, Math.round(L / 1.25));
-    for (let k = 0; k < nc; k++) {
-      const y = ((k + 0.5) / nc) * L;
-      m.box(0.21, y, -1.05, 0.42, 0.42, 0.55, STONE_DK);
-      m.box(0.11, y, -1.52, 0.22, 0.42, 0.4, STONE_DK);
-    }
-    m.box(0.1, L / 2, -0.52, 0.72, L, 0.52, STONE);            // the course the corbels carry
-    m.box(0.1, L / 2, 0.34, 0.7, L, 1.2, col);                 // breast wall
-    const nm = Math.max(1, Math.round(L / 2.5)), w = Math.min(1.4, (L / nm) * 0.58);
-    for (let k = 0; k < nm; k++) {
-      const y = ((k + 0.5) / nm) * L;
-      m.box(0.1, y, 1.47, 0.7, w, 1.06, col);
-      const r = (sx, sy) => [0.1 + sx * 0.35, y + sy * w / 2, 2.0], t = (sx, sy) => [0.1 + sx * 0.12, y + sy * (w / 2 - 0.12), 2.26];
-      m.prism([r(-1, -1), r(1, -1), r(1, 1), r(-1, 1)], [t(-1, -1), t(1, -1), t(1, 1), t(-1, 1)], STONE);
-      if (k % 2 === 0) slit(m, 0.44, y, 1.45, 0.13, 0.7);
+    m.box(0.16, L / 2, -0.62, 0.5, L, 0.34, STONE_DK);                    // string course under the parapet
+    m.box(0.02, L / 2, 0.55, 0.78, L, 1.1, col);                          // breast wall
+    const k0 = Math.floor(s0 / PITCH), off = s0 - k0 * PITCH;
+    for (let k = -1; k * PITCH - off < L; k++) {
+      const c0 = k * PITCH - off, a = Math.max(0, c0 + 0.5), b = Math.min(L, c0 + PITCH - 0.6);   // a merlon, less the embrasure after it
+      if (b - a < 0.5) continue;
+      const id = k0 + k, r = h01(id), broken = r > 0.9, h = broken ? 0.5 + h01(id + 0.5) * 0.7 : 1.45 + (r - 0.5) * 0.14, y = (a + b) / 2, w = b - a;
+      m.box(0.02, y, 1.1 + h / 2, 0.78, w, h, col);
+      if (!broken) {
+        const e = 0.47, t = 0.2;
+        m.prism([[0.02 - e, a - 0.06, 1.1 + h], [0.02 + e, a - 0.06, 1.1 + h], [0.02 + e, b + 0.06, 1.1 + h], [0.02 - e, b + 0.06, 1.1 + h]],
+          [[0.02 - e + t, a + 0.08, 1.1 + h + 0.26], [0.02 + e - t, a + 0.08, 1.1 + h + 0.26], [0.02 + e - t, b - 0.08, 1.1 + h + 0.26], [0.02 - e + t, b - 0.08, 1.1 + h + 0.26]], STONE);
+        if (w > 1.6) slit(m, 0.42, y, 1.1 + h * 0.5, 0.14, h * 0.62);
+      } else if (w > 1.2) {
+        m.box(0.02, a + w * 0.3, 1.1 + h + 0.2, 0.7, w * 0.36, 0.4, STONE_DK, 0, 0.12);   // a stump of it still standing
+      }
     }
   });
 }
