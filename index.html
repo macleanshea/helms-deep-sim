@@ -119,8 +119,21 @@
   <div id="devMenu" class="panel" hidden></div>
   <div id="coach" hidden><div class="spot"></div><div class="coach-card"><i class="arrow"></i><div class="coach-body"></div><button class="primary" id="coachOk">Got it</button></div></div>
   <div id="modal" hidden></div>
-  <div id="loading"><div class="spinner"></div><span>Surveying the Deeping-coomb…</span></div>
+  <div id="loading">
+    <picture class="ld-art">
+      <source media="(max-aspect-ratio: 3/4)" srcset="assets/splash/loading-phone.webp">
+      <source media="(max-aspect-ratio: 3/2)" srcset="assets/splash/loading-tall.webp">
+      <img src="assets/splash/loading-wide.webp" alt="" fetchpriority="high" decoding="async">
+    </picture>
+    <div class="ld-text">
+      <h1 class="ld-title">Helm’s <br>Deep</h1>
+      <small class="ld-sub">Modern Defense Simulator</small>
+      <div class="ld-bar"><i id="ldBar"></i></div>
+      <span class="ld-pct" id="ldPct">0%</span>
+    </div>
+  </div>
 </div>
+<script src="src/loading.js"></script>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>
