@@ -443,6 +443,9 @@ section (was 2 for a 3 m piece that only slowed); obstacles stay at 3. A challen
 its garrison's cost. Also: the Advanced button is outlined in the accent colour and filled when open, and
 opens itself when a defender is added in a challenge; an air strike is always twelve bombs, laid further
 apart on a longer run.
+With the new wire the stand-in commander won Easy 4 of 5, Medium 5 of 5 and Hard 4 of 5; the Hard garrison's
+belt was cut to the middle of the wall (49 sections for 85), which brought Hard back to 1 of 5. Behaviour
+checks 24 of 25 (`keep` open as before).
 
 **Weapons and shields as models.** Gear was plain boxes in four flat colours. Each kind is now a generated
 model of its own (`tools/assets/src/gear-*/`: sword, shield, club, crossbow, rifle, machine gun, marksman's

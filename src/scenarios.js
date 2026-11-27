@@ -341,7 +341,9 @@ export function waveSummary(groups, crews = false) {
 /** A belt of field works in front of the Deeping Wall. */
 function fieldWorks(map, scale = 1) {
   const g = [];
-  g.push(...alongWall(map, 'wire', Math.round(110 * scale), 0.12, 0.9, 62));
+  // (a belt of wire fills whatever stretch it is given, so a thinner garrison's belt is a shorter one: the middle of the wall, its ends open)
+  const span = Math.min(0.39, 0.39 * scale);
+  g.push(...alongWall(map, 'wire', Math.round(110 * scale), 0.51 - span, 0.51 + span, 62));
   g.push(...alongWall(map, 'mine', Math.round(90 * scale), 0.25, 0.8, 92));
   g.push(...alongWall(map, 'claymore', Math.round(10 * scale), 0.38, 0.62, 30));
   g.push(...alongWall(map, 'hedgehog', Math.round(34 * scale), 0.62, 0.9, 40));
