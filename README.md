@@ -28,7 +28,7 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 
 ## Playing
 
-The battlefield is shown in an isometric 3D view modelled on the film's set: the Hornburg on
+The battlefield is shown in a 3D view modelled on the film's set: the Hornburg on
 its rock against the southern cliff (on your right as you look up the valley), its inner ward
 climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
 its culvert.
@@ -93,8 +93,10 @@ not yet committed. Shortly before dawn everything left comes on at once.
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
 
-**Camera.** Scroll to zoom (from the whole valley down to a single squad), right-drag or `WASD`
-to pan, middle-drag or `Q`/`E` to rotate, `Home` to reset the view. `G` jumps to the latest
+**Camera.** Scroll to zoom, from the whole valley seen from high above down to a single squad seen
+from just over its shoulders: the view swings lower as it closes in. Right-drag or `WASD` to pan,
+middle-drag or `Q`/`E` to turn, middle-drag up and down or `PgUp`/`PgDn` to tip the view, `Home` to
+reset it. `G` jumps to the latest
 alert; clicking an alert in the feed or a point on the minimap looks there too.
 
 **Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left (each card shows the unit's
@@ -212,7 +214,8 @@ results** button puts the table on the clipboard together with the graphics card
 resolution it was measured on. GPU timings need a browser that exposes
 `EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
 
-Units are drawn at one of four levels of detail chosen from the zoom: dots, then boxes, then
+Each unit is drawn at one of four levels of detail chosen from its size on screen (so the far
+ranks of a host cost little while the near ones are drawn in full): dots, then boxes, then
 blocky stand-ins of about seventy triangles, and the full models (about a thousand triangles for
 a soldier, several thousand for a vehicle). The **Detailed models** setting places the ladder:
 full models take over at a zoom proportional to it, dots give way at its square root (so the
@@ -227,7 +230,10 @@ scale. On high quality, in screen pixels per metre:
 | Very far | 0.9 | 1.5 | 2.5 |
 
 Balanced and performance quality bring the full models (and so the boxes' upper limit) in
-closer.
+closer. The scale is measured where each unit stands, so in a low view the nearest
+ranks are full models while the far end of the same host is boxes and dots; and if a view would
+still spend more than 2.5 million triangles on units, every level is pulled in closer until it
+does not.
 
 ## How it works
 
@@ -238,7 +244,7 @@ closer.
   other through uniform grids, and the horde navigates with a congestion-aware flow field that
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
   renderer interpolates between them.
-- `src/render/` — a WebGL2 renderer: an orthographic isometric camera, a height-field terrain
+- `src/render/` — a WebGL2 renderer: a perspective camera whose pitch follows the zoom, a height-field terrain
   mesh, a static shadow map, 3D particles and short-lived lights, a persistent ground decal
   layer, and bloom post-processing. Everything is generated in code; there are no image or
   model files.

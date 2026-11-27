@@ -1,8 +1,8 @@
-// WebGL2 renderer: a pitched orthographic ("isometric") 3D view.
+// WebGL2 renderer: a perspective view over the valley (see camera.js).
 //  - terrain: a height-field mesh textured from a baked procedural albedo
 //  - fortress: one static mesh, rebuilt when a section is breached, casting a shadow map
-//  - units, vehicles, props, ordnance: instanced meshes with shader animation, drawn at one of
-//    four levels of detail chosen from the zoom (dots, boxes, blocky stand-ins, full models)
+//  - units, vehicles, props, ordnance: instanced meshes with shader animation, each drawn at one of
+//    four levels of detail chosen from its size on screen (dots, boxes, blocky stand-ins, full models)
 //  - surfaces are textured from two generated material arrays (see materials.js)
 //  - particles: billboards / streaks / ground quads, depth-tested against the scene
 //  - corpses, craters and scorch marks are stamped into a persistent decal texture
@@ -14,7 +14,8 @@ import { COLS, SPR } from './atlas.js';
 import { buildModels } from './models/index.js';
 import { buildMaterials } from './materials.js';
 import { buildStructures } from './structures.js';
-import { viewMatrix, SIN_P, COS_P } from './camera.js';
+import { viewProj, orthoMatrix, camState, FOV } from './camera.js';
+import { UNIT_TRI_BUDGET } from './perf.js';
 import { S_DONE, S_CLIMB, LADDER_TIME } from '../sim/sim.js';
 import * as SH from './shaders.js';
 import { LAYOUT } from '../layout.js';
@@ -26,7 +27,7 @@ const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v
 // region covered by the shadow map: the fortress and its approaches
 const SB = { x0: LAYOUT.shadowBox[0], x1: LAYOUT.shadowBox[2], y0: LAYOUT.shadowBox[1], y1: LAYOUT.shadowBox[3], z0: -8, z1: 120 };
 
-// Levels of detail by zoom (CSS px per metre): dots, boxes, stand-ins, full models. The player's
+// Levels of detail by scale on screen (CSS px per metre where the unit stands): dots, boxes, stand-ins, full models. The player's
 // model-detail setting (`heroScale`) moves the whole ladder: full models take over at HERO_ZOOM x
 // heroScale (0.5 = twice as far out); dots move out more gently, with the square root of it, so the
 // whole valley stays cheap to draw; and boxes give way to stand-ins at the geometric midpoint, so
@@ -78,6 +79,7 @@ export class Renderer {
     this.pBright = compile(gl, SH.VS_FULL, SH.FS_BRIGHT);
     this.pBlur = compile(gl, SH.VS_FULL, SH.FS_BLUR);
     this.pComp = compile(gl, SH.VS_FULL, SH.FS_COMPOSITE);
+    this.pSky = compile(gl, SH.VS_FULL, SH.FS_SKY);
 
     // shared quads
     this.quad = gl.createBuffer();
@@ -180,7 +182,8 @@ export class Renderer {
     this.vp = new Float32Array(16);
     this.lpos = new Float32Array(24); this.lcol = new Float32Array(18);
     this.stats = { units: 0, parts: 0, dots: 0, tier: 0, draws: 0, tris: { terrain: 0, fort: 0, units: 0, shadows: 0, fx: 0 }, cpu: 0, gpu: {}, gpuOk: !!this.timerExt };
-    this.perfOn = false; this._queries = []; this._query = null; this.view = new Float32Array(3);
+    this.perfOn = false; this._queries = []; this._query = null; this.eye = new Float32Array(3); this.haze = new Float32Array(4);
+    this.lodBias = 1; this._tier = 0; this.camF = 1; // lodBias > 1 pulls every level of detail in closer, to hold the triangle budget
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
@@ -205,18 +208,24 @@ export class Renderer {
     gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, true, 20, 16);
   }
 
-  _instAttribs(buf) {
+  /** Point the bound vertex array's per-instance attributes at `buf`, starting `base` bytes in. */
+  _instAttribs(buf, base = 0) {
     const gl = this.gl;
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    const at = [[4, 4, gl.FLOAT, false, 0], [5, 2, gl.FLOAT, false, 16], [6, 4, gl.UNSIGNED_BYTE, true, 24], [7, 4, gl.UNSIGNED_BYTE, true, 28]];
-    for (const [loc, n, type, norm, off] of at) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, n, type, norm, ISTRIDE, off); gl.vertexAttribDivisor(loc, 1); }
+    gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 4, gl.FLOAT, false, ISTRIDE, base); gl.vertexAttribDivisor(4, 1);
+    gl.enableVertexAttribArray(5); gl.vertexAttribPointer(5, 2, gl.FLOAT, false, ISTRIDE, base + 16); gl.vertexAttribDivisor(5, 1);
+    gl.enableVertexAttribArray(6); gl.vertexAttribPointer(6, 4, gl.UNSIGNED_BYTE, true, ISTRIDE, base + 24); gl.vertexAttribDivisor(6, 1);
+    gl.enableVertexAttribArray(7); gl.vertexAttribPointer(7, 4, gl.UNSIGNED_BYTE, true, ISTRIDE, base + 28); gl.vertexAttribDivisor(7, 1);
   }
 
-  /** GPU buffers for a model: one instance list shared by its levels of detail (plus one for static props). */
+  /**
+   * GPU buffers for a model. Its instances are queued in three lists, one for each level of detail it can be
+   * drawn at (0 full, 1 stand-in, 2 box), which go to the GPU end to end in one buffer; static props have their own.
+   */
   _initModel(m) {
     const gl = this.gl;
-    m.cap = 256; m.n = 0;
-    m.idata = new ArrayBuffer(m.cap * ISTRIDE); m.f = new Float32Array(m.idata); m.u8 = new Uint8Array(m.idata);
+    m.lists = [0, 1, 2].map(() => { const idata = new ArrayBuffer(64 * ISTRIDE); return { cap: 64, n: 0, f: new Float32Array(idata), u8: new Uint8Array(idata) }; });
+    m.n = 0; m.gcap = 0;
     m.ibuf = gl.createBuffer(); m.pbuf = gl.createBuffer(); m.pn = 0;
     for (const geo of [m.full, m.mid, m.lod]) {
       if (!geo) continue;
@@ -236,15 +245,16 @@ export class Renderer {
   }
 
   _put(m, x, y, z, yaw, scale, phase, r, g, b, flash, walk, atk, tilt, pose = 0) {
-    if (m.n >= m.cap) {
-      m.cap *= 2;
-      const nd = new ArrayBuffer(m.cap * ISTRIDE); new Uint8Array(nd).set(m.u8);
-      m.idata = nd; m.f = new Float32Array(nd); m.u8 = new Uint8Array(nd);
+    const L = m.lists[this._tier]; // (the level of detail is set by the caller before it queues a unit)
+    if (L.n >= L.cap) {
+      L.cap *= 2;
+      const nd = new ArrayBuffer(L.cap * ISTRIDE); new Uint8Array(nd).set(L.u8);
+      L.f = new Float32Array(nd); L.u8 = new Uint8Array(nd);
     }
-    const o = m.n * 8, f = m.f, u = m.u8, b8 = m.n * ISTRIDE;
+    const o = L.n * 8, f = L.f, u = L.u8, b8 = L.n * ISTRIDE;
     f[o] = x; f[o + 1] = y; f[o + 2] = z; f[o + 3] = yaw; f[o + 4] = scale; f[o + 5] = phase;
     u[b8 + 24] = r; u[b8 + 25] = g; u[b8 + 26] = b; u[b8 + 27] = flash; u[b8 + 28] = walk; u[b8 + 29] = atk; u[b8 + 30] = tilt; u[b8 + 31] = pose;
-    m.n++;
+    L.n++; m.n++;
   }
 
   // ------------------------------------------------------------- terrain
@@ -452,11 +462,12 @@ export class Renderer {
     // mood colours are authored in display space; the shaders light in linear space
     if (u.uSunCol) gl.uniform3f(u.uSunCol, env.sun[0] * env.sun[0] * SUN_GAIN, env.sun[1] * env.sun[1] * SUN_GAIN, env.sun[2] * env.sun[2] * SUN_GAIN);
     if (u.uAmb) gl.uniform3f(u.uAmb, env.amb[0] * env.amb[0] * AMB_GAIN, env.amb[1] * env.amb[1] * AMB_GAIN, env.amb[2] * env.amb[2] * AMB_GAIN);
-    if (u.uView) gl.uniform3fv(u.uView, this.view);
+    if (u.uEye) gl.uniform3fv(u.uEye, this.eye);
+    if (u.uHaze) gl.uniform4fv(u.uHaze, this.haze);
     if (u.uWet) gl.uniform1f(u.uWet, env.wet || 0);
     if (u.uExposure) gl.uniform1f(u.uExposure, EXPOSURE);
     if (u.uFog) gl.uniform3fv(u.uFog, env.fog);
-    if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 60, 330);
+    if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 40, MARGIN - 8); // the ground is gone into the haze before the modelled terrain ends
     if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.uniform1f(u.uShadowTexel, this.shadowTexel); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
     if (u.uLPos) { gl.uniform4fv(u.uLPos, this.lpos); gl.uniform3fv(u.uLCol, this.lcol); }
     if (u.uDecal) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.decalTex); gl.uniform1i(u.uDecal, 1); }
@@ -489,7 +500,7 @@ export class Renderer {
     if (props) return tier === 0 ? m.full : m.mid || m.full;
     if (tier === 0) return shadow ? m.mid || m.full : m.full;
     if (tier === 1 || m.big) return m.mid || m.full;
-    return m.lod;
+    return m.lod || m.mid || m.full;
   }
 
   _drawMeshes(env, clock, tier, shadowPass, props) {
@@ -497,15 +508,21 @@ export class Renderer {
     gl.useProgram(p.p); this._common(p.u, env);
     gl.uniform1f(p.u.uTime, clock); gl.uniform1f(p.u.uShadowPass, shadowPass ? 1 : 0); gl.uniform1f(p.u.uLift, env.lift);
     for (const name in this.meshes) {
-      const m = this.meshes[name], n = props ? m.pn : m.n;
-      if (!n) continue;
+      const m = this.meshes[name], a = m.anim;
+      if (!(props ? m.pn : m.n)) continue;
       if (shadowPass && (name === 'mine' || name === 'cube')) continue;
-      const geo = this._geo(m, tier, shadowPass, props), a = m.anim;
       gl.uniform4f(p.u.uPivot, a[0], a[1], a[2], a[3]); gl.uniform1f(p.u.uRecoil, a[4]); gl.uniform4f(p.u.uPivot2, a[5], a[6], a[7], a[8]); gl.uniform1f(p.u.uLegX, a[9]);
-      gl.uniform1f(p.u.uMatOn, geo === m.full ? 1 : 0);   // stand-ins are too small on screen for texture to show
-      gl.bindVertexArray(props ? geo.pvao : geo.vao);
-      if (geo.itype) gl.drawElementsInstanced(gl.TRIANGLES, geo.n, geo.itype, 0, n); else gl.drawArraysInstanced(gl.TRIANGLES, 0, geo.n, n);
-      st.draws++; if (shadowPass) st.tris.shadows += (geo.n / 3) * n; else st.tris.units += (geo.n / 3) * n;
+      // props: one list, at the level of detail of the middle of the view. Units: a list for each level, end to end in the buffer
+      for (let t = 0, base = 0; t < (props ? 1 : 3); t++) {
+        const n = props ? m.pn : m.lists[t].n;
+        if (!n) continue;
+        const geo = this._geo(m, props ? tier : t, shadowPass, props);
+        gl.uniform1f(p.u.uMatOn, geo === m.full ? 1 : 0);   // stand-ins are too small on screen for texture to show
+        gl.bindVertexArray(props ? geo.pvao : geo.vao);
+        if (!props) { this._instAttribs(m.ibuf, base * ISTRIDE); base += n; }
+        if (geo.itype) gl.drawElementsInstanced(gl.TRIANGLES, geo.n, geo.itype, 0, n); else gl.drawArraysInstanced(gl.TRIANGLES, 0, geo.n, n);
+        st.draws++; if (shadowPass) st.tris.shadows += (geo.n / 3) * n; else st.tris.units += (geo.n / 3) * n;
+      }
     }
   }
 
@@ -536,13 +553,14 @@ export class Renderer {
     if (!this.perfOn && !this._queries.length) for (const k in g) delete g[k];
   }
 
-  _drawParticles(n, minPx, tint, zoom, vw, vh) {
+  /** `f`: the camera's focal length in pixels. */
+  _drawParticles(n, minPx, tint, f, vw, vh) {
     if (!n) return;
     this.stats.draws++; this.stats.tris.fx += n * 2;
     const gl = this.gl, p = this.pPart;
     gl.useProgram(p.p);
     gl.uniformMatrix4fv(p.u.uVP, false, this.vp);
-    gl.uniform2f(p.u.uK, (2 * zoom) / vw, (2 * zoom) / vh); gl.uniform1f(p.u.uZoom, zoom); gl.uniform1f(p.u.uCols, COLS); gl.uniform1f(p.u.uMinPx, minPx);
+    gl.uniform2f(p.u.uK, (2 * f) / vw, (2 * f) / vh); gl.uniform1f(p.u.uZoom, f); gl.uniform1f(p.u.uCols, COLS); gl.uniform1f(p.u.uMinPx, minPx);
     gl.uniform3fv(p.u.uTint, tint);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.atlas); gl.uniform1i(p.u.uAtlas, 0);
     gl.bindVertexArray(this.vaoPart);
@@ -563,9 +581,11 @@ export class Renderer {
     if (sim && sim.structVersion !== this.structVersion) { this.structVersion = sim.structVersion; this._updateStructures(sim); }
     if (sim && (sim !== this.propSim || sim.propVersion !== this.propVersion)) { this.propSim = sim; this.propVersion = sim.propVersion; this._updateProps(sim); }
     if (fx) this._flushDecals(fx);
-    viewMatrix(cam, vw, vh, SIN_P, COS_P, this.vp);
-    // direction from the scene toward the (orthographic) camera
-    this.view[0] = -Math.sin(cam.yaw) * COS_P; this.view[1] = Math.cos(cam.yaw) * COS_P; this.view[2] = SIN_P;
+    const cs = camState(cam, vw, vh);
+    viewProj(cam, vw, vh, this.vp);
+    this.eye[0] = cs.ex; this.eye[1] = cs.ey; this.eye[2] = cs.ez; this.camF = cs.f;
+    // the air: clear out to a little beyond the point of interest, then thickening toward the horizon
+    this.haze[0] = Math.max(140, cs.dist * 1.25); this.haze[1] = 1 / (700 + cs.dist * 0.6); this.haze[2] = 0.94; this.haze[3] = 420;
 
     // brightest few flashes become real lights
     this.lpos.fill(0); this.lcol.fill(0);
@@ -587,6 +607,19 @@ export class Renderer {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const zc = cam.zoom / (cam.dpr || 1);
     this._time('scene');
+    {
+      // the sky, behind everything
+      const p = this.pSky, th = Math.tan(FOV / 2);
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.BLEND);
+      gl.useProgram(p.p);
+      gl.uniform3f(p.u.uCamR, cs.rx, cs.ry, 0); gl.uniform3f(p.u.uCamU, cs.ux, cs.uy, cs.uz); gl.uniform3f(p.u.uCamF, cs.fx, cs.fy, cs.fz);
+      gl.uniform2f(p.u.uTan, (th * vw) / vh, th); gl.uniform3fv(p.u.uFog, env.fog); gl.uniform1f(p.u.uTime, clock || 0);
+      gl.uniform3f(p.u.uZenith, env.amb[0] * 0.38 + env.fog[0] * 0.3, env.amb[1] * 0.38 + env.fog[1] * 0.3, env.amb[2] * 0.38 + env.fog[2] * 0.3);
+      gl.bindVertexArray(this.vaoFull);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
+      st.draws++;
+    }
     this._scene(env);
 
     let dots = 0;
@@ -594,27 +627,42 @@ export class Renderer {
     if (sim) {
       for (const name in this.meshes) this.meshes[name].n = 0;
       const L = this.lod(q);
+      // the level of detail at the middle of the view (props are drawn at it; each unit takes its own from its distance)
       const tier = zc < L.dot ? 3 : zc < L.box ? 2 : zc < L.hero ? 1 : 0;
       st.tier = tier;
-      dots = this._fillUnits(cam, sim, al, vw, vh, tier, clock, env.lift > 0.12);
+      for (const name in this.meshes) { const ls = this.meshes[name].lists; ls[0].n = ls[1].n = ls[2].n = 0; }
+      dots = this._fillUnits(cam, cs, sim, al, vw, vh, L, clock, env.lift > 0.12);
+      this._tier = 0;
       this._fillDynamic(sim, fx, al, clock);
-      for (const name in this.meshes) { const m = this.meshes[name]; if (m.n) { gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf); gl.bufferData(gl.ARRAY_BUFFER, m.u8, gl.DYNAMIC_DRAW, 0, m.n * ISTRIDE); } }
+      for (const name in this.meshes) {
+        const m = this.meshes[name];
+        if (!m.n) continue;
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf);
+        if (m.n > m.gcap) m.gcap = Math.max(64, m.n * 2);
+        gl.bufferData(gl.ARRAY_BUFFER, m.gcap * ISTRIDE, gl.DYNAMIC_DRAW); // (a fresh store each frame: the driver need not wait on the last one)
+        let base = 0;
+        for (const ls of m.lists) if (ls.n) { gl.bufferSubData(gl.ARRAY_BUFFER, base * ISTRIDE, ls.u8, 0, ls.n * ISTRIDE); base += ls.n; }
+      }
       gl.disable(gl.BLEND);
       this._drawMeshes(env, clock, tier, false, true);
-      if (env.shadows && tier < 3) {
+      if (env.shadows) {
         gl.enable(gl.BLEND); gl.depthMask(false);
         this._drawMeshes(env, clock, tier, true, false);
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
       this._drawMeshes(env, clock, tier, false, false);
+      // hold the triangle budget: if this view spent too much on units, bring every level of detail in closer next frame
+      const spent = st.tris.units + st.tris.shadows;
+      if (spent > UNIT_TRI_BUDGET) this.lodBias = Math.min(12, this.lodBias * Math.max(1.06, Math.sqrt(spent / UNIT_TRI_BUDGET)));
+      else if (spent < UNIT_TRI_BUDGET * 0.6 && this.lodBias > 1) this.lodBias = Math.max(1, this.lodBias / 1.03);
     }
     this._time('effects');
     gl.enable(gl.BLEND); gl.depthMask(false);
-    if (dots) this._drawParticles(dots, 2.6, [1, 1, 1], cam.zoom, vw, vh);
+    if (dots) this._drawParticles(dots, 2.6, [1, 1, 1], cs.f, vw, vh);
     if (fx) {
       const n = fx.fill(this.partF, this.partU, this.partMax, sim);
       st.parts = n;
-      this._drawParticles(n, 1.6, [env.amb[0] * 0.6 + 0.4, env.amb[1] * 0.6 + 0.4, env.amb[2] * 0.6 + 0.4], cam.zoom, vw, vh);
+      this._drawParticles(n, 1.6, [env.amb[0] * 0.6 + 0.4, env.amb[1] * 0.6 + 0.4, env.amb[2] * 0.6 + 0.4], cs.f, vw, vh);
     }
     gl.depthMask(true); gl.disable(gl.BLEND);
 
@@ -638,11 +686,13 @@ export class Renderer {
   }
 
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
-  _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
+  _fillUnits(cam, cs, sim, al, vw, vh, L, clock, torches) {
     const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
     const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
-    const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
-    const hw = vw / 2 + 60, hh = vh / 2 + 120;
+    const { ex, ey, ez, rx, ry, ux, uy, uz, fx: fwx, fy: fwy, fz: fwz, f: focal, near } = cs;
+    const hw = vw / 2, hh = vh / 2, dprI = 1 / (cam.dpr || 1);
+    // each unit's level of detail comes from its scale on screen (CSS px per metre where it stands)
+    const bias = this.lodBias, zDot = L.dot * bias, zBox = L.box * bias, zHero = L.hero * bias;
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
     const PFv = this.partF, PU = this.partU;
     let dots = 0, drawn = 0;
@@ -658,9 +708,13 @@ export class Renderer {
         zi = gz[((by[i] / HM_RES) | 0) * GZ_W + ((bx[i] / HM_RES) | 0)] * (1 - u) + segTop[0] * u;
       } else if (el[i]) { const sg = mseg[((yi / 4) | 0) * (WORLD_W / 4) + ((xi / 4) | 0)]; zi = sg >= 0 ? segTop[sg] : gz[((yi / HM_RES) | 0) * GZ_W + ((xi / HM_RES) | 0)]; }
       else zi = gz[((yi / HM_RES) | 0) * GZ_W + ((xi / HM_RES) | 0)];
-      const dx = xi - cam.x, dy = yi - cam.y;
-      const sx = (c * dx + s * dy) * z0, sy = ((-s * dx + c * dy) * SIN_P - zi * COS_P) * z0;
-      if (sx < -hw || sx > hw || sy < -hh || sy > hh) continue;
+      const dx = xi - ex, dy = yi - ey, dz = zi - ez, w = dx * fwx + dy * fwy + dz * fwz;
+      if (w < near) continue;
+      // off screen, with room for the tallest and widest thing drawn (a siege tower, a ladder laid flat)
+      const z0 = focal / w, sx = (dx * rx + dy * ry) * z0, sy = (dx * ux + dy * uy + dz * uz) * z0, pad = 14 * z0 + 8;
+      if (sx < -hw - pad || sx > hw + pad || sy < -hh - pad || sy > hh + pad) continue;
+      const zc = z0 * dprI, tier = zc < zDot ? 3 : zc < zBox ? 2 : zc < zHero ? 1 : 0;
+      this._tier = tier === 3 ? 2 : tier;
       const d = UNITS[type[i]], um_i = um[type[i]];
       const h = (Math.imul(i, 2654435761) >>> 24);
       const fl = time - hitT[i];
@@ -682,6 +736,7 @@ export class Renderer {
       }
       if (tier === 3 && d.size < 7) {
         // far view: a coloured dot. cyan = armed defender, amber = out of ammunition, red = attacker
+        if (dots >= this.partMax) continue; // (the particle buffer is full: a horde this size is a carpet of dots already)
         const o = dots * PF;
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + 1; PFv[o + 3] = d.size * 0.42; PFv[o + 4] = d.size * 0.42; PFv[o + 5] = 0; PFv[o + 6] = SPR.dot;
         let r, g, b;
@@ -763,10 +818,10 @@ export class Renderer {
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 1); gl.clearDepth(1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     // straight down, north up; flipped vertically so row 0 of the read-back is the north edge
-    viewMatrix({ x: WORLD_W / 2, y: WORLD_H / 2, zoom: w / WORLD_W, yaw: 0 }, w, h, 1, 0, this.vp);
+    orthoMatrix({ x: WORLD_W / 2, y: WORLD_H / 2, zoom: w / WORLD_W, yaw: 0 }, w, h, 1, 0, this.vp);
     this.vp[1] = -this.vp[1]; this.vp[5] = -this.vp[5]; this.vp[9] = -this.vp[9]; this.vp[13] = -this.vp[13];
     this.lpos.fill(0); this.lcol.fill(0);
-    this.view[0] = 0; this.view[1] = 0; this.view[2] = 1;
+    this.eye[0] = WORLD_W / 2; this.eye[1] = WORLD_H / 2; this.eye[2] = 1e5; this.haze.fill(0); this.haze[3] = 1; // seen from straight above, through clear air
     this._scene({ amb: [0.75, 0.75, 0.75], sun: [0.5, 0.5, 0.48], fog: [0.1, 0.1, 0.1], shadows: true, lift: 0, wet: 0 });
     const px = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);

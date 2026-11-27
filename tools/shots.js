@@ -31,7 +31,7 @@ const compare = get('compare', null);
 const port = +get('port', 5187);
 
 /**
- * The views. `at` is [x, y, zoom, yaw?] in world metres and px per metre (null: the home view);
+ * The views. `at` is [x, y, zoom, yaw?, tilt?] in world metres, px per metre and radians (null: the home view);
  * `ui` keeps the panels on screen. Battle views are taken `t` seconds into the named preset.
  */
 const YAW = 1.2;
@@ -47,6 +47,8 @@ const SETUP = [
   ['the-deep-z3', [1180, 470, 3]],
   ['postern-z10', [1045, 660, 10, YAW + 2.2]],
   ['garrison-z36', [962, 500, 36]],
+  ['low-toward-the-wall', [840, 470, 16, YAW, -0.14]],
+  ['low-down-the-valley', [958, 430, 22, YAW + Math.PI, -0.12]],
 ];
 const BATTLE = { preset: 'garrison', t: 420, views: [
   ['battle-whole-map', null],
@@ -104,7 +106,7 @@ async function main() {
       await page.evaluate(async ({ at, ui }) => {
         const app = window.__app;
         document.querySelectorAll('style').forEach((s) => { if (s.textContent.startsWith('#topbar,#left')) s.disabled = !!ui; });
-        if (at) { app.cam.x = at[0]; app.cam.y = at[1]; app.cam.zoom = at[2]; app.cam.yaw = at[3] == null ? 1.2 : at[3]; } else app.homeView();
+        if (at) { app.cam.x = at[0]; app.cam.y = at[1]; app.cam.zoom = at[2]; app.cam.yaw = at[3] == null ? 1.2 : at[3]; app.cam.tilt = at[4] || 0; } else app.homeView();
         await window.__settle(3);
       }, { at, ui: opts.ui });
       const file = path.join(out, `${name}.${ext}`);
@@ -128,6 +130,9 @@ async function main() {
           for (let k = 0; k < 100 && sim.time < t && !sim.result; k++) { sim.step(); sim.events.length = 0; }
           await new Promise((r) => setTimeout(r, 0));
         }
+        // stepping the battle with the picture frozen piles up hours of muzzle flashes: clear them, then let a moment's worth happen
+        window.__fx.reset();
+        for (let k = 0; k < 6 && !sim.result; k++) { sim.step(); sim.events.length = 0; }
         // the thickest of the horde, as the benchmark finds it
         const cells = new Map();
         for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === 1) { const k = ((sim.y[i] / 80) | 0) * 100 + ((sim.x[i] / 80) | 0); cells.set(k, (cells.get(k) || 0) + 1); }

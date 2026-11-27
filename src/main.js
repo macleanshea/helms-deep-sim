@@ -1,4 +1,4 @@
-// Application glue: state machine (setup -> battle -> debrief), isometric camera, input,
+// Application glue: state machine (setup -> battle -> debrief), the camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
 import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH } from './config.js';
@@ -10,7 +10,7 @@ import { SUPPLY_R } from './sim/support.js';
 import { drawAtlas } from './render/atlas.js';
 import { Renderer, HERO_SCALE_DEFAULT } from './render/renderer.js';
 import { Perf } from './render/perf.js';
-import { toScreen, toGround, pick, SIN_P, DEFAULT_YAW } from './render/camera.js';
+import { toScreen, toGround, pick, camState, DEFAULT_YAW } from './render/camera.js';
 import { Fx } from './render/fx.js';
 import { Audio } from './audio.js';
 import { buildUI, fmt } from './ui/ui.js';
@@ -52,7 +52,7 @@ const MOOD = {
 
 const app = {
   mode: 'setup', map, setup: null, sim: null, oobOpen: false, modeChosen: false,
-  cam: { x: WORLD_W / 2, y: WORLD_H / 2, zoom: 0.6, yaw: DEFAULT_YAW },
+  cam: { x: WORLD_W / 2, y: WORLD_H / 2, z: 0, zoom: 0.6, yaw: DEFAULT_YAW, tilt: 0 },
   speed: 1, paused: false, tool: null, brushCount: 50,
   selGroup: null, hoverGroup: null, selection: [], markers: [],
   previewDirty: false, clock: 0, acc: 0, slowT: 0, showLosses: false,
@@ -66,29 +66,49 @@ const app = {
 };
 let ui;
 let dpr = 1, vw = 1, vh = 1;
-const T2 = [0, 0], T3 = [0, 0, 0];
+const T2 = [0, 0, 0], T3 = [0, 0, 0], T4 = [0, 0, 0], RP = [0, 0, 0, 0];
+const MAX_ZOOM = 90; // closest view (px per metre at the middle of the screen): a soldier stands a fifth of the screen high
 
 // ------------------------------------------------------------------ camera
 const heightAt = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim ? app.sim.surfZ(x, y) : map.groundZ(x, y));
-/** World -> overlay pixels. Result is valid until the next call. */
+app.cam.ground = map.terrZ; // the camera stays clear of the mountainsides (walls it may look over or through)
+/** World -> overlay pixels: [x, y, scale there in px per metre (0: behind the camera)]. Result is valid until the next call. */
 const S = (x, y, z = 0) => toScreen(app.cam, vw, vh, x, y, z, T2);
+/** How flat a circle lying on the ground at a point looks from the camera: 1 from straight above, near 0 edge on. */
+const flatAt = (x, y, z) => { const q = camState(app.cam, vw, vh); return Math.max(0.04, (q.ez - z) / Math.hypot(x - q.ex, y - q.ey, z - q.ez)); };
+/** How far above its centre, in pixels, the far edge of a ground circle of radius r appears. */
+const riseOf = (x, y, z, r) => { const a = S(x, y, z)[1], yaw = app.cam.yaw; return a - toScreen(app.cam, vw, vh, x + Math.sin(yaw) * r, y - Math.cos(yaw) * r, z, T4)[1]; };
 const labXY = new Float32Array(160);
 function pickAt(sx, sy) { const p = pick(app.cam, vw, vh, sx, sy, heightAt, T3); return { x: p[0], y: p[1], z: p[2] }; }
 function insets() { return app.mode === 'setup' ? { l: 316, r: 336, t: 54, b: 0 } : { l: 0, r: 0, t: 54, b: 120 }; }
+let fitKey = '', fitVal = 1;
+/** The zoom at which the whole valley just fits between the panels at the present heading. */
 function fitZoom() {
-  const i = insets(), c = Math.abs(Math.cos(app.cam.yaw)), s = Math.abs(Math.sin(app.cam.yaw));
-  const ew = WORLD_W * c + WORLD_H * s, eh = (WORLD_W * s + WORLD_H * c) * SIN_P;
-  return Math.min((vw - i.l - i.r) / ew, (vh - i.t - i.b) / eh);
+  const i = insets(), key = `${vw} ${vh} ${app.cam.yaw.toFixed(3)} ${i.l} ${i.r} ${i.t} ${i.b}`;
+  if (key === fitKey) return fitVal;
+  // a trial camera over the middle of the map, drawn in or out until the map's corners fit (the pitch changes with the zoom, so by steps)
+  const c = { x: WORLD_W / 2, y: WORLD_H / 2, zoom: 1, yaw: app.cam.yaw }, aw = Math.max(50, vw - i.l - i.r), ah = Math.max(50, vh - i.t - i.b);
+  for (let k = 0; k < 10; k++) {
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const [x, y] of [[0, 0], [WORLD_W, 0], [0, WORLD_H], [WORLD_W, WORLD_H]]) { const q = toScreen(c, vw, vh, x, y, 0, T4); if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    c.zoom *= Math.min(aw / (x1 - x0), ah / (y1 - y0));
+  }
+  fitKey = key;
+  return (fitVal = c.zoom);
 }
 function fitCamera() {
   const i = insets(), c = app.cam;
-  c.zoom = fitZoom() * 1.32; c.x = WORLD_W / 2 + 60; c.y = WORLD_H / 2 + 20;
-  const g = toGround(c, vw, vh, vw - (i.l + (vw - i.l - i.r) / 2), vh - (i.t + (vh - i.t - i.b) / 2), 0, T2);
-  c.x = g[0]; c.y = g[1];
+  c.zoom = fitZoom() * 1.25; c.tilt = 0; c.x = WORLD_W / 2 + 60; c.y = WORLD_H / 2 + 20;
+  // slide the view until that point sits in the middle of the space between the panels
+  for (let k = 0; k < 3; k++) {
+    const g = toGround(c, vw, vh, i.l + (vw - i.l - i.r) / 2, i.t + (vh - i.t - i.b) / 2, 0, T4);
+    c.x += WORLD_W / 2 + 60 - g[0]; c.y += WORLD_H / 2 + 20 - g[1];
+  }
 }
 function clampCam() {
   const c = app.cam;
-  c.zoom = Math.max(fitZoom() * 0.8, Math.min(36, c.zoom));
+  c.zoom = Math.max(fitZoom() * 0.8, Math.min(MAX_ZOOM, c.zoom));
+  c.tilt = Math.max(-0.2, Math.min(0.75, c.tilt || 0));
   c.x = Math.max(-120, Math.min(WORLD_W + 120, c.x)); c.y = Math.max(-120, Math.min(WORLD_H + 120, c.y));
 }
 function zoomAt(sx, sy, f) {
@@ -382,7 +402,7 @@ function updateMouse(e) {
   m.sx = e.clientX; m.sy = e.clientY; m.inside = true;
   const p = pickAt(m.sx, m.sy); m.wx = p.x; m.wy = p.y; m.wz = p.z;
 }
-const panDrag = (m, btn, moved) => ({ kind: btn === 1 ? 'rot' : 'rpan', sx: m.sx, sy: m.sy, cx: app.cam.x, cy: app.cam.y, yaw: app.cam.yaw, moved, btn });
+const panDrag = (m, btn, moved) => { const g = toGround(app.cam, vw, vh, m.sx, m.sy, 0, T4); return { kind: btn === 1 ? 'rot' : 'rpan', sx: m.sx, sy: m.sy, cx: app.cam.x, cy: app.cam.y, gx: g[0], gy: g[1], yaw: app.cam.yaw, tilt: app.cam.tilt || 0, moved, btn }; };
 overlay.addEventListener('contextmenu', (e) => e.preventDefault());
 overlay.addEventListener('pointerleave', () => { app.mouse.inside = false; });
 overlay.addEventListener('pointerdown', (e) => {
@@ -411,14 +431,17 @@ overlay.addEventListener('pointermove', (e) => {
     if (Math.abs(m.sx - d.sx) + Math.abs(m.sy - d.sy) > 5) d.moved = true;
     if (d.moved) {
       const c = app.cam, keep = [c.x, c.y];
+      // the ground point that was grabbed stays under the pointer
       c.x = d.cx; c.y = d.cy;
-      const g = toGround(c, vw, vh, vw / 2 - (m.sx - d.sx), vh / 2 - (m.sy - d.sy), 0, T2);
-      c.x = g[0]; c.y = g[1]; clampCam();
+      const g = toGround(c, vw, vh, m.sx, m.sy, 0, T2);
+      c.x = d.cx + d.gx - g[0]; c.y = d.cy + d.gy - g[1]; clampCam();
       if (Number.isNaN(c.x)) { c.x = keep[0]; c.y = keep[1]; }
     }
   } else if (d.kind === 'rot') {
     d.moved = true;
+    // middle-drag: sideways turns the view, up and down tips it
     app.cam.yaw = d.yaw - (m.sx - d.sx) * 0.006;
+    app.cam.tilt = d.tilt + (m.sy - d.sy) * 0.004; clampCam();
   } else if (d.kind === 'moveGroup') {
     d.g.x = m.wx - d.ox; d.g.y = m.wy - d.oy; d.moved = true;
   }
@@ -538,12 +561,28 @@ window.addEventListener('resize', resize);
 // ----------------------------------------------------------------- overlay
 const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
 let selSetSrc = null, selSetVal = null; // the selection as a Set, rebuilt only when the selection array changes
-function ring(c, x, y, z, r) { const p = S(x, y, z); c.ellipse(p[0], p[1], Math.max(2, r * app.cam.zoom), Math.max(1.4, r * app.cam.zoom * SIN_P), 0, 0, 6.2832); return p; }
+/**
+ * Add a circle lying flat on the ground to path `c`, as the camera sees it; `rev` winds it the other way (a hole).
+ * Returns [x, y, scale, rise]: its centre on screen and how far above the centre its far edge appears. Valid until the next call.
+ */
+function ring(c, x, y, z, r, rev = false) {
+  const n = r > 60 ? 64 : r > 12 ? 40 : 24;
+  let on = false, top = 1e9;
+  for (let k = 0; k <= n; k++) {
+    const a = ((rev ? -k : k) / n) * 6.2832, q = toScreen(app.cam, vw, vh, x + Math.cos(a) * r, y + Math.sin(a) * r, z, T4);
+    if (!q[2]) { on = false; continue; } // behind the camera
+    if (on) c.lineTo(q[0], q[1]); else { c.moveTo(q[0], q[1]); on = true; }
+    if (q[1] < top) top = q[1];
+  }
+  const p = toScreen(app.cam, vw, vh, x, y, z, T4);
+  RP[0] = p[0]; RP[1] = p[1]; RP[2] = p[2]; RP[3] = top < 1e8 ? Math.max(0, p[1] - top) : 0;
+  return RP;
+}
 
 /** Reach of a unit's weapon from a spot: the outer ring, and the inner one it cannot fire inside. Walls add reach. */
 function rangeRings(c, def, x, y, alpha) {
   const z0 = heightAt(x, y) + 0.3;
-  const label = (p, r, txt, col) => { c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`; c.fillText(txt, p[0], p[1] - r * app.cam.zoom * SIN_P - 5); };
+  const label = (p, r, txt, col) => { c.font = `600 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${col},${alpha})`; c.fillText(txt, p[0], p[1] - p[3] - 5); };
   // commanders and captains: how far their steadying presence carries
   if (def.aura) {
     const col = '240,179,74';
@@ -574,15 +613,18 @@ const rangeCache = { t: -1, zones: [], ranges: [], key: [] };
 function unionArea(c, pts, col, fillA, lineA) {
   if (!pts.length) return;
   if (rl.width !== overlay.width || rl.height !== overlay.height) { rl.width = overlay.width; rl.height = overlay.height; }
-  const r = rctx, z = app.cam.zoom;
+  const r = rctx;
   r.setTransform(dpr, 0, 0, dpr, 0, 0); r.globalCompositeOperation = 'source-over'; r.clearRect(0, 0, vw, vh);
   const path = (shrink) => {
     r.beginPath();
     for (const p of pts) {
-      const s = S(p[0], p[1], p[2]), ro = Math.max(0.5, p[3] * z - shrink), ri = p[4] > 0 ? p[4] * z + shrink : 0;
-      if (s[0] + ro < -50 || s[0] - ro > vw + 50 || s[1] + ro * SIN_P < -50 || s[1] - ro * SIN_P > vh + 50) continue;
-      r.moveTo(s[0] + ro, s[1]); r.ellipse(s[0], s[1], ro, ro * SIN_P, 0, 0, 6.2832);
-      if (ri > 0) { r.moveTo(s[0] + ri, s[1]); r.ellipse(s[0], s[1], ri, ri * SIN_P, 0, 6.2832, 0, true); }
+      const s = S(p[0], p[1], p[2]), k = s[2];
+      if (!k) continue;
+      const ro = p[3] * k;
+      if (s[0] + ro < -50 || s[0] - ro > vw + 50 || s[1] + ro < -50 || s[1] - ro > vh + 50) continue;
+      // (`shrink` is in pixels: the outline is what is left when the area is drawn again a little smaller)
+      ring(r, p[0], p[1], p[2], Math.max(0.5 / k, p[3] - shrink / k));
+      if (p[4] > 0) ring(r, p[0], p[1], p[2], p[4] + shrink / k, true);
     }
   };
   r.fillStyle = `rgb(${col})`; path(0); r.fill('nonzero');
@@ -642,7 +684,7 @@ function drawMissionMarks(c, zones, groups) {
   const z = app.cam.zoom;
   for (const list of seen.values()) {
     const a = list[0], p = S(a.x, a.y, heightAt(a.x, a.y) + 0.3);
-    tag(c, p[0], p[1] - a.r * z * SIN_P - 14, list.length > 1 ? `ARTILLERY · ${list.length} sections` : `${a.label} · TARGET`, list.length > 1 ? '240,179,74' : app.artyColor(zones.findIndex((q) => q.a === a)));
+    tag(c, p[0], p[1] - riseOf(a.x, a.y, heightAt(a.x, a.y) + 0.3, a.r) - 14, list.length > 1 ? `ARTILLERY · ${list.length} sections` : `${a.label} · TARGET`, list.length > 1 ? '240,179,74' : app.artyColor(zones.findIndex((q) => q.a === a)));
   }
 }
 function drawMissionMark(c, a, col, first) {
@@ -826,8 +868,9 @@ function drawOverlay(dtReal) {
       const x = cx * LOSS_CELL + H2, y = cy * LOSS_CELL + H2;
       const p = S(x, y, heightAt(x, y) + 0.3);
       if (p[0] < -30 || p[1] < -30 || p[0] > vw + 30 || p[1] > vh + 30) continue;
-      const r = Math.max(3, Math.min(LOSS_CELL * 0.5, 1.5 + Math.sqrt(n) * 1.4) * z);
-      c.moveTo(p[0] + r, p[1]); c.ellipse(p[0], p[1], r, r * SIN_P, 0, 0, 6.2832);
+      if (!p[2]) continue;
+      const r = Math.max(3, Math.min(LOSS_CELL * 0.5, 1.5 + Math.sqrt(n) * 1.4) * p[2]), px0 = p[0], py0 = p[1];
+      c.moveTo(px0 + r, py0); c.ellipse(px0, py0, r, r * flatAt(x, y, 0), 0, 0, 6.2832);
     }
     c.fill(); c.stroke();
     c.font = `700 11px ${FONT}`; c.textAlign = 'left';
@@ -857,7 +900,7 @@ function drawOverlay(dtReal) {
     } else {
       c.setLineDash(mk.r > 10 ? [8, 6] : []); c.lineDashOffset = -t * 20;
       c.beginPath(); const p = ring(c, mk.x, mk.y, mk.z + 0.3, mk.r * (mk.r <= 6 ? 1 + mk.t : 1)); c.stroke(); c.setLineDash([]);
-      lx = p[0]; ly = p[1] - Math.max(8, mk.r * z * SIN_P) - 7;
+      lx = p[0]; ly = p[1] - Math.max(8, p[3]) - 7;
     }
     if (mk.label) { c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = `rgba(${mk.col},${Math.min(1, a + 0.3)})`; c.fillText(mk.label, lx, ly); }
   }
@@ -868,7 +911,7 @@ function drawOverlay(dtReal) {
     c.beginPath(); const p = ring(c, f.x, f.y, heightAt(f.x, f.y) + 0.3, f.r); c.stroke(); c.setLineDash([]);
     c.fillStyle = 'rgba(255,70,50,0.07)'; c.fill();
     c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = 'rgba(255,140,120,0.95)';
-    c.fillText(`FOCUS FIRE ${Math.ceil(f.until - sim.time)}s`, p[0], p[1] - f.r * z * SIN_P - 8);
+    c.fillText(`FOCUS FIRE ${Math.ceil(f.until - sim.time)}s`, p[0], p[1] - p[3] - 8);
   }
   // company morale: a flag where a company has broken, a mark where one is wavering
   c.font = `700 12px ${FONT}`; c.textAlign = 'center';
@@ -911,8 +954,8 @@ function drawOverlay(dtReal) {
       const uz = sim.unitZ(i);
       const p = S(sim.x[i], sim.y[i], uz + 0.15), sx = p[0], sy = p[1];
       if (sx < -20 || sy < -20 || sx > vw + 20 || sy > vh + 20) continue;
-      const r = Math.max(3.5, (sim.rad[i] + 0.7) * z);
-      c.moveTo(sx + r, sy); c.ellipse(sx, sy, r, r * SIN_P, 0, 0, 6.2832);
+      const r = Math.max(3.5, (sim.rad[i] + 0.7) * p[2]);
+      c.moveTo(sx + r, sy); c.ellipse(sx, sy, r, r * flatAt(sim.x[i], sim.y[i], uz), 0, 0, 6.2832);
       if (sim.state[i] === S_MOVE && drawn < 60) { const q = S(sim.tx[i], sim.ty[i], heightAt(sim.tx[i], sim.ty[i])); c.moveTo(sx, sy); c.lineTo(q[0], q[1]); }
       if (++drawn > 1500) break;
     }
@@ -985,7 +1028,7 @@ function drawOverlay(dtReal) {
       circle(24, true);
       const p = S(ax, ay, az);
       c.font = `700 11px ${FONT}`; c.textAlign = 'center'; c.fillStyle = ok ? '#f0b34a' : '#ff8b73';
-      c.fillText(ok ? `${ok} section${ok > 1 ? 's' : ''} in range` : 'Out of range', p[0], p[1] - 24 * z * SIN_P - 12);
+      c.fillText(ok ? `${ok} section${ok > 1 ? 's' : ''} in range` : 'Out of range', p[0], p[1] - riseOf(ax, ay, az, 24) - 12);
     } else if (k === 'focus') circle(Math.max(28, d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 28), true);
     else if (k === 'gunship') { circle(150, true); c.beginPath(); ring(c, ax, ay, az, 85); c.stroke(); }
     else if (k === 'supply') circle(SUPPLY_R, true);
@@ -1105,18 +1148,23 @@ function frame(now) {
     let rx = 0, ry = 0;
     if (ks.has('a') || ks.has('arrowleft')) rx -= pan;
     if (ks.has('d') || ks.has('arrowright')) rx += pan;
-    if (ks.has('w') || ks.has('arrowup')) ry -= pan / SIN_P;
-    if (ks.has('s') || ks.has('arrowdown')) ry += pan / SIN_P;
+    if (ks.has('w') || ks.has('arrowup')) ry -= pan * 1.3;
+    if (ks.has('s') || ks.has('arrowdown')) ry += pan * 1.3;
     if (rx || ry) { cam.x += cy * rx - sy * ry; cam.y += sy * rx + cy * ry; }
+    if (ks.has('pageup')) cam.tilt = (cam.tilt || 0) + 0.8 * rdt;   // tip the view up toward the vertical, or lay it down
+    if (ks.has('pagedown')) cam.tilt = (cam.tilt || 0) - 0.8 * rdt;
     if (ks.has('q')) cam.yaw += 1.3 * rdt;
     if (ks.has('e')) cam.yaw -= 1.3 * rdt;
     clampCam();
   }
+  // the view looks at whatever stands at its centre: a wall walk, the court, the valley floor (eased, so crossing a parapet does not jolt)
+  { const tz = Math.max(0, Math.min(30, heightAt(cam.x, cam.y))); cam.z += (tz - cam.z) * Math.min(1, rdt * 6); if (Math.abs(tz - cam.z) < 0.01) cam.z = tz; }
   if (app.previewDirty && !(app.drag && app.drag.kind === 'moveGroup')) rebuildPreview();
 
   const sim = app.sim;
   fx.view.x = cam.x; fx.view.y = cam.y; fx.view.zoom = cam.zoom; fx.view.cy = Math.cos(cam.yaw); fx.view.sy = Math.sin(cam.yaw);
-  fx.view.rad = Math.hypot(vw / 2, vh / 2 / SIN_P) / cam.zoom + 40;
+  // how far round the point of interest effects are worth their particles: what the screen shows at that depth, and more when the view lies low
+  fx.view.rad = Math.min(520, (Math.hypot(vw / 2, vh / 2) / cam.zoom) * (1 + 1.6 * Math.cos(camState(cam, vw, vh).pitch)) + 40);
 
   let alpha = 1, simDt = 0, simMs = 0;
   const halted = app.paused || ui.modalOpen(); // the battle waits while a dialog is up
@@ -1182,7 +1230,7 @@ function frame(now) {
   env.wet = app.mode === 'battle' ? Math.max(0, Math.min(1, (0.44 - base.amb[0]) * 6)) : 0;   // it rains through the night
 
   const sh = fx.shake, shk = sh ? (sh * 2.2) / Math.max(0.6, cam.zoom * 0.5) : 0;
-  const rcam = { x: cam.x + Math.sin(app.clock * 71) * shk, y: cam.y + Math.cos(app.clock * 83) * shk, zoom: cam.zoom * dpr, yaw: cam.yaw, dpr };
+  const rcam = { x: cam.x + Math.sin(app.clock * 71) * shk, y: cam.y + Math.cos(app.clock * 83) * shk, z: cam.z, zoom: cam.zoom * dpr, yaw: cam.yaw, tilt: cam.tilt, dpr, ground: map.terrZ };
   renderer.render(rcam, sim, app.mode === 'battle' ? fx : null, alpha, env, app.clock);
   // drop the fallen from the selection (a fresh array only when someone actually fell)
   if (app.selection.length && app.selection.some((i) => !sim.alive[i] || sim.team[i] !== DEF)) app.selection = app.selection.filter((i) => sim.alive[i] && sim.team[i] === DEF);

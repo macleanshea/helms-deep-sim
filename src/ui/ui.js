@@ -533,7 +533,7 @@ export function buildUI(app, portraits) {
         [`${k('Space')} ${k('−')} ${k('+')}`, 'Pause · slower · faster'],
         [k('Scroll'), 'Zoom toward the cursor'],
         [`${k('Right-drag')} ${k('W A S D')}`, 'Pan'],
-        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Rotate the view'],
+        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Turn the view. Dragging up or down (or <b>PgUp</b> <b>PgDn</b>) tips it'],
         [k('Home'), 'Reset the view'],
         [k('G'), 'Jump to the latest alert (again for the one before). Clicking an alert or the minimap looks there too'],
         [k('F2'), 'Performance overlay'],

@@ -31,10 +31,10 @@ vec3 rockFace(vec2 q){
 
 // Lighting. Colours come in and go out in display space; the sums are done in linear light:
 // a sky/ground ambient, the sun or moon with a soft shadow, up to six flash lights, and a specular
-// lobe whose width and strength come from the material. The view direction is constant (the camera
-// is orthographic), so the highlights cost almost nothing.
+// lobe whose width and strength come from the material. The view direction is taken per fragment
+// from the camera's position.
 const LIGHT = `
-uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uView; uniform float uWet; uniform float uExposure;
+uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uEye; uniform float uWet; uniform float uExposure;
 uniform mat4 uShadowVP; uniform highp sampler2DShadow uShadow; uniform float uShadowOn; uniform float uShadowTexel;
 uniform vec4 uLPos[6]; uniform vec3 uLCol[6];
 float shadowAt(vec3 wp, float ndl){
@@ -47,6 +47,7 @@ float shadowAt(vec3 wp, float ndl){
 }
 vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
   vec3 a = albedo*albedo;
+  vec3 uView = normalize(uEye - wp);
   float ndl = max(dot(n,uSun),0.);
   float sh = shadowAt(wp, ndl);
   float gl = 1.-rough, pw = 6. + gl*gl*220., sk = spec*min((pw+8.)*0.011, 1.1);
@@ -64,9 +65,14 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
   return sqrt(c/(1.+0.22*c));
 }
 uniform vec3 uFog; uniform vec4 uWorld; // world w,h and fade distances
-vec3 fogged(vec3 c, vec2 wxy){
-  vec2 o = max(max(-wxy, wxy - uWorld.xy), vec2(0.));
-  return mix(c, uFog, smoothstep(uWorld.z, uWorld.w, length(o)));
+uniform vec4 uHaze; // distance haze: where it starts (m from the eye), its density (per m), the most it may hide, the height (m) over which it thins by half
+vec3 fogged(vec3 c, vec3 wp){
+  vec2 o = max(max(-wp.xy, wp.xy - uWorld.xy), vec2(0.));
+  float edge = smoothstep(uWorld.z, uWorld.w, length(o));
+  // the air between: thicker with distance beyond the point of interest, thinner up the mountainside
+  float d = max(0., length(wp - uEye) - uHaze.x);
+  float haze = (1. - exp(-d*uHaze.y))*uHaze.z*exp2(-max(wp.z, 0.)/uHaze.w);
+  return mix(c, uFog, max(edge, haze));
 }
 `;
 
@@ -146,7 +152,7 @@ void main(){
     rough = mix(rough, 0.1, w); spec = mix(spec, 1., w);
   }
   if (vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; rough = mix(rough, 0.85, d.a); }
-  o = vec4(fogged(shade(c, nd, vW, rough, spec, 1.), vW.xy), 1.);
+  o = vec4(fogged(shade(c, nd, vW, rough, spec, 1.), vW), 1.);
 }`;
 
 export const FS_BAKE = `#version 300 es
@@ -242,7 +248,7 @@ void main(){
     c *= 1. - 0.2*wet; rough = mix(rough, rough*0.45, wet); spec = mix(spec, max(spec, 0.45), wet);
   }
   if (vN.z > 0.7 && vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
-  o = vec4(fogged(shade(c, n, vW, rough, spec, 1.), vW.xy), 1.);
+  o = vec4(fogged(shade(c, n, vW, rough, spec, 1.), vW), 1.);
 }`;
 
 export const VS_DEPTH = `#version 300 es
@@ -329,7 +335,7 @@ void main(){
   vec3 col = shade(c, n, vW, rough, spec, 1.);
   col += vC*uLift*(0.55+0.45*n.z);                   // keep figures readable at night
   col = mix(col, vec3(1.), vFlash*0.8);
-  o = vec4(fogged(col, vW.xy), 1.);
+  o = vec4(fogged(col, vW), 1.);
 }`;
 
 // billboards (mode 0), streaks stretched along a world axis (1) and ground-hugging quads (2)
@@ -339,22 +345,25 @@ layout(location=1) in vec3 aPos; layout(location=2) in vec4 aSRS; layout(locatio
 uniform mat4 uVP; uniform vec2 uK; uniform float uZoom; uniform float uCols; uniform float uMinPx;
 out vec2 vUV; out vec4 vColor; out float vAdd;
 void main(){
+  // uK: clip units per metre before the perspective divide (2f/vw, 2f/vh); uZoom: the focal length f in pixels
   vec4 c0 = uVP*vec4(aPos,1.);
-  float mn = uMinPx/uZoom;
+  float mn = uMinPx*max(c0.w, 0.)/uZoom;   // the size in metres that is uMinPx pixels at this depth
   if (aAM.y < 0.5) {
     vec2 sz = max(aSRS.xy, vec2(mn));
     float c=cos(aSRS.z), s=sin(aSRS.z); vec2 q = aCorner*sz; q = vec2(q.x*c - q.y*s, q.x*s + q.y*c);
     gl_Position = c0 + vec4(q*uK, 0., 0.);
   } else if (aAM.y < 1.5) {
     vec4 c1 = uVP*vec4(aPos + aAxis,1.);
-    vec2 d = (c1.xy - c0.xy)/uK; float len = length(d); vec2 dir = len > 1e-5 ? d/len : vec2(1.,0.); vec2 nr = vec2(-dir.y, dir.x);
+    // the streak's run on screen, in metres at its mid depth
+    float wm = max(0.5*(c0.w + c1.w), 1e-3);
+    vec2 d = (c1.xy/max(c1.w, 1e-3) - c0.xy/max(c0.w, 1e-3))*wm/uK; float len = length(d); vec2 dir = len > 1e-5 ? d/len : vec2(1.,0.); vec2 nr = vec2(-dir.y, dir.x);
     vec2 q = dir*aCorner.x*max(len, mn*2.) + nr*aCorner.y*max(aSRS.y, mn);
     gl_Position = (c0+c1)*0.5 + vec4(q*uK, 0., 0.);
   } else {
     float c=cos(aSRS.z), s=sin(aSRS.z); vec2 q = aCorner*aSRS.xy; q = vec2(q.x*c - q.y*s, q.x*s + q.y*c);
     gl_Position = uVP*vec4(aPos + vec3(q, 0.),1.);
   }
-  gl_Position.z -= 0.0005;
+  gl_Position.z -= 0.35;   // a hand's breadth toward the viewer, so a flash on a surface is not buried in it
   float col = mod(aSRS.w, uCols), row = floor(aSRS.w/uCols);
   vUV = (vec2(col,row) + 0.5 + aCorner*0.96)/uCols;
   vColor = aColor; vAdd = aAM.x;
@@ -405,6 +414,27 @@ void main(){
   c += (texture(uTex, vUV+uDir*1.385).rgb + texture(uTex, vUV-uDir*1.385).rgb)*0.316;
   c += (texture(uTex, vUV+uDir*3.231).rgb + texture(uTex, vUV-uDir*3.231).rgb)*0.07;
   o = vec4(c,1.);
+}`;
+
+// The sky behind everything: the haze colour along the horizon (the far ground fades into the same colour),
+// climbing to the colour overhead through slow, broken cloud.
+export const FS_SKY = `#version 300 es
+precision highp float;
+uniform vec3 uCamR; uniform vec3 uCamU; uniform vec3 uCamF; uniform vec2 uTan; uniform vec3 uFog; uniform vec3 uZenith; uniform float uTime;
+in vec2 vUV; out vec4 o;
+${NOISE_LITE}
+void main(){
+  vec2 q = vUV*2.-1.;
+  vec3 d = normalize(uCamF + uCamR*(q.x*uTan.x) + uCamU*(q.y*uTan.y));
+  float e = d.z;                                   // sine of the height above the horizon
+  vec3 c = uFog;
+  if (e > 0.) {
+    vec2 p = d.xy/(e + 0.14);
+    float cloud = fbm3(p*1.1 + vec2(uTime*0.012, uTime*0.004));
+    vec3 sky = uZenith*(0.72 + 0.6*cloud);
+    c = mix(uFog, sky, smoothstep(0.01, 0.3, e));
+  }
+  o = vec4(c, 1.);
 }`;
 
 export const FS_COMPOSITE = `#version 300 es

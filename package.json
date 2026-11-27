@@ -11,6 +11,7 @@
     "checks": "node tools/checks.js",
     "maplint": "node tools/maplint.js",
     "golden": "node tools/golden.js",
-    "shots": "node tools/shots.js"
+    "shots": "node tools/shots.js",
+    "uicheck": "node tools/uicheck.js"
   }
 }

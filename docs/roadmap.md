@@ -78,7 +78,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | --- | --- | --- |
 | 1 | Sync with main, baseline and guard rails | done, bar the owner's benchmark table |
 | 2 | Layout extraction (no visible change) | 2a done; 2b lands with milestone 5 |
-| 3 | Perspective camera and engine foundation | |
+| 3 | Perspective camera and engine foundation | camera, per-unit detail, haze and sky done; HDR, depth pre-pass and the frame governor to come |
 | 4 | Simulation decoupled from rendering (still on the main thread) | |
 | 5 | Map redesign in greybox, owner signs off | |
 | 6 | One animated path for every unit | |
@@ -128,6 +128,19 @@ shape, and must become a question asked of the map rather than arithmetic on the
 - the postern's approach is `map.rear[2]`, and the door is the only `T.DOOR` cell group.
 
 ### 3. Camera and engine foundation
+
+**3a, done.** `src/render/camera.js` is a perspective camera whose pitch follows the zoom (about 56
+degrees with the whole valley in view, about 19 with a platoon filling the screen); `zoom` is still
+the state variable, so benchmark and screenshot views carry over. It aims at whatever stands at the
+centre of the view (a wall walk, the court) and lifts itself clear of the mountainsides. Middle-drag
+or PgUp/PgDn tips it. The renderer picks each unit's level of detail from its own size on screen,
+culls against the view, and pulls every level in when a view would pass the unit triangle budget;
+far ground fades into a haze that starts beyond the point of interest, under a sky. The overlay's
+ground rings are drawn in perspective. `npm run uicheck` proves a point projected to the screen is
+picked again within 0.1 m at every zoom, heading and tilt, and that a box drawn in battle selects
+the defenders inside it. Still wanted: the owner's `?bench` table for this stage against the baseline.
+
+**3b, to come.**
 
 Perspective camera with zoom-linked pitch, ray picking and a boom that cannot pass through rock;
 selection, ground rings, health pips, labels and the minimap footprint reworked. In the renderer: an
@@ -226,6 +239,7 @@ npm run maplint     # is the battlefield still playable? (a second)
 npm run golden      # did anything change? map, fortress mesh and whole battles, hashed (under a minute)
 npm run checks      # does the siege still behave? (about ten minutes)
 npm run matrix      # is it still balanced? (a few minutes)
+npm run uicheck     # does pointing at the picture still find the right place and the right soldiers? (three minutes)
 npm run shots -- --out /tmp/after --compare /tmp/before   # does it still look the same? (software rendering; several minutes a set)
 ```
 
