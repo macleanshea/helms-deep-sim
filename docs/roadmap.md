@@ -140,7 +140,14 @@ ground rings are drawn in perspective. `npm run uicheck` proves a point projecte
 picked again within 0.1 m at every zoom, heading and tilt, and that a box drawn in battle selects
 the defenders inside it. Still wanted: the owner's `?bench` table for this stage against the baseline.
 
-**3b, to come.**
+The draw order now lays down the depth of the ground and fortress first, then draws units, then
+shades the ground and fortress only where they still show, so the terrain's costly shader never
+runs under a soldier, behind a wall or beyond a ridge. Pictures of this stage are in
+`docs/progress/m3-camera/`, beside the starting point in `docs/baseline/shots/`.
+
+**3b, to come.** An HDR scene target with the tonemap moved to the composite (with the lighting
+work, where it pays), and a frame governor that scales resolution and detail to hold 60 fps and
+recovers upward. Both want the owner's benchmark numbers first: the baseline, and this stage.
 
 Perspective camera with zoom-linked pitch, ray picking and a boom that cannot pass through rock;
 selection, ground rings, health pips, labels and the minimap footprint reworked. In the renderer: an

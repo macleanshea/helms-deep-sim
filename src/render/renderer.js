@@ -478,9 +478,25 @@ export class Renderer {
     }
   }
 
-  _scene(env) {
+  /**
+   * The ground and the fortress, depth only. What is drawn after them can then be shaded once, where it shows:
+   * the terrain's costly shader never runs under a soldier, behind a wall or on the far side of a ridge.
+   */
+  _scenePre() {
+    const gl = this.gl, p = this.pDepth;
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.depthFunc(gl.LESS); gl.disable(gl.BLEND);
+    gl.colorMask(false, false, false, false);
+    gl.useProgram(p.p); gl.uniformMatrix4fv(p.u.uVP, false, this.vp);
+    gl.bindVertexArray(this.terrain.vao); gl.drawElements(gl.TRIANGLES, this.terrain.count, gl.UNSIGNED_INT, 0);
+    gl.bindVertexArray(this.struct.vaoDepth); gl.drawArrays(gl.TRIANGLES, 0, this.struct.count);
+    gl.colorMask(true, true, true, true);
+    this.stats.draws += 2;
+  }
+
+  /** The ground and the fortress in colour. `pre`: their depths are already laid down (see _scenePre), so only what shows is shaded. */
+  _scene(env, pre = false) {
     const gl = this.gl;
-    gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(!pre); gl.depthFunc(pre ? gl.LEQUAL : gl.LESS); gl.disable(gl.BLEND);
     let p = this.pTerrain;
     gl.useProgram(p.p); this._common(p.u, env);
     gl.uniform4fv(p.u.uAlbRect, this.albRect); gl.uniform1f(p.u.uTime, this.clock || 0);
@@ -492,6 +508,7 @@ export class Renderer {
     gl.useProgram(p.p); this._common(p.u, env);
     gl.bindVertexArray(this.struct.vao);
     gl.drawArrays(gl.TRIANGLES, 0, this.struct.count);
+    gl.depthMask(true); gl.depthFunc(gl.LESS);
     const st = this.stats; st.tris.terrain = this.terrain.count / 3; st.tris.fort = this.struct.count / 3; st.draws += 2;
   }
 
@@ -606,7 +623,7 @@ export class Renderer {
     gl.clearColor(env.fog[0], env.fog[1], env.fog[2], 1); gl.clearDepth(1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     const zc = cam.zoom / (cam.dpr || 1);
-    this._time('scene');
+    this._time('depth');
     {
       // the sky, behind everything
       const p = this.pSky, th = Math.tan(FOV / 2);
@@ -620,7 +637,7 @@ export class Renderer {
       gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
       st.draws++;
     }
-    this._scene(env);
+    this._scenePre();
 
     let dots = 0;
     this._time('units');
@@ -643,19 +660,23 @@ export class Renderer {
         let base = 0;
         for (const ls of m.lists) if (ls.n) { gl.bufferSubData(gl.ARRAY_BUFFER, base * ISTRIDE, ls.u8, 0, ls.n * ISTRIDE); base += ls.n; }
       }
+      // solid things first, then the ground and fortress where they still show, then the shadows that lie on them
       gl.disable(gl.BLEND);
       this._drawMeshes(env, clock, tier, false, true);
+      this._drawMeshes(env, clock, tier, false, false);
+      this._time('scene');
+      this._scene(env, true);
+      this._time('shadows');
       if (env.shadows) {
         gl.enable(gl.BLEND); gl.depthMask(false);
         this._drawMeshes(env, clock, tier, true, false);
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
-      this._drawMeshes(env, clock, tier, false, false);
       // hold the triangle budget: if this view spent too much on units, bring every level of detail in closer next frame
       const spent = st.tris.units + st.tris.shadows;
       if (spent > UNIT_TRI_BUDGET) this.lodBias = Math.min(12, this.lodBias * Math.max(1.06, Math.sqrt(spent / UNIT_TRI_BUDGET)));
       else if (spent < UNIT_TRI_BUDGET * 0.6 && this.lodBias > 1) this.lodBias = Math.max(1, this.lodBias / 1.03);
-    }
+    } else { this._time('scene'); this._scene(env, true); }
     this._time('effects');
     gl.enable(gl.BLEND); gl.depthMask(false);
     if (dots) this._drawParticles(dots, 2.6, [1, 1, 1], cs.f, vw, vh);

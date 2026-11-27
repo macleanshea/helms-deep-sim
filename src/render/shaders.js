@@ -92,6 +92,7 @@ float fbm3(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*noise(p); p=p*2
 export const VS_TERRAIN = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal;
 uniform mat4 uVP;
+invariant gl_Position; // the depth pre-pass must land on exactly the same depths
 out vec3 vW; out vec3 vN;
 void main(){ vW = aPos; vN = aNormal; gl_Position = uVP*vec4(aPos,1.); }`;
 
@@ -210,6 +211,7 @@ void main(){ vUV = a; gl_Position = vec4(a*2.-1., 0., 1.); }`;
 export const VS_STRUCT = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNormal; layout(location=2) in float aPart; layout(location=3) in vec4 aColor;
 uniform mat4 uVP;
+invariant gl_Position;
 out vec3 vW; out vec3 vN; out vec3 vC; flat out float vMat;
 void main(){ vW = aPos; vN = aNormal; vC = aColor.rgb; vMat = aColor.a*255.; gl_Position = uVP*vec4(aPos,1.); }`;
 
@@ -254,6 +256,7 @@ void main(){
 export const VS_DEPTH = `#version 300 es
 layout(location=0) in vec3 aPos;
 uniform mat4 uVP;
+invariant gl_Position;
 void main(){ gl_Position = uVP*vec4(aPos,1.); }`;
 export const FS_DEPTH = `#version 300 es
 precision highp float;
