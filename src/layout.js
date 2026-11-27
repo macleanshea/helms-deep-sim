@@ -14,21 +14,29 @@
 
 const PLATEAU = 12; // the Hornburg's rock and court stand this high (config.js PLATEAU_Z must agree)
 
-/** The Hornburg: a ring wall round a court, with the inner ward climbing the rock in two terraces. */
+/**
+ * The Hornburg: a ring wall round a court, and inside it two more courts stepping up to the cliff. `t1` is the inner
+ * court, the top of a great drum that stands higher than the ring wall's walk; `t2` is the upper court against the
+ * rock, where the hall is cut into the cliff. All three levels can be stood on and are joined by stairs (`stairs.tiers`).
+ */
 const keep = {
   cx: 960, cy: 710, r: 72, half: 4.5,
-  t1: { x: 968, y: 724, r: 48, z: PLATEAU + 8 },
-  t2: { x: 990, y: 742, r: 27, z: PLATEAU + 17 },
-  // the horn tower stands on the middle ward toward the Deep, slender and far taller than anything else; `drumTop` is
-  // the height of the inner keep's battlements (the keep is the drum that stands on the upper terrace, t2)
-  tower: { x: 1004, y: 712, r: 7.5, top: 90 },
-  drumTop: PLATEAU + 27,
+  t1: { x: 968, y: 724, r: 48, z: PLATEAU + 11 },
+  t2: { x: 984, y: 745, r: 27, z: PLATEAU + 19 },
+  // the horn tower stands on the inner court toward the Deep, slender and far taller than anything else (it is solid:
+  // nothing stands on it, and `foot` is how far round it the ground is taken up by its base)
+  tower: { x: 1009, y: 724, r: 7.5, top: 90, foot: 3.5 },
 };
 
 export const LAYOUT = {
   keep,
   /** The ring wall's sections, and which of them hold the gate, the postern and the door from the Deeping Wall's walk. */
-  ring: { sections: 36, gate: 19, postern: 34, door: 28 },
+  /**
+   * `bastions`: open platforms that swell out of the ring wall at these bearings, level with its walk (part of the
+   * walk: men stand on them, nothing passes through them), `out` beyond the wall's centre line and `r` across.
+   * `gatehouse`: the two platforms that flank the gate, standing `deep` out from the wall's face and `wide` along it.
+   */
+  ring: { sections: 36, gate: 19, postern: 34, door: 28, bastions: [152, 238, 318, 12], bastion: { out: 2.5, r: 7.5 }, gatehouse: { deep: 7.5, wide: 7 } },
 
   /**
    * The valley's rock walls. The northern rim runs at y = a0 at the mouth and steps south to a1 between x0 and x1,
@@ -51,8 +59,9 @@ export const LAYOUT = {
 
   /** The causeway from the gate down to the valley floor, and the stair from the postern down into the Deep: points after the door itself. */
   // the causeway: a crescent sweeping out from the gate and round to the north, down to the valley floor in about 180 m
-  causeway: { via: [[850, 676], [812, 652], [784, 614], [772, 568]], half: 7 },
-  rear: { via: [[1052, 664], [1066, 634], [1074, 602]], half: 4.5 },
+  // (each leaves its opening square to the wall for `lead` metres before it turns: the points given come after that)
+  causeway: { via: [[840, 668], [808, 648], [784, 614], [772, 568]], half: 7, lead: 14 },
+  rear: { via: [[1062, 664], [1072, 634], [1074, 602]], half: 4.5, lead: 10 },
   /** The road the causeway becomes, wandering west down the valley from its foot. */
   road: { x: 772, y: 568, swing: 46, wave: 210, ease: 160 },
 
@@ -61,7 +70,9 @@ export const LAYOUT = {
    * In the court: [bearing on the ring, which way round it climbs].
    */
   // (the third court stair, on the side of the Deep, reaches the stretch of wall over the postern)
-  stairs: { wall: [[0.2, 1], [0.44, -1], [0.62, 1], [0.84, -1]], court: [[248, -1], [160, 1], [322, 1]] },
+  // `tiers`: flights that hug the drum of a court and climb to it from the level below: [which court (1 or 2), the
+  // bearing of the foot from that court's centre, the bearing of the head, the level it starts from (0 the court, 1 `t1`)]
+  stairs: { wall: [[0.2, 1], [0.44, -1], [0.62, 1], [0.84, -1]], court: [[248, -1], [160, 1], [322, 1]], tiers: [[1, 252, 224, 0], [1, 296, 324, 0], [2, 262, 224, 1]] },
 
   /** The stream: it wanders `swing` metres either side of the culvert with this wavelength, and drifts south as it goes east. */
   stream: { swing: 26, wave: 120, drift: 0.1 },

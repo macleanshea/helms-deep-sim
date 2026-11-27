@@ -18,6 +18,8 @@ export const WALL_H = 12;     // Deeping Wall walkway
 export const PLATEAU_Z = 12;  // Hornburg rock and courtyard
 export const RING_TOP = 21;   // Hornburg curtain wall walkway
 export const STEP = 3.3;      // largest height change a unit can walk between neighbouring cells
+export const WAY_STEP = 0.9;  // and the largest between a built roadway (the causeway, the rear ramp) and the ground beside it: they have
+                              // walled sides, and are got onto and off at their ends
 
 // obstacle flags per nav cell
 export const OB = { WIRE: 1, AV: 2 };

@@ -102,7 +102,7 @@ alert; clicking an alert in the feed or a point on the minimap looks there too.
 **Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left (each card shows the unit's
 range), set how many per placement, then click the map to drop a block or drag to draw a line;
 the dashed ring shows the weapon's reach from that spot, and a dotted one how far a commander
-or captain steadies the troops around them. Dragging along a wall top mans the battlements. Under **Field
+or captain steadies the troops around them. Point at a wall top and the men lock onto it: a click mans the parapet there, a drag mans it along the wall's curve however far the pointer strays, and they face outward (hold Alt to place freely instead). The Hornburg's bastions, gatehouse platforms and its inner and upper courts can all be manned; a block or line stays on the level it was started on. Under **Field
 works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
 move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle

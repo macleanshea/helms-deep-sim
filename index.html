@@ -28,6 +28,7 @@
     <div class="tb-group setup-only" id="presetBox">
       <span class="lbl">Scenario</span>
       <select id="preset" title="Load a ready-made order of battle"></select>
+      <span class="lbl" id="presetBest" title="Your best score on this challenge" hidden></span>
     </div>
 
     <div class="tb-group battle-only" id="speedCtl">
@@ -73,7 +74,7 @@
     <div class="brush">
       <div class="row"><span class="lbl">Units per placement</span><input id="brushCount" type="number" min="1" max="5000" value="50"></div>
       <div class="chips" id="brushChips"></div>
-      <p class="tip" id="brushTip">Pick a unit, then <b>click</b> the map to drop a block or <b>drag</b> to draw a line.</p>
+      <p class="tip" id="brushTip">Pick a unit, then <b>click</b> the map to drop a block or <b>drag</b> to draw a line. On a wall the men take the parapet and follow its curve; hold <b>Alt</b> to place freely.</p>
     </div>
   </aside>
 

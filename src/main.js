@@ -1,9 +1,9 @@
 // Application glue: state machine (setup -> battle -> debrief), the camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH } from './config.js';
-import { buildMap, KEEP } from './map.js';
-import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH, WALL_H, RING_TOP } from './config.js';
+import { buildMap, KEEP, WALL_HALF } from './map.js';
+import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS, wallPoint, wallRunLength } from './scenarios.js';
 import { scoreBattle } from './score.js';
 import { Sim, S_MOVE, LOSS_CELL, LOSS_W, LOSS_H } from './sim/sim.js';
 import { SUPPLY_R } from './sim/support.js';
@@ -188,7 +188,7 @@ app.selectPlaceTool = (type) => {
   app.selGroup = null;
   ui.refreshPalette(); ui.refreshInspector();
   const d = type && UNITS[U[type]];
-  ui.hint(type ? `<b>${d.name}</b> — ${d.cls === C.OBST ? 'drag to lay a line' : 'click to drop a block, drag to draw a line'} · right-click when done` : null);
+  ui.hint(type ? `<b>${d.name}</b> — ${d.cls === C.OBST ? 'drag to lay a line' : d.team === DEF && d.cls === C.INF ? 'click to drop a block, drag to draw a line · on a wall they man the parapet' : 'click to drop a block, drag to draw a line'} · right-click when done` : null);
 };
 app.setTypeCount = (type, n) => {
   const gs = app.setup.groups.filter((g) => g.type === type);
@@ -402,10 +402,64 @@ function fireTool(x0, y0, x1, y1) {
   app.tool = null; ui.hint(null);
 }
 
+// ------------------------------------------------------------------- placing troops
+// Men put on a wall are put ON the wall: the pointer locks onto the walk, a drag follows the walk's curve however far
+// the pointer strays from it, and they stand at the parapet looking out. Anything else is put on the level that was
+// pointed at when the button went down (the ground, or one of the Hornburg's courts) and stays on it.
+const WALKS = [[], []]; // points down the middle of every wall walk that can be stood on: [the Deeping Wall, the ring]
+for (let k = 0; k <= 200; k++) { const u = k / 200, p = wallPoint(map, 0, u); if (map.seg[map.cellOf(p.x, p.y)] >= 0) WALKS[0].push({ u, x: p.x, y: p.y, z: WALL_H }); }
+for (let u = 0; u < 360; u += 1.25) { const p = wallPoint(map, 1, u); if (map.seg[map.cellOf(p.x, p.y)] >= 0) WALKS[1].push({ u, x: p.x, y: p.y, z: RING_TOP }); }
+/** The wall walk at a point of the screen: { wall, u } (see scenarios.js wallPoint) or null. `only`: the nearest point of that wall, however far off. */
+function wallNear(sx, sy, only = -1) {
+  let best = null, bd = 1e18, scale = 0;
+  for (let w = 0; w < 2; w++) {
+    if (only >= 0 && w !== only) continue;
+    for (const q of WALKS[w]) { const p = S(q.x, q.y, q.z); if (!p[2]) continue; const d = (p[0] - sx) * (p[0] - sx) + (p[1] - sy) * (p[1] - sy); if (d < bd) { bd = d; best = q; scale = p[2]; } }
+  }
+  if (!best) return null;
+  const wall = WALKS[1].includes(best) ? 1 : 0;
+  if (only < 0) {
+    // under the pointer, or within a finger's width of it where the walk is too thin on screen to hit
+    const hit = pickAt(sx, sy), sg = map.seg[map.cellOf(hit.x, hit.y)], onIt = sg >= 0 && app.sim && app.sim.elev[map.cellOf(hit.x, hit.y)] && map.segments[sg].group === wall;
+    if (!onIt && Math.sqrt(bd) > Math.max(9, (wall ? KEEP.half : WALL_HALF) * scale * 0.3)) return null;
+  }
+  return { wall, u: best.u };
+}
+const lockable = (def) => def.team === DEF && def.cls === C.INF;
+/**
+ * What a press (and drag) with the placing tool would put down: the fields of a group, or null. `d` is the drag
+ * (null while only hovering); the pointer is app.mouse.
+ */
+function placement(d) {
+  const m = app.mouse, def = UNITS[U[app.tool.type]], click = Math.max(5, 10 / app.cam.zoom);
+  const lock = d ? d.lock : lockable(def) && !m.alt ? wallNear(m.sx, m.sy) : null;
+  if (lock) {
+    const end = d ? wallNear(m.sx, m.sy, lock.wall) : null;
+    let a = lock.u, b = end ? end.u : a;
+    if (lock.wall === 1) { let db = b - a; db -= Math.round(db / 360) * 360; b = a + db; } // (the short way round the ring)
+    let len = wallRunLength(map, lock.wall, a, b);
+    if (len < click) {
+      // a click: as much of the walk as the block needs standing two deep, centred where it was clicked
+      const st = Math.min(def.spacing, 1.5), want = Math.max(st, Math.ceil(app.brushCount / 2) * st), du = (want / 2) / (lock.wall ? (KEEP.r * Math.PI) / 180 : map.wallLen);
+      a = lock.u - du; b = lock.u + du;
+      if (!lock.wall) { a = Math.max(0, a); b = Math.min(1, b); }
+      len = wallRunLength(map, lock.wall, a, b);
+    }
+    const mid = wallPoint(map, lock.wall, (a + b) / 2);
+    return { x: mid.x, y: mid.y, ang: Math.atan2(mid.nx, -mid.ny), w: len, extra: { run: { wall: lock.wall, a, b } }, lock: true };
+  }
+  // off the walls: on the level pointed at when the button went down, wherever the pointer goes after
+  let x1 = m.wx, y1 = m.wy;
+  if (d && d.z0 !== undefined) { const g = toGround(app.cam, vw, vh, m.sx, m.sy, d.z0, T4); x1 = g[0]; y1 = g[1]; }
+  const x0 = d ? d.x0 : x1, y0 = d ? d.y0 : y1, L = Math.hypot(x1 - x0, y1 - y0), line = d && L > click;
+  const lv = d && d.lv ? d.lv : { wall: map.seg[map.cellOf(x1, y1)] >= 0 && !!(app.sim && app.sim.elev[map.cellOf(x1, y1)]), tier: map.tier[map.cellOf(x1, y1)] };
+  return { x: line ? (x0 + x1) / 2 : x1, y: line ? (y0 + y1) / 2 : y1, ang: line ? Math.atan2(y1 - y0, x1 - x0) : Math.PI / 2, w: line ? L : 0, extra: lockable(def) ? { lv } : {}, x0, y0, x1, y1, line };
+}
+
 // ------------------------------------------------------------------- input
 function updateMouse(e) {
   const m = app.mouse;
-  m.sx = e.clientX; m.sy = e.clientY; m.inside = true;
+  m.sx = e.clientX; m.sy = e.clientY; m.inside = true; m.alt = !!e.altKey;
   const p = pickAt(m.sx, m.sy); m.wx = p.x; m.wy = p.y; m.wz = p.z;
 }
 const panDrag = (m, btn, moved) => { const g = toGround(app.cam, vw, vh, m.sx, m.sy, 0, T4); return { kind: btn === 1 ? 'rot' : 'rpan', sx: m.sx, sy: m.sy, cx: app.cam.x, cy: app.cam.y, gx: g[0], gy: g[1], yaw: app.cam.yaw, tilt: app.cam.tilt || 0, moved, btn }; };
@@ -419,7 +473,11 @@ overlay.addEventListener('pointerdown', (e) => {
   const m = app.mouse;
   if (e.button !== 0) { app.drag = panDrag(m, e.button, false); return; }
   if (app.mode === 'setup') {
-    if (app.tool) { app.drag = { kind: 'place', x0: m.wx, y0: m.wy }; return; }
+    if (app.tool) {
+      const def = UNITS[U[app.tool.type]], c = map.cellOf(m.wx, m.wy), wall = map.seg[c] >= 0 && !!app.sim.elev[c];
+      app.drag = { kind: 'place', x0: m.wx, y0: m.wy, z0: m.wz, lock: lockable(def) && !e.altKey ? wallNear(m.sx, m.sy) : null, lv: { wall, tier: map.tier[c] } };
+      return;
+    }
     const g = groupAt(m.wx, m.wy);
     if (g) { if (app.selGroup !== g) { app.selGroup = g; ui.refreshInspector(); } app.drag = { kind: 'moveGroup', g, ox: m.wx - g.x, oy: m.wy - g.y, moved: false }; }
     else { if (app.selGroup) { app.selGroup = null; ui.refreshInspector(); } app.drag = panDrag(m, 0, true); }
@@ -450,6 +508,20 @@ overlay.addEventListener('pointermove', (e) => {
     app.cam.tilt = d.tilt + (m.sy - d.sy) * 0.004; clampCam();
   } else if (d.kind === 'moveGroup') {
     d.g.x = m.wx - d.ox; d.g.y = m.wy - d.oy; d.moved = true;
+    if (d.g.run || d.g.lv) {
+      // a group of men put down by hand: slid along a wall it stays on the wall's curve; dragged off, it stands where it is dropped
+      const def = UNITS[U[d.g.type]], lk = lockable(def) && !m.alt ? wallNear(m.sx, m.sy) : null;
+      if (lk) {
+        const len = d.g.run ? wallRunLength(map, d.g.run.wall, d.g.run.a, d.g.run.b) : Math.max(4, d.g.w), du = (len / 2) / (lk.wall ? (KEEP.r * Math.PI) / 180 : map.wallLen);
+        let a = lk.u - du, b = lk.u + du; if (!lk.wall) { a = Math.max(0, a); b = Math.min(1, b); }
+        const mid = wallPoint(map, lk.wall, (a + b) / 2);
+        d.g.run = { wall: lk.wall, a, b }; delete d.g.lv; d.g.x = mid.x; d.g.y = mid.y; d.g.ang = Math.atan2(mid.nx, -mid.ny); d.g.w = wallRunLength(map, lk.wall, a, b);
+      } else {
+        const c = map.cellOf(d.g.x, d.g.y);
+        if (d.g.run) { d.g.w = Math.min(d.g.w, 60); delete d.g.run; }
+        d.g.lv = { wall: map.seg[c] >= 0 && !!app.sim.elev[c], tier: map.tier[c] };
+      }
+    }
   }
 });
 overlay.addEventListener('pointerup', (e) => {
@@ -467,11 +539,9 @@ overlay.addEventListener('pointerup', (e) => {
       if (app.sim.orderMove(app.selection, m.wx, m.wy)) { marker(m.wx, m.wy, 5, 1.2, '94,200,242'); audio.play('confirm'); } else audio.play('deny');
     }
   } else if (d.kind === 'place') {
-    const L = Math.hypot(m.wx - d.x0, m.wy - d.y0);
-    const line = L > Math.max(5, 10 / app.cam.zoom);
-    const def = UNITS[U[app.tool.type]];
-    const g = line ? makeGroup(def.key, app.brushCount, (d.x0 + m.wx) / 2, (d.y0 + m.wy) / 2, Math.atan2(m.wy - d.y0, m.wx - d.x0), L) : makeGroup(def.key, app.brushCount, m.wx, m.wy, Math.PI / 2, 0);
-    if (line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(L / def.spacing) + 1); // a drawn line of wire/obstacles is always filled end to end
+    const def = UNITS[U[app.tool.type]], q = placement(d);
+    const g = makeGroup(def.key, app.brushCount, q.x, q.y, q.ang, q.w, q.extra);
+    if (q.line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(q.w / def.spacing) + 1); // a drawn line of wire/obstacles is always filled end to end
     const n = groupPositions(map, g).length / 2;
     if (!n) { ui.toast(`${def.name} can't be placed there.`, 'warn'); audio.play('deny'); return; }
     if (n < g.count) { if (def.cls !== C.OBST) ui.toast(`Only room for ${fmt(n)} of ${fmt(g.count)} here.`, 'warn'); g.count = n; }
@@ -814,11 +884,9 @@ function drawOverlay(dtReal) {
     // placement ghost
     if (app.tool && m.inside) {
       const d = app.drag && app.drag.kind === 'place' ? app.drag : null;
-      const def = UNITS[U[app.tool.type]];
-      const L = d ? Math.hypot(m.wx - d.x0, m.wy - d.y0) : 0;
-      const line = d && L > Math.max(5, 10 / z);
-      const g = { id: 0, type: def.key, team: def.team, count: app.brushCount, x: line ? (d.x0 + m.wx) / 2 : m.wx, y: line ? (d.y0 + m.wy) / 2 : m.wy, ang: line ? Math.atan2(m.wy - d.y0, m.wx - d.x0) : Math.PI / 2, w: line ? L : 0 };
-      if (line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(L / def.spacing) + 1);
+      const def = UNITS[U[app.tool.type]], q = placement(d), line = q.line;
+      const g = { id: 0, type: def.key, team: def.team, count: app.brushCount, x: q.x, y: q.y, ang: q.ang, w: q.w, ...q.extra };
+      if (line && def.cls === C.OBST && def.ob !== 'mine' && def.ob !== 'claymore') g.count = Math.max(g.count, Math.floor(q.w / def.spacing) + 1);
       const pos = groupPositions(map, g), n = Math.min(g.count, pos.length / 2);
       const col = def.team === DEF ? '94,200,242' : '232,87,61';
       c.fillStyle = `rgba(${col},0.8)`;
@@ -826,7 +894,14 @@ function drawOverlay(dtReal) {
       c.beginPath();
       for (let k = 0; k < n; k += step) { const p = S(pos[k * 2], pos[k * 2 + 1], heightAt(pos[k * 2], pos[k * 2 + 1]) + 0.5); c.moveTo(p[0] + rr, p[1]); c.arc(p[0], p[1], rr, 0, 6.2832); }
       c.fill();
-      if (line) { const a = S(d.x0, d.y0, heightAt(d.x0, d.y0)); c.strokeStyle = `rgba(${col},0.9)`; c.lineWidth = 1.5; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(m.sx, m.sy); c.stroke(); c.setLineDash([]); }
+      if (line) { const a = S(d.x0, d.y0, d.z0), b = S(q.x1, q.y1, d.z0); c.strokeStyle = `rgba(${col},0.9)`; c.lineWidth = 1.5; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); c.setLineDash([]); }
+      if (q.lock) {
+        // the stretch of wall walk they will man, lit along its parapet
+        const r = g.run, half = r.wall ? KEEP.half : WALL_HALF, top = r.wall ? RING_TOP : WALL_H;
+        c.strokeStyle = `rgba(${col},0.95)`; c.lineWidth = 3; c.beginPath();
+        for (let k = 0; k <= 32; k++) { const w = wallPoint(map, r.wall, r.a + ((r.b - r.a) * k) / 32), p = S(w.x + w.nx * (half - 0.3), w.y + w.ny * (half - 0.3), top + 0.2); if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }
+        c.stroke();
+      }
       rangeRings(c, def, g.x, g.y, 0.85);
       c.font = `600 12px ${FONT}`; c.textAlign = 'left';
       c.fillStyle = n ? '#fff' : '#ff8b73';
@@ -835,7 +910,8 @@ function drawOverlay(dtReal) {
       const over = cost && forceCost(app.setup.groups) + cost > app.setup.budget;
       if (over) c.fillStyle = '#ff8b73';
       const pts = cost && app.oobOpen ? `  ·  ${fmt(cost)} pts` : '';
-      c.fillText(n ? `${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${pts}${over ? '  —  over budget' : ''}` : 'Not here', m.sx + 16, m.sy - 12);
+      const where = q.lock ? 'On the wall  ·  ' : g.lv && g.lv.tier ? (g.lv.tier === 2 ? 'Upper court  ·  ' : 'Inner court  ·  ') : '';
+      c.fillText(n ? `${where}${fmt(n)}${n < g.count && def.cls !== C.OBST ? ' / ' + fmt(g.count) : ''}${pts}${over ? '  —  over budget' : ''}` : 'Not here', m.sx + 16, m.sy - 12);
     }
     return;
   }
@@ -1301,6 +1377,7 @@ if (!params.has('bench')) ui.showWelcome();
 
 // handy for debugging and automated tests
 app.project = (x, y, z) => { const p = S(x, y, z == null ? heightAt(x, y) : z); return [p[0], p[1]]; };
+app.rebuildPreview = rebuildPreview; // (for tools/uicheck.js)
 window.__app = app; window.__ui = ui; window.__renderer = renderer; window.__fx = fx; window.__perf = perf;
 if (params.has('perf')) perf.toggle(true);
 if (params.has('bench')) setTimeout(() => perf.bench(), 500);

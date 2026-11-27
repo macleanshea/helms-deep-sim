@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, A, K, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, WAY_STEP, UNITS, U, WEAPONS, ARMOR_MULT, A, K, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { mulberry } from '../rng.js';
@@ -44,6 +44,9 @@ export class Sim {
     this.rand = mulberry(this.opt.seed || 1);
     this.rand2 = mulberry((this.opt.seed || 1) ^ 0x9e3779b9); // the horde's own dice: the director's choices
     this.mtype = map.type; this.mseg = map.seg; this.cz = map.cz; this.portal = map.portal;
+    // built roadways (the causeway, the rear ramp): their sides are walled, so they are entered and left at their ends
+    this.tier = map.tier; // which of the Hornburg's courts a cell is (see map.js)
+    this.way = map.way || (map.way = Uint8Array.from(map.type, (t) => (t === T.ROAD ? 1 : 0)));
 
     const N = MAX_UNITS;
     this.alive = new Uint8Array(N); this.team = new Uint8Array(N); this.type = new Uint8Array(N);
@@ -112,10 +115,10 @@ export class Sim {
     this.orcCost = new Uint16Array(NC); this.orcDir = new Uint8Array(NC).fill(255);
     this.gateDir = new Uint8Array(NC).fill(255);
     this.srcBuf = new Int32Array(8192); this.srcMark = new Uint8Array(NC);
-    this.navOrc = { cz: this.cz, elev: this.elev, portal: this.portal, step: STEP, ladder: this.lad, virt: this.virt };
-    this.navHeavy = { cz: this.cz, elev: this.elev, portal: this.portal, step: 1.6 };
-    this.navDef = { cz: this.cz, elev: this.elevD, portal: this.portal, step: STEP };
-    this.navVeh = { cz: this.cz, elev: this.elevD, portal: this.portal, step: 1.6 };
+    this.navOrc = { cz: this.cz, elev: this.elev, portal: this.portal, step: STEP, ladder: this.lad, virt: this.virt, way: this.way };
+    this.navHeavy = { cz: this.cz, elev: this.elev, portal: this.portal, step: 1.6, way: this.way };
+    this.navDef = { cz: this.cz, elev: this.elevD, portal: this.portal, step: STEP, way: this.way };
+    this.navVeh = { cz: this.cz, elev: this.elevD, portal: this.portal, step: 1.6, way: this.way };
     this.navDirty = true; this.lastNav = -100; this.gateDirty = true;
     this.orders = []; this.orderSeq = 0;
 
@@ -182,7 +185,9 @@ export class Sim {
     const face = d.team === DEF ? Math.PI : 0;
     let made = 0;
     for (let k = 0; k < n; k++) {
-      const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
+      // (a man put on a wall walk looks out over its parapet, whichever way that stretch of wall faces)
+      const sg = d.team === DEF ? this.mseg[this.map.cellOf(pos[k * 2], pos[k * 2 + 1])] : -1, out = sg >= 0 ? Math.atan2(this.segs[sg].ny, this.segs[sg].nx) : face;
+      const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], out + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
       if (i < 0) break;
       made++;
       if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; if (d.crew) { this.cd2[i] = 0; this.eIdle[i] = this.time; } }
@@ -347,6 +352,7 @@ export class Sim {
       if (et) return true;
       const dz = this.cz[ct] - this.cz[cf];
       if (dz > STEP || dz < -STEP) return false;
+      if (this.way[ct] !== this.way[cf] && (dz > WAY_STEP || dz < -WAY_STEP)) return false; // a roadway's walled side
       if (sz === 0) return true;
       if (mt === T.STAIR) return false;
       if (sz === 2 && (dz > 1.6 || dz < -1.6 || (this.ob[ct] & OB.AV))) return false;
@@ -555,10 +561,13 @@ export class Sim {
     const dx = x2 - x1, dy = y2 - y1, d = Math.sqrt(dx * dx + dy * dy);
     if (d < 20) return true;
     const n = (d / CELL) | 0, ix = dx / n, iy = dy / n;
+    let zl, zs;
     for (let k = 2; k < n - 1; k++) {
       const c = (((y1 + iy * k) / CELL) | 0) * GW + (((x1 + ix * k) / CELL) | 0);
       if (this.mtype[c] === T.CLIFF) { if (k > 3 && k < n - 3) return false; continue; }
       if (this.elev[c]) return false;
+      // the drums of the Hornburg's inner courts: a shot passes over one only if the line between the two men clears it
+      if (this.tier[c]) { if (zl === undefined) { zl = this.cz[this.map.cellOf(x1, y1)] + 1.5; zs = (this.cz[this.map.cellOf(x2, y2)] + 1.5 - zl) / n; } if (this.cz[c] > zl + zs * k + 0.5) return false; }
     }
     return true;
   }
@@ -1301,7 +1310,7 @@ export class Sim {
           dirx = (-uy / ur) * sg + (ux / ur) * rc; diry = (ux / ur) * sg + (uy / ur) * rc;
           const dl = Math.sqrt(dirx * dirx + diry * diry) || 1; dirx /= dl; diry /= dl;
         } else {
-          if (k !== 255 && d2 < 144 && te === eg) k = 255;
+          if (k !== 255 && d2 < 144 && te === eg && this.tier[this.map.cellOf(this.tx[i], this.ty[i])] === this.tier[this.map.cellOf(x, y)]) k = 255; // (close, and on his own level: straight there)
           if (k !== 255) { dirx = DXN[k]; diry = DYN[k]; } else { dirx = dx / l; diry = dy / l; }
         }
         this._move(i, dirx, diry, Math.min(d.speed, l / DT), d.cls === C.INF ? 0 : 2, 1);
@@ -1753,7 +1762,7 @@ export class Sim {
       (d.cls === C.VEH ? veh : inf).push(i);
     }
     let any = false;
-    const te = this.elevD[this.map.cellOf(x, y)];
+    const te = this.elevD[this.map.cellOf(x, y)], tt = this.tier[this.map.cellOf(x, y)];
     for (const [list, isVeh] of [[inf, false], [veh, true]]) {
       if (!list.length) continue;
       const sp = isVeh ? 11 : 2.3;
@@ -1767,7 +1776,7 @@ export class Sim {
         if (px < 4 || py < 4 || px > WORLD_W - 4 || py > WORLD_H - 4) continue;
         const pc = this.map.cellOf(px, py);
         // keep the whole block on the level that was clicked (all on the wall walk, or all on the ground)
-        if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & OB.AV)))) continue;
+        if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || this.tier[pc] !== tt || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & OB.AV)))) continue;
         const i = list[k++];
         this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1; this.ax[i] = px; this.ay[i] = py;
         this.aux[i] = this.time + 30 + Math.hypot(px - this.x[i], py - this.y[i]) / UNITS[this.type[i]].speed * 4;
@@ -1804,7 +1813,10 @@ export class Sim {
         for (let j = this.dcHead[c]; j >= 0; j = this.cnext[j]) { const dx = this.x[j] - q.x, dy = this.y[j] - q.y; if (dx * dx + dy * dy < 1.2) { occ = true; break; } }
         if (!occ) slot = q;
       }
-      if (!slot) slot = { x: PO.courtMuster[0] + (this.rand() - 0.5) * 40, y: PO.courtMuster[1] + (this.rand() - 0.5) * 30 };
+      for (let tries = 0; !slot && tries < 12; tries++) { // (no place left: anywhere in the outer court by the muster point)
+        const q = { x: PO.courtMuster[0] + (this.rand() - 0.5) * 40, y: PO.courtMuster[1] + (this.rand() - 0.5) * 30 }, qc = this.map.cellOf(q.x, q.y);
+        if (tries === 11 || (this.mtype[qc] === T.COURT && !this.tier[qc])) slot = q;
+      }
       this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1; this.ax[i] = slot.x; this.ay[i] = slot.y;
       this.ord[i] = this.elev[this.map.cellOf(slot.x, slot.y)] === 2 ? kf.ring : kf.court;
       if (sect && this.ord[i] === kf.court) { const o = sect[(((Math.atan2(slot.y - rk.y, slot.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0]; if (o >= 0) this.ord[i] = o; }
@@ -1850,7 +1862,7 @@ export class Sim {
       const d = UNITS[this.type[i]];
       if (d.cls !== C.INF || !d.speed) return;
       const dk = Math.hypot(this.x[i] - KEEP.cx, this.y[i] - KEEP.cy);
-      if (dk > KEEP.r + 6) list.push([dk, i]);
+      if (dk > KEEP.r + 6 && this.elevD[this.map.cellOf(this.x[i], this.y[i])] !== 2) list.push([dk, i]); // (a man on one of the ring's bastions is in the keep already)
     };
     if (ids) for (const i of ids) consider(i); else for (let i = 0; i < this.n; i++) consider(i);
     if (!list.length) return 0;

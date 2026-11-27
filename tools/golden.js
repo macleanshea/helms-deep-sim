@@ -33,7 +33,7 @@ const plain = (v) => JSON.stringify(v, (k, x) => (typeof x === 'number' ? Math.r
 
 function mapHashes() {
   const map = buildMap();
-  const grids = sha([map.type, map.seg, map.cz, map.gz, map.portal]);
+  const grids = sha([map.type, map.seg, map.cz, map.gz, map.portal, map.tier]);
   const terrain = sha([map.hm]);
   const lines = sha([plain({ segments: map.segments, stairs: map.stairs, causeway: [...map.causeway], causeLen: map.causeway.len, rear: [...map.rear], rearLen: map.rear.len,
     keepSlots: map.keepSlots, labels: map.labels, GATE: map.GATE, POSTERN: map.POSTERN, DOOR: map.DOOR, CULVERT: map.CULVERT, wallTop: map.wallTop, wallJoin: map.wallJoin, wallLen: map.wallLen,

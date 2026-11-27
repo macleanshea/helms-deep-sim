@@ -1,6 +1,6 @@
 // Formation layout and preset orders of battle.
 
-import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS } from './config.js';
+import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS, WAY_STEP } from './config.js';
 import { KEEP, N_WALL, WALL_HALF } from './map.js';
 import { LAYOUT } from './layout.js';
 import { mulberry } from './rng.js';
@@ -21,7 +21,7 @@ export function canPlace(map, def, x, y, onWall = null) {
   const wall = map.seg[c] >= 0;
   if (def.team === ORC) return !wall && t !== T.COURT;
   if (def.cls === C.OBST) return !wall && t !== T.COURT;
-  if (def.cls !== C.INF) return !wall;
+  if (def.cls !== C.INF) return !wall && !map.tier[c]; // (nothing on wheels or tracks climbs the stairs to the inner courts)
   return onWall === null ? true : wall === onWall;
 }
 
@@ -41,11 +41,44 @@ function walkable(map) {
       const x = cx + dx, y = cy + dy;
       if ((!dx && !dy) || x < 0 || y < 0 || x >= gw || y >= gh) continue;
       const n = y * gw + x;
-      if (ok[n] || map.type[n] === T.CLIFF || map.seg[n] >= 0 || Math.abs(map.cz[n] - map.cz[c]) > 3.3) continue;
+      const dz = Math.abs(map.cz[n] - map.cz[c]);
+      if (ok[n] || map.type[n] === T.CLIFF || map.seg[n] >= 0 || dz > 3.3 || ((map.type[n] === T.ROAD) !== (map.type[c] === T.ROAD) && dz > WAY_STEP)) continue;
       ok[n] = 1; q[t++] = n;
     }
   }
   return (map._walkable = ok);
+}
+
+/**
+ * A point on the middle line of a wall walk: `wall` 0 is the Deeping Wall and `u` runs 0..1 along it; `wall` 1 is the
+ * Hornburg's ring and `u` is a bearing in degrees. Returns { x, y, nx, ny } with (nx, ny) pointing outward.
+ */
+export function wallPoint(map, wall, u) {
+  if (wall === 1) { const a = (u * Math.PI) / 180, nx = Math.cos(a), ny = Math.sin(a); return { x: KEEP.cx + KEEP.r * nx, y: KEEP.cy + KEEP.r * ny, nx, ny }; }
+  const p = map.wallAt(Math.max(0, Math.min(1, u)));
+  let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
+  return { x: p.x, y: p.y, nx, ny };
+}
+/** How long a stretch of wall walk is, in metres, between two values of `u` (see wallPoint). */
+export const wallRunLength = (map, wall, a, b) => (wall === 1 ? (Math.abs(b - a) * Math.PI / 180) * KEEP.r : Math.abs(b - a) * map.wallLen);
+
+/**
+ * Places along a stretch of wall walk (`g.run = { wall, a, b }`), following its curve: the front rank at the parapet,
+ * spread over the whole stretch, then the ranks behind it as far as the walk is wide.
+ */
+function runPositions(map, def, g) {
+  const { wall, a, b } = g.run, half = wall === 1 ? KEEP.half : WALL_HALF, len = wallRunLength(map, wall, a, b), out = [];
+  const st = Math.min(def.spacing * (g.spread || 1), 1.5), cap = Math.max(1, Math.floor(len / st) + 1);
+  let left = g.count;
+  for (let o = half - 1.0; o > -half + 0.8 && left > 0; o -= 1.6) {
+    const n = Math.min(left, cap);
+    for (let k = 0; k < n; k++) {
+      // (a rank that is not full is spread over the whole stretch, not bunched at one end)
+      const f = n > 1 ? k / (n - 1) : 0.5, p = wallPoint(map, wall, a + (b - a) * f), x = p.x + p.nx * o, y = p.y + p.ny * o;
+      if (canPlace(map, def, x, y, true)) { out.push(x, y); left--; }
+    }
+  }
+  return out;
 }
 
 const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Math.max(1, Math.ceil(Math.sqrt(g.count * 1.8))));
@@ -56,9 +89,13 @@ const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Ma
  */
 export function groupPositions(map, g, strict = false) {
   const def = UNITS[U[g.type]];
+  if (g.run && def.team === DEF && def.cls === C.INF) return runPositions(map, def, g);
   const sp = def.spacing * (g.spread || 1);
   const out = [];
-  const onWall = def.team === DEF && def.cls === C.INF ? map.seg[map.cellOf(g.x, g.y)] >= 0 : null;
+  // (`g.lv`, when the player has put the group down by hand: the level that was pointed at, { wall, tier })
+  const onWall = def.team === DEF && def.cls === C.INF ? (g.lv ? !!g.lv.wall : map.seg[map.cellOf(g.x, g.y)] >= 0) : null;
+  // a group stands in one court of the Hornburg: the one it was put in (it does not spill up or down a tier)
+  const tier = g.lv ? g.lv.tier : map.tier[map.cellOf(g.x, g.y)], inTier = (x, y) => def.team !== DEF || map.seg[map.cellOf(x, y)] >= 0 || map.tier[map.cellOf(x, y)] === tier;
   const ux = Math.cos(g.ang), uy = Math.sin(g.ang);
   const px = -uy, py = ux;
   const cols = colsFor(g, sp);
@@ -84,7 +121,7 @@ export function groupPositions(map, g, strict = false) {
       const a = (c - (cols - 1) / 2) * sp;
       const x = g.x + ux * a + px * off * sp + (r() - 0.5) * sp * jit;
       const y = g.y + uy * a + py * off * sp + (r() - 0.5) * sp * jit;
-      if (canPlace(map, def, x, y, onWall) && !(open && !open[map.cellOf(x, y)])) out.push(x, y);
+      if (canPlace(map, def, x, y, onWall) && inTier(x, y) && !(open && !open[map.cellOf(x, y)])) out.push(x, y);
     }
   }
   return out;

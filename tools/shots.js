@@ -51,6 +51,11 @@ const SETUP = [
   ['hornburg-from-the-valley', [930, 705, 5.2, 1.35, -0.2]],
   ['hornburg-from-above-the-deep', [985, 715, 5, YAW + Math.PI, 0]],
   ['the-deep-from-the-wall', [1090, 480, 3.4, 1.57, -0.1]],
+  ['postern-and-rear-ramp', [1046, 684, 13, YAW + 2.6, 0]],
+  ['court-stairs', [948, 690, 11, 0.5, 0]],
+  ['inner-courts', [976, 728, 6.5, 0.4, 0]],
+  ['culvert-from-the-deep', [985, 452, 12, YAW + Math.PI, 0]],
+  ['gatehouse', [872, 684, 12, YAW, 0]],
   ['low-toward-the-wall', [840, 470, 16, YAW, -0.14]],
   ['low-down-the-valley', [958, 430, 22, YAW + Math.PI, -0.12]],
 ];

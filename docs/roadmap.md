@@ -206,6 +206,39 @@ craggy cliff meshes.
 `hornburg-from-above-the-deep`, `the-deep-from-the-wall`) against the references. Proportions are
 cheap to change now (they are numbers in `src/layout.js`) and dear once the art is built on them.
 
+### 5b. The fortress works the way it is drawn
+
+After the owner played the preview: towers could be walked through and not stood on, the inner ward was solid
+rock, a drag along a wall dropped men behind and below it, the postern was askew to its ramp, court stairs
+stopped short of the terrace, the culvert was barred on one face, and the horde walked over the causeway's
+parapets. Every one was the same fault: the picture and the rules were made from different numbers. Now
+**whatever stands in the Hornburg is declared once, in `src/layout.js` and `src/map.js`, and the mesh
+(`src/render/structures.js`) is built from that**.
+
+- **Three courts.** `t1` is the inner court on its drum (23 m), `t2` the upper court against the cliff (31 m):
+  court cells at their own heights (`map.tier`), joined by curved flights that hug the drums (`stairs.tiers`,
+  the same entries the mesh draws). A group stays on the tier it was put on; firing positions, move orders and
+  shortcuts keep to one tier; a shot passes over a drum only if the line clears it. The fall-back still musters
+  in the outer court and on the ring wall. Nothing on wheels or tracks goes up the stairs.
+- **Bastions and gatehouse.** The drawn-only turrets are gone. Four bastions swell out of the ring wall and two
+  platforms flank the gate, all level with the wall walk and part of it: stood on, walked onto, solid from below.
+- **Roadways have sides.** Between a roadway cell (the causeway, the rear ramp) and the ground beside it the
+  step limit is `WAY_STEP` (0.9 m) instead of 3.3: they are entered at the foot and at the gate. Side crossings
+  in a ten-minute battle fell from about 690 to 3.
+- **Openings square to their ramps**: each ramp runs straight out from the wall's face for `lead` metres first.
+- Culvert arch and grate on both faces; the houses are gone; a man beside a stair is drawn on the ground, not
+  floating at the stair's height; scraps of court nobody could reach are solid.
+- **Placing troops** (`src/main.js placement()`, `scenarios.js wallPoint/runPositions`): pointing at a wall walk
+  locks onto it; a drag mans it along its curve however far the pointer strays, front rank at the parapet,
+  facing out; off the walls a block or line stays on the level it was started on. Alt places freely.
+  `tools/uicheck.js` drags along both walls with a 60 to 70 px overshoot and clicks on each court.
+- The scenario list no longer prints the best score after the name; it has its own "Best 198" label.
+
+Measured on these rules (`docs/progress/fortress-rules/`): map lint 8 of 8; stand-in commander wins Easy 4/5,
+Medium 5/5, Hard 2/5, no orders loses all fifteen (the horde wins as fast as before); behaviour checks 24 of
+25 with `keep` open as before. The `deep` check's head-count was loosened, with the reasoning beside it: with
+walled roadways the southern companies go round the causeway's foot and fewer are in the Deep at one moment.
+
 ### 6. One animated path for every unit
 
 `src/render/anim.js` and a new unit vertex shader play clips from a baked bone texture. Walking stays

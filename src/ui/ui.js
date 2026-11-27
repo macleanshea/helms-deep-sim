@@ -81,16 +81,24 @@ export function buildUI(app, portraits) {
     const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank && !p.hidden);
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
-      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
+      // (the best score won on it is shown beside the list, labelled: tacked onto the name it read as part of the name)
+      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b && b.medal ? '  ★' : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
+    ui.showBest();
     preset.title = sb ? 'Autofill the map with a scenario\'s armies' : 'Choose the challenge';
     for (const b of modeSw.children) b.classList.toggle('active', app.modeChosen && (b.dataset.mode === 'sandbox') === sb);
   };
+  /** The best score on the chosen challenge, beside the list (nothing in the sandbox, or before one is won). */
+  ui.showBest = () => {
+    const b = !app.isSandbox() && bestScores[preset.value], out = $('presetBest');
+    out.textContent = b ? `Best ${b.score}${b.medal ? ' ★' : ''}` : '';
+    out.hidden = !b;
+  };
   ui.refreshPresets = (best) => { bestScores = best; ui.refreshPresetList(); };
-  preset.addEventListener('change', () => { ui.hideCoach(); app.loadPreset(preset.value); preset.blur(); });
-  ui.setPreset = (k) => { preset.value = k; };
+  preset.addEventListener('change', () => { ui.hideCoach(); app.loadPreset(preset.value); preset.blur(); ui.showBest(); });
+  ui.setPreset = (k) => { preset.value = k; ui.showBest(); };
   for (const b of modeSw.children) {
     const sb = b.dataset.mode === 'sandbox';
     b.addEventListener('click', () => { if (!app.modeChosen || sb !== app.isSandbox()) app.enterMode(b.dataset.mode); b.blur(); });

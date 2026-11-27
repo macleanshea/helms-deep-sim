@@ -86,19 +86,21 @@ const walls = segs.filter((s) => s.kind === 'wall'), ring = segs.filter((s) => s
     let head = false, foot = false, n = 0;
     for (let c = 0; c < NC; c++) {
       if (mtype[c] !== T.STAIR) continue;
-      const [x, y] = cellXY(c), rx = x - st.x, ry = y - st.y, a = rx * st.dx + ry * st.dy, p = -rx * st.dy + ry * st.dx;
-      if (a < -CELL || a > st.len + CELL || Math.abs(p) > st.half + CELL) continue;
+      const [x, y] = cellXY(c);
+      if (map.alongStair(st, x, y) < 0) continue;
       n++;
-      if (portal[c]) head = true;
+      if (!st.tier && portal[c]) head = true;
       for (const d of [-1, 1, -GW, GW, -GW - 1, -GW + 1, GW - 1, GW + 1]) {
         const m = c + d; if (m < 0 || m >= NC) continue;
-        if (mtype[m] !== T.STAIR && mtype[m] !== T.CLIFF && mseg[m] < 0 && Math.abs(cz[m] - cz[c]) <= STEP) foot = true;
+        if (mtype[m] === T.STAIR || mtype[m] === T.CLIFF || mseg[m] >= 0 || Math.abs(cz[m] - cz[c]) > STEP) continue;
+        // a flight to one of the Hornburg's inner courts ends on that court; its foot is on the level below
+        if (st.tier && mtype[m] === T.COURT && map.tier[m] === st.tier) head = true; else foot = true;
       }
     }
     if (!head || !foot || !n) ok = false;
     rows.push(`${k}: ${n} cells${head ? '' : ' NO HEAD'}${foot ? '' : ' NO FOOT'}`);
   });
-  check('every stair joins the ground to a wall walk', ok, rows.join(' · '));
+  check('every stair joins the level below it to the one above', ok, rows.join(' · '));
 }
 
 // ---- ways through ------------------------------------------------------------------------------
@@ -115,7 +117,7 @@ const gateCell = map.cellOf(gate.ox, gate.oy);
 // heavy engines: as the sim routes a ram to the gate (no stairs, no walls, shallow steps only)
 const heavy = solve([gateCell], sim.navHeavy, (c) => (mtype[c] === T.CLIFF || mtype[c] === T.STAIR || sim.orcBlock[c] || elev[c] ? 0 : 10));
 // men on foot, attackers' rules with every wall standing
-const footOrc = solve([gateCell], { cz, elev, portal, step: STEP }, (c) => (mtype[c] === T.CLIFF || sim.orcBlock[c] ? 0 : 10));
+const footOrc = solve([gateCell], { cz, elev, portal, step: STEP, way: sim.way }, (c) => (mtype[c] === T.CLIFF || sim.orcBlock[c] ? 0 : 10));
 // the garrison's rules, from the court
 let courtCell = -1; for (let c = 0; c < NC && courtCell < 0; c++) if (mtype[c] === T.COURT) courtCell = c;
 const footDef = courtCell < 0 ? new Uint8Array(NC) : solve([courtCell], sim.navDef, (c) => (mtype[c] === T.CLIFF ? 0 : 10));
@@ -168,8 +170,8 @@ const footDef = courtCell < 0 ? new Uint8Array(NC) : solve([courtCell], sim.navD
 const ground = (c) => (mtype[c] === T.CLIFF || elev[c] ? 0 : 10);
 let west = -1; for (let gy = 0; gy < GH && west < 0; gy++) { const c = ((GH >> 1) + (gy & 1 ? -1 : 1) * ((gy + 1) >> 1)) * GW + 2; if (mtype[c] === T.GROUND) west = c; }
 const rearFoot = map.rear[map.rear.length - 1];
-const fieldSet = solve([west], { cz, elev, portal: new Uint8Array(NC), step: STEP }, ground);
-const deepSet = solve([map.cellOf(rearFoot.x, rearFoot.y)], { cz, elev, portal: new Uint8Array(NC), step: STEP }, ground);
+const fieldSet = solve([west], { cz, elev, portal: new Uint8Array(NC), step: STEP, way: sim.way }, ground);
+const deepSet = solve([map.cellOf(rearFoot.x, rearFoot.y)], { cz, elev, portal: new Uint8Array(NC), step: STEP, way: sim.way }, ground);
 const area = (f) => { let n = 0; for (let c = 0; c < NC; c++) if (f(c)) n++; return n * CELL * CELL; };
 const J = map.wallJoin, Tp = map.wallTop;
 let deepDepth = 0, deepWidth = 0;
