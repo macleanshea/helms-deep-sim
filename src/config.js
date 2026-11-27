@@ -23,20 +23,20 @@ export const STEP = 3.3;      // largest height change a unit can walk between n
 export const OB = { WIRE: 1, AV: 2 };
 
 // armour classes
-export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5 };
+export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5, ENGINE: 6 };
 // damage kinds
 export const K = { BULLET: 0, HEAVY: 1, HE: 2, AP: 3, MELEE: 4, BOLT: 5, ROCK: 6, SMASH: 7 };
 
-// damage multiplier [kind][armour]
+// damage multiplier [kind][armour]. ENGINE is a crewed siege engine: small arms cannot hurt the timber, only its carriers.
 export const ARMOR_MULT = [
-  /* bullet */ [1, 0.22, 0.12, 1, 0.3, 0.6],
-  /* heavy  */ [1, 0.7, 0.6, 1, 1, 1],
-  /* he     */ [1, 0.75, 1.5, 1, 0.5, 1],
-  /* ap     */ [1, 1.3, 0.45, 1, 1, 1],
-  /* melee  */ [1, 1, 1, 1, 0.12, 0.5],
-  /* bolt   */ [1, 1, 1, 1, 0.03, 0.3],
-  /* rock   */ [1, 1, 1, 1, 0.8, 1],
-  /* smash  */ [1, 1, 1, 1, 1, 1],
+  /* bullet */ [1, 0.22, 0.12, 1, 0.3, 0.6, 0],
+  /* heavy  */ [1, 0.7, 0.6, 1, 1, 1, 0.5],
+  /* he     */ [1, 0.75, 1.5, 1, 0.5, 1, 1],
+  /* ap     */ [1, 1.3, 0.45, 1, 1, 1, 0.45],
+  /* melee  */ [1, 1, 1, 1, 0.12, 0.5, 1],
+  /* bolt   */ [1, 1, 1, 1, 0.03, 0.3, 1],
+  /* rock   */ [1, 1, 1, 1, 0.8, 1, 1],
+  /* smash  */ [1, 1, 1, 1, 1, 1, 1],
 ];
 
 // tracer styles (see fx.js)
@@ -112,27 +112,42 @@ export const UNITS = [
     desc: 'Air-dropped ammunition.' },
   // ---- attackers -------------------------------------------------------
   { key: 'uruk', team: ORC, name: 'Uruk-hai', role: R.MELEE, hp: 130, speed: 4.8, rad: 0.5, size: 3.2, spr: 16, mdmg: 24, mreload: 1.0, reach: 1.3, spacing: 1.7, armor: A.FLESH,
-    desc: 'Armoured heavy infantry. The body of the horde.' },
+    desc: 'Armoured heavy infantry. The body of the horde.',
+    note: 'Line companies carry and escort the engines, lock shields to cross the killing ground, replace fallen carriers and storm the ladders.', counter: 'High explosive, wire and fire from the flank break a shield wall; rifles kill whatever is exposed.' },
   { key: 'archer', team: ORC, name: 'Crossbow Uruk', role: R.ARCHER, hp: 90, speed: 4.5, rad: 0.5, size: 3.2, spr: 17, w: 'xbow', mdmg: 18, mreload: 1.2, reach: 1.3, spacing: 1.8, armor: A.FLESH,
-    desc: 'Volleys bolts. Weak against troops behind battlements.' },
+    desc: 'Volleys bolts. Weak against troops behind battlements.',
+    note: 'Set up a fire base behind pavises and pin the wall with volleys while the ladders go up. They rarely kill; they keep heads down.', counter: 'Rifles and marksmen on the fire base. A commander nearby steadies pinned platoons.' },
   { key: 'berserker', team: ORC, name: 'Berserker', role: R.MELEE, hp: 320, speed: 6.4, rad: 0.55, size: 3.7, spr: 18, mdmg: 50, mreload: 0.8, reach: 1.5, spacing: 2.2, armor: A.FLESH, hvt: 1, pri: 1.4, fearless: true,
-    desc: 'Fast and very hard to drop. First up the ladders; cannot be pinned.' },
+    desc: 'Fast and very hard to drop. First up the ladders; cannot be pinned.',
+    note: 'The spearhead. Held back until the ladders are nearly up, then first over the top to hold the ladder head.', counter: 'Marksmen as they break cover; keep the ladder heads manned.' },
   { key: 'warg', team: ORC, name: 'Warg Rider', role: R.MELEE, hp: 240, speed: 10.5, rad: 0.9, size: 5.4, spr: 19, mdmg: 40, mreload: 0.9, reach: 1.8, spacing: 3.2, armor: A.FLESH, cav: true,
-    desc: 'Cavalry. Crosses the killing ground fast; hard to pin down.' },
+    desc: 'Cavalry. Crosses the killing ground fast; hard to pin down.',
+    note: 'The reserve. They wait out of range for a breach or a fallen gate, ride down troops caught outside the walls, then raid the guns and ammunition in the Deep. They cannot climb.', counter: 'Keep a reserve inside the wall and do not leave infantry in the open.' },
   { key: 'chief', team: ORC, name: 'Uruk Captain', role: R.MELEE, hp: 650, speed: 4.6, rad: 0.65, size: 4.4, spr: 29, mdmg: 60, mreload: 0.9, reach: 1.6, spacing: 7, armor: A.FLESH, hvt: 1, pri: 3, cmd: true, aura: 95,
-    desc: 'Drives nearby companies on. Kill him and they waver.' },
+    desc: 'Drives nearby companies on. Kill him and they waver.',
+    note: 'Follows his own companies from behind. Near him they almost never rout, and the broken rally to him. The troops around him take most shots aimed at him.', counter: 'Thin the company around him with high explosive, then mark him with focus fire.' },
   { key: 'troll', team: ORC, name: 'Siege Troll', role: R.TROLL, hp: 3600, speed: 3.6, rad: 1.8, size: 8.6, spr: 20, mdmg: 260, mreload: 1.8, reach: 2.6, maoe: 3.5, sdmg: 240, spacing: 7, armor: A.HEAVY, big: true, hvt: 2,
-    desc: 'Shrugs off rifle fire. Smashes gates, walls and vehicles.' },
+    desc: 'Shrugs off rifle fire. Smashes gates, walls and vehicles.',
+    note: 'Pushes the siege towers, or masses on the one stretch of wall the catapults are battering.', counter: 'Rockets and tank guns. A troll pushing a tower is not fighting.' },
   { key: 'ladder', team: ORC, name: 'Ladder Crew', role: R.LADDER, hp: 520, speed: 3.9, rad: 1.2, size: 13, spr: 21, spacing: 9, armor: A.FLESH, big: true, hvt: 1, pri: 1.2,
-    desc: 'Raises a ladder so infantry can scale the Deeping Wall.' },
+    crew: { need: 6, min: 2, troll: 0, hp: 900, box: [5.2, 0.4], slots: [[3.6, 0.7], [3.6, -0.7], [0, 0.7], [0, -0.7], [-3.6, 0.7], [-3.6, -0.7]] },
+    desc: 'Raises a ladder so infantry can scale the Deeping Wall.',
+    note: 'Carried by six Uruk-hai inside a company. Bullets cannot hurt the ladder, only its carriers, and the company replaces them. A dropped ladder can be picked up again.', counter: 'Marksmen on the carriers, grenades and mortars on the ladder, and men at the wall head to throw it down.' },
   { key: 'ram', team: ORC, name: 'Battering Ram', role: R.RAM, hp: 1600, speed: 2.7, rad: 2.2, size: 12, spr: 23, sdmg: 230, spacing: 10, armor: A.WOOD, big: true, heavy: true, hvt: 2,
-    desc: 'Heads up the causeway to break the Hornburg gate.' },
+    crew: { need: 8, min: 3, troll: 0, roof: true, box: [3.0, 1.2], slots: [[1.9, 0.85], [1.9, -0.85], [0, 0.85], [0, -0.85], [-1.9, 0.85], [-1.9, -0.85], [-3.7, 0.6], [-3.7, -0.6]] },
+    desc: 'Heads up the causeway to break the Hornburg gate.',
+    note: 'A roofed ram pushed by eight Uruk-hai; the roof covers them from the wall. It batters faster with a full crew.', counter: 'Rockets, tank guns and air strikes before it reaches the gate.' },
   { key: 'sapper', team: ORC, name: 'Blast Sapper', role: R.SAPPER, hp: 320, speed: 6.0, pri: 0.8, rad: 0.6, size: 3.9, spr: 24, spacing: 4, armor: A.FLESH, hvt: 1,
-    desc: 'Carries a charge to the culvert to breach the wall.' },
+    desc: 'Carries a charge to the culvert to breach the wall.',
+    note: 'Hides in the ranks and sprints for the culvert at the last moment.', counter: 'Marksmen on the sprint; mines and wire in front of the culvert.' },
   { key: 'catapult', team: ORC, name: 'Catapult', role: R.CATAPULT, hp: 1200, speed: 1.9, rad: 2.4, size: 11, spr: 25, w: 'rock', spacing: 12, armor: A.WOOD, big: true, heavy: true, hvt: 2,
-    desc: 'Hurls rocks at defenders from a distance.' },
+    crew: { need: 6, min: 2, troll: 0, box: [2.6, 2.0], slots: [[-3.4, 1.6], [-3.4, -1.6], [-1.2, 3.0], [-1.2, -3.0], [1.2, 3.0], [1.2, -3.0]] },
+    desc: 'Hurls rocks at defenders from a distance.',
+    note: 'Each has a mission: hunt mortars that keep firing from one place, batter the stretch of wall the trolls are working on, or pin a sector. They stand off once rockets have found one.', counter: 'Howitzers, mortars and air strikes. Move or hold fire with mortars that are being ranged on.' },
   { key: 'tower', team: ORC, name: 'Siege Tower', role: R.TOWER, hp: 10000, speed: 2.5, rad: 3.6, size: 12, spr: 30, spacing: 18, armor: A.WOOD, big: true, heavy: true, hvt: 2, pri: 0.6, carry: 50,
-    desc: 'Rolls up to the wall and puts 50 Uruk-hai onto the battlements.' },
+    crew: { need: 12, min: 4, troll: 4, box: [3.2, 3.2], slots: [[-5.2, 2.4], [-5.2, -2.4], [-5.2, 0], [-3.0, 4.6], [-3.0, -4.6], [-0.5, 4.6], [-0.5, -4.6], [2.0, 4.6], [2.0, -4.6], [-7.0, 1.2], [-7.0, -1.2], [-7.0, 3.4]] },
+    desc: 'Rolls up to the wall and puts 50 Uruk-hai onto the battlements.',
+    note: 'Pushed by trolls and sent off ahead of its wave so it docks with the escalade. Small arms cannot stop it.', counter: 'Rockets and tank guns before it docks; obstacles in its lane.' },
 ];
 
 export const U = {};
@@ -157,6 +172,7 @@ export const SUPPORT = {
 // Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
 // fixed pool shared over everything on this list in the attacker's order of battle.
 export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
+export const CAPTAIN_REACH = 1.3; // an Uruk captain's presence carries this much further than his `aura`
 export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
 export const DEFAULT_OPTIONS = {
@@ -171,3 +187,4 @@ export const DEFAULT_OPTIONS = {
   morale: true, // companies waver, break and rally
   seed: 1,
 };
+

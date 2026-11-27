@@ -310,7 +310,7 @@ export class Fx {
 
   /** A wall section or gate gives way: masonry bursts outward and a pall of dust hangs over the gap. */
   breach(s, quiet) {
-    const gate = s.kind === 'gate' || s.kind === 'postern';
+    const gate = s.kind === 'gate' || s.kind === 'postern' || s.kind === 'door';
     this.addShake(s.x, s.y, quiet ? 0.5 : 1.3);
     this.sound(gate ? 'gatebreak' : 'collapse', s.x, s.y, 1);
     const rn = () => this.rnd(), top = s.top, base = gate ? 12 : 0;

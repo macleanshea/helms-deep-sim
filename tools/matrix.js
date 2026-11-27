@@ -8,7 +8,7 @@ import os from 'node:os';
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
-const presets = get('presets', 'recon,three-hundred,garrison,combined').split(',');
+const presets = get('presets', 'first-night,garrison,three-hundred').split(',');
 const policies = get('policies', 'none,auto').split(',');
 const seeds = Array.from({ length: +get('seeds', 3) }, (_, i) => i + 1);
 const extra = [];
@@ -35,13 +35,14 @@ await Promise.all(Array.from({ length: Math.max(1, Math.min(os.cpus().length, jo
 process.stderr.write('\n');
 
 const pad = (s, n) => String(s).padEnd(n);
-console.log(pad('preset', 15) + pad('policy', 8) + pad('seed', 5) + pad('result', 7) + pad('end', 12) + pad('defenders', 12) + pad('horde left', 13) + pad('gate', 7) + pad('ammo', 6) + pad('score', 7) + pad('cp', 14) + 'tick ms');
+console.log(pad('preset', 15) + pad('policy', 8) + pad('seed', 5) + pad('result', 7) + pad('end', 12) + pad('defenders', 12) + pad('horde left', 13) + pad('gate', 7) + pad('ammo', 6) + pad('score', 7) + pad('cp', 14) + pad('ladders', 12) + pad('wall', 6) + pad('foothold', 9) + pad('on wall', 8) + 'tick ms');
 for (const r of results) {
   if (r.error) { console.log(pad(r.preset, 15) + pad(r.policy, 8) + pad(r.seed, 5) + 'ERROR ' + r.error); continue; }
   const frac = r.dawn ? ` (${(r.t / r.dawn).toFixed(2)})` : '';
   console.log(pad(r.preset, 15) + pad(r.policy, 8) + pad(r.seed, 5) + pad(r.win === null ? '—' : r.win ? 'WIN' : 'loss', 7) + pad(Math.round(r.t) + frac, 12)
     + pad(`${r.defEnd}/${r.def0}`, 12) + pad(`${r.orcEnd}/${r.orc0}`, 13) + pad(r.gateT < 0 ? '—' : r.gateT, 7) + pad(Math.round(r.ammoMin * 100) + '%', 6)
-    + pad(r.score != null ? r.score : '—', 7) + pad(r.cp ? `${r.cp.spent}/${r.cp.earned}` : '—', 14) + `${r.tickAvg} / ${r.tickMax}`);
+    + pad(r.score != null ? r.score : '—', 7) + pad(r.cp ? `${r.cp.spent}/${r.cp.earned}` : '—', 14)
+    + pad(`${r.siege.laddersUp}/${r.siege.ladders} -${r.siege.thrown}`, 12) + pad(r.siege.firstWallT < 0 ? '—' : r.siege.firstWallT, 6) + pad(r.siege.footholdT < 0 ? '—' : r.siege.footholdT, 9) + pad(r.siege.peakOnWall, 8) + `${r.tickAvg} / ${r.tickMax} / ${r.tick10}`);
 }
 // one line per preset x policy
 console.log('');
@@ -50,5 +51,5 @@ for (const p of presets) for (const pol of policies) {
   if (!rs.length) continue;
   const wins = rs.filter((r) => r.win).length;
   const med = (f) => { const v = rs.map(f).sort((a, b) => a - b); return v[v.length >> 1]; };
-  console.log(`${pad(p, 15)}${pad(pol, 8)}wins ${wins}/${rs.length}   median end ${Math.round(med((r) => r.t))}s${rs[0].dawn ? ` (${med((r) => r.t / r.dawn).toFixed(2)} of dawn)` : ''}   median survivors ${Math.round(100 * med((r) => r.defEnd / r.def0))}%`);
+  console.log(`${pad(p, 15)}${pad(pol, 8)}wins ${wins}/${rs.length}   median end ${Math.round(med((r) => r.t))}s${rs[0].dawn ? ` (${med((r) => r.t / r.dawn).toFixed(2)} of dawn)` : ''}   median survivors ${Math.round(100 * med((r) => r.defEnd / r.def0))}%   ladders raised ${Math.round(100 * med((r) => r.siege.laddersUp / Math.max(1, r.siege.ladders)))}%   first at the wall ${rs[0].dawn ? med((r) => (r.siege.firstWallT < 0 ? 9 : r.siege.firstWallT / r.dawn)).toFixed(2) + ' of dawn' : Math.round(med((r) => r.siege.firstWallT)) + 's'}`);
 }

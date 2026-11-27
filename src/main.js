@@ -1,7 +1,7 @@
 // Application glue: state machine (setup -> battle -> debrief), isometric camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS } from './config.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH } from './config.js';
 import { buildMap, KEEP } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
 import { scoreBattle } from './score.js';
@@ -149,7 +149,7 @@ app.raiseHorde = (n) => {
   groupsChanged(); ui.refreshPalette();
   ui.toast(`A horde of ${fmt(n)} is drawn up in the valley.`);
 };
-const BEST_KEY = 'hd-best-v1';
+const BEST_KEY = 'hd-best-v2'; // v2: the siege rules changed what a score is worth
 /** Best score per scenario. Only well-formed entries are trusted; anything else in storage is ignored. */
 const loadBest = () => {
   try {
@@ -547,8 +547,9 @@ function rangeRings(c, def, x, y, alpha) {
   if (def.aura) {
     const col = '240,179,74';
     c.strokeStyle = `rgba(${col},${alpha * 0.8})`; c.lineWidth = 1.2; c.setLineDash([2, 5]);
-    c.beginPath(); const p = ring(c, x, y, z0, def.aura); c.stroke(); c.setLineDash([]);
-    label(p, def.aura, `${def.team === DEF ? 'steadies' : 'drives on'} ${def.aura} m`, col);
+    const reach = Math.round(def.aura * (def.team === ORC ? CAPTAIN_REACH : 1));
+    c.beginPath(); const p = ring(c, x, y, z0, reach); c.stroke(); c.setLineDash([]);
+    label(p, reach, `${def.team === DEF ? 'steadies' : 'drives on'} ${reach} m`, col);
   }
   const w = def.wdef || (def.ob === 'claymore' ? WEAPONS.claymore : def.pool ? { range: SUPPLY_R, supply: true } : null);
   if (!w || !w.range) return;
@@ -704,7 +705,7 @@ function drawBreaches(c) {
     const e = segs[k2], x = (s.x + e.x) / 2, y = (s.y + e.y) / 2;
     const p = S(x, y, s.top + 9);
     if (p[0] < -80 || p[1] < -40 || p[0] > vw + 80 || p[1] > vh + 40) continue;
-    const txt = s.kind === 'gate' ? '✕ GATE DESTROYED' : s.kind === 'postern' ? '✕ POSTERN BROKEN' : s.culvert || e.culvert || (k <= app.map.CULVERT && k2 >= app.map.CULVERT) ? '✕ CULVERT BLOWN' : `✕ WALL BREACHED${k2 > k ? ` · ${(k2 - k + 1) * Math.round(s.len)} m` : ''}`;
+    const txt = s.kind === 'gate' ? '✕ GATE DESTROYED' : s.kind === 'postern' ? '✕ POSTERN BROKEN' : s.kind === 'door' ? '✕ DOOR FORCED' : s.culvert || e.culvert || (k <= app.map.CULVERT && k2 >= app.map.CULVERT) ? '✕ CULVERT BLOWN' : `✕ WALL BREACHED${k2 > k ? ` · ${(k2 - k + 1) * Math.round(s.len)} m` : ''}`;
     c.strokeStyle = 'rgba(255,110,80,0.8)'; c.lineWidth = 1; c.beginPath(); const g = S(x, y, s.top * 0.3); c.moveTo(g[0], g[1]); c.lineTo(p[0], p[1] + 10); c.stroke();
     tag(c, p[0], p[1], txt, '255,139,115', 'rgba(40,10,6,0.88)');
   }
@@ -873,12 +874,13 @@ function drawOverlay(dtReal) {
   let nLab = 0;
   for (let g = 0; g < sim.ng; g++) {
     const st = sim.gState[g], conf = sim.gConf[g] > sim.time, pin = sim.gPin[g] === 2;
-    if ((!st && !conf && !pin) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
+    const wall = !st && !conf && !pin && sim.gShield[g] === 1 && sim.gAlive[g] >= 40; // a company behind locked shields
+    if ((!st && !conf && !pin && !wall) || sim.gAlive[g] < 15 || sim.gExempt[g]) continue;
     const gx = sim.gCx[g], gy = sim.gCy[g];
     const p = S(gx, gy, heightAt(gx, gy) + 5);
     if (p[0] < 0 || p[1] < 60 || p[0] > vw || p[1] > vh) continue;
     const orc = sim.gTeam[g] === ORC;
-    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : st ? '! wavering' : '▼ pinned';
+    const txt = st >= 2 ? '⚑ routed' : conf ? '?' : st ? '! wavering' : wall ? '▣ shields' : '▼ pinned';
     // keep the field legible: never stack labels on top of one another
     let clash = false;
     for (let k = 0; k < nLab; k += 2) if (Math.abs(labXY[k] - p[0]) < 96 && Math.abs(labXY[k + 1] - p[1]) < 24) { clash = true; break; }
@@ -886,7 +888,7 @@ function drawOverlay(dtReal) {
     labXY[nLab++] = p[0]; labXY[nLab++] = p[1];
     const tw = c.measureText(txt).width + 10;
     c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 18, 4); c.fill();
-    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : !st && !conf ? '#8fd8ff' : orc ? '#f0b34a' : '#ffb86a';
+    c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : wall ? '#d6dae6' : !st && !conf ? '#8fd8ff' : orc ? '#f0b34a' : '#ffb86a';
     c.fillText(txt, p[0], p[1] + 0.5); // middle baseline: vertically centred in the tag
   }
   // commanders: a star over each so they can be found (and hunted)
@@ -956,12 +958,12 @@ function drawOverlay(dtReal) {
     }
   }
   // gates
-  for (const k of [map.GATE, map.POSTERN]) {
+  for (const k of [map.GATE, map.POSTERN, map.DOOR]) {
     const s = sim.segs[k];
     if (s.breached || s.hp >= s.maxHp) continue;
     const p = S(s.x, s.y, s.top + 7);
     bar(p[0], p[1], 54, s.hp / s.maxHp, '#f0b34a');
-    c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : 'POSTERN', p[0], p[1] - 5);
+    c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.fillStyle = '#f0b34a'; c.fillText(k === map.GATE ? 'GATE' : k === map.POSTERN ? 'POSTERN' : 'DOOR', p[0], p[1] - 5);
   }
   drawBreaches(c);
   // drag visuals

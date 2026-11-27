@@ -35,6 +35,8 @@ const ICONS = {
 
 /** `portraits`: { unit key: { img, x, y, size } }, tiles of the painted atlas (see portraits.js). It may fill in after the UI is built. */
 export function buildUI(app, portraits) {
+  /** What one unit counts for in its side's strength: with crewed engines on, an engine is timber, not troops. */
+  const strength = (d) => (d.crew ? 0 : 1) + (d.carry || 0); // an engine is timber, not troops
   const ui = {};
   const icon = (d, px) => {
     const cv = document.createElement('canvas'), dpr = Math.min(2, window.devicePixelRatio || 1), src = portraits[d.key];
@@ -76,10 +78,10 @@ export function buildUI(app, portraits) {
   ui.refreshPresetList = () => {
     const sb = app.isSandbox(), cur = preset.value;
     preset.innerHTML = '';
-    const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank);
+    const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank && !p.hidden);
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
-      const o = el('option', null, p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
+      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
@@ -131,6 +133,7 @@ export function buildUI(app, portraits) {
       const meta = (r ? `<i class="rng" title="${r.what}">${RANGE_SVG}${r.text}</i>` : '') + (d.cost && showCost ? `<em title="Requisition points each">${d.cost} pts</em>` : '');
       b.append(ic, el('div', null, `<b><span class="nm">${d.name}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</b><span>${d.desc}</span>`));
       b.addEventListener('click', () => { app.selectPlaceTool(app.tool && app.tool.type === d.key ? null : d.key); b.blur(); });
+      if (d.note) bindTip(b, d.name, `${d.note}<br><br><b>Counter:</b> ${d.counter}`);
       palette.append(b);
     };
     const mine = UNITS.filter((d) => d.team === tab && !d.hidden);
@@ -141,7 +144,7 @@ export function buildUI(app, portraits) {
       section('Field works', mine.filter((d) => d.cls === C.OBST || d.cls === C.CACHE));
     } else {
       // a whole host in waves, without laying out each one by hand
-      const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * (1 + (UNITS[U[g.type]].carry || 0)), 0);
+      const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * strength(UNITS[U[g.type]]), 0);
       const box = el('div', 'raise', `<b>Automated placement</b><span>Raise a horde with troops, ladders, engines and captains.${cur ? ` Replaces the ${fmt(cur)} raised now.` : ''}</span>`);
       const row = el('div', 'row'), inp = el('input'), go = el('button', 'primary', cur ? 'Replace' : 'Raise');
       inp.type = 'number'; inp.min = 100; inp.max = 40000; inp.step = 500; inp.value = cur ? Math.round(cur / 500) * 500 || 500 : 8000;
@@ -173,7 +176,7 @@ export function buildUI(app, portraits) {
     const sandbox = app.isSandbox(), open = sandbox || app.oobOpen;
     ui.refreshBegin();
     // a challenge's order of attack: what comes when (below the order of battle)
-    const ws = sandbox ? [] : waveSummary(app.setup.groups).filter((w) => w.size > 0);
+    const ws = sandbox ? [] : waveSummary(app.setup.groups, true).filter((w) => w.size > 0);
     attackSec.hidden = ws.length < 2;
     attackList.innerHTML = '';
     for (const w of ws) attackList.append(el('div', 'wrow', `<i>${w.k + 1}</i><div>${w.name}${w.k === 0 ? ' — on the field' : ''}<span>${w.note || 'infantry'}</span></div><b>${fmt(w.size)}</b>`));
@@ -189,7 +192,7 @@ export function buildUI(app, portraits) {
     for (const team of [DEF, ORC]) {
       const byType = new Map();
       for (const g of app.setup.groups) if (g.team === team) byType.set(g.type, (byType.get(g.type) || 0) + g.count);
-      let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * (1 + (UNITS[U[k]].carry || 0));
+      let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * strength(UNITS[U[k]]);
       const locked = team === ORC && !sandbox;
       const head = el('div', 'side-head ' + (team === DEF ? 'def' : 'orc'), `<div>${team === DEF ? 'DEFENDERS' : 'ATTACKERS'} <span>· ${fmt(total)}</span></div>`);
       const clr = el('button', null, 'Clear'); clr.addEventListener('click', () => app.clearTeam(team));
@@ -537,11 +540,16 @@ export function buildUI(app, portraits) {
       ])}`],
     ['tips', 'Tips', `${rows([
         ['Ammunition', 'Troops re-arm within 60 m of a cache or supply drop. An amber pip marks a soldier out of rounds.'],
+        ['Lines of fire', 'Nobody shoots through his own men. On a battlement two ranks fire, the front one kneeling at the parapet; on open ground three, prone, kneeling and standing. Anyone further back looks for a gap nearby or waits his turn, and steps up when a man ahead falls. A man on a wall covers the ground in front of him, not along the wall. Packing more men onto a wall does not add fire: spread them along it.'],
+        ['The back door', 'The Hornburg gate is strong; the postern at its rear, up the ramp from the Deep, is not. Leave the Deeping Wall empty and the horde comes over it, or through the culvert, and up that ramp: falling back means holding the postern too. And where the wall meets the keep, its walk runs through an arch into the court: the door there can be battered down by anyone holding that end of the wall.'],
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Guns on the Hornburg and grenades can.'],
-        ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away.'],
-        ['Captains ★', 'They drive their wave on from the rear. Mark one with focus fire; when he falls, his companies waver.'],
-        ['Siege works', 'Ladders and towers reach the wall walk, sappers blow the culvert, rams break the gate and catapults hunt mortars that stay put. Alerts warn of each in time to act.'],
+        ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away. Crossbow volleys and catapult rocks pin your own platoons the same way: they fire slower and wilder until it lifts.'],
+        ['Shield walls ▣', 'Inside the reach of your small arms the Uruk-hai lock shields (pale on the map, marked ▣): slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],
+        ['Captains ★', 'They follow behind their own companies, which will not rout while he stands and rally to him if they do. The troops around him take most shots aimed at him: thin them, then mark him with focus fire.'],
+        ['Siege works', 'Small arms cannot hurt a ladder, ram or tower, only the Uruk-hai and trolls moving it; others step in for the fallen, and a dropped engine can be picked up again. Men at an uncontested ladder head throw the ladder down. Alerts warn of each engine in time to act.'],
+        ['The reserve', 'Warg riders wait out of range for a breach or a fallen gate, and ride down troops caught outside the walls. Shortly before dawn everything the enemy has left comes on at once.'],
       ])}`],
+    ['enemy', 'Tactics', `${rows(UNITS.filter((d) => d.team === ORC && d.note).map((d) => [d.name, `${d.note}<br><i>Counter:</i> ${d.counter}`]))}`],
   ];
   let helpTab = 'basics';
   ui.showHelp = () => {
@@ -641,6 +649,7 @@ export function buildUI(app, portraits) {
     menu.style.left = Math.max(8, Math.min(innerWidth - menu.offsetWidth - 8, b.right - menu.offsetWidth + 40)) + 'px';
   };
   window.addEventListener('pointerdown', (e) => { const t = e.target instanceof Node ? e.target : null; if (!menu.hidden && !(t && (menu.contains(t) || btnSettings.contains(t)))) ui.toggleSettings(false); }, true);
+
   /** Close any open popover; true if one was open. */
   ui.closePopups = () => { const was = !menu.hidden || !coach.hidden; ui.toggleSettings(false); ui.hideCoach(); return was; };
 

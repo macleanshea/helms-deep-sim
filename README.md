@@ -38,7 +38,19 @@ its culvert.
 The welcome screen offers two ways to play; the **Sandbox / Challenge** switch in the top bar
 changes between them at any time.
 
-A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first):
+A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first). There are
+three, one to a difficulty:
+
+| | Scenario | The night |
+| --- | --- | --- |
+| Easy | **First Night** | A company on the centre of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
+| Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
+| Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
+
+In each the first wave is a real assault, not a probe, so the fight reaches the wall early, and a
+platoon is kept below the wall where the enemy cannot count it. Difficulty is measured, not
+guessed: see *Headless runs and balance* below.
+
 
 - The enemy and the battle options are fixed. The garrison is issued at its full
   **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
@@ -64,10 +76,19 @@ formations you place yourself take an "advance after" delay. Sandbox battles are
 
 In a challenge the horde attacks in waves: a vanguard that starts on the field, then escalades, the siege
 train and a final assault, which wait beyond the valley mouth and march on in turn. Releases
-are paced so the last and heaviest wave lands shortly before dawn; cutting a wave down quickly
+are paced so the last wave has time to fight at the wall before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to the
-next wave, and an alert names the stretch of wall it is aimed at — the middle waves go for
-whichever sector looks weakest.
+next wave, and an alert names the stretch of wall it is aimed at.
+
+**The horde has a plan.** Each wave is split into task forces by lane, each with a captain and an
+objective: a third of the Deeping Wall, or the gate. Two forces of three go in against whichever
+sector looks weakest *from what the horde has seen* (heads counted on the wall once it is close
+enough to look, and how hard each sector has been firing), so troops kept below the wall are a
+surprise, and the vanguard is a real probe. A force steps off together, with slow engines given a
+head start. Warg riders are held out of range until there is a breach, a fallen gate, or infantry
+caught outside the walls. A force that is spent before it has closed pulls back and comes on again
+with the next wave. A foothold on the wall, or a sector whose fire dies away, draws in whoever has
+not yet committed. Shortly before dawn everything left comes on at once.
 
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
@@ -126,11 +147,48 @@ Orders can be given while paused. The battle waits while a dialog is open.
   stop shooting and its morale wears away. Berserkers cannot be pinned, and warg riders keep most
   of their pace under fire.
 - Both sides have command units (★). Lose one and nearby companies are briefly disorganised
-  and lose morale. Uruk captains march at the rear of their wave and are not shot on sight —
-  mark one with focus fire. Any company that takes heavy losses in a short time may break and
-  run, and can rally later.
+  and lose morale. An Uruk captain follows behind his own companies. While he stands they almost
+  never rout, and a broken company falls back on the nearest captain and rallies there. He is not
+  shot on sight, and the troops pressed around him take most shots aimed at him: thin them with
+  high explosive, then mark him with focus fire.
+- **Bodies take space.** Only so many can stand in one spot, so a ladder, a breach or a gate
+  admits a column, not a crowd. Trolls and engines push the small aside.
+- **Lines of fire.** Nobody shoots through his own men. On a battlement two ranks can fire, the
+  front one kneeling at the parapet and the second standing behind it; on open ground three, lying
+  prone, kneeling and standing. A man with no clear line looks for a gap in the ranks or a free
+  place at the parapet nearby (never more than 30 m from where he was put), or waits, and steps up
+  when a man ahead falls. A man on a wall covers the ground in front of him, 75 degrees either side
+  of straight out, not along the wall. Grenade launchers and mortars lob over everyone. Kneeling at
+  a parapet or lying prone, a man is about half as easy for a crossbow to hit. So firepower follows
+  frontage: a wall manned ten deep fires no harder than one manned two deep. The defenders take up
+  room as the attackers do.
+- **The Hornburg's back door.** The gate facing the valley is built to take a long battering
+  (it takes six sappers' charges); the postern at the rear, at the top of the ramp up from the
+  Deep, is a lighter door that a party of Uruk-hai can hack down in under a minute and one charge
+  breaks. Give up the Deeping Wall and the horde comes round for it: ladders go up unopposed at
+  the keep end of the empty wall, sappers blow the culvert, and the Deep fills while one force
+  keeps the gate busy. Falling back means defending two short fronts, not one.
+- **The door from the wall.** Where the Deeping Wall meets the Hornburg, its walk runs through an
+  arch straight into the court. The garrison passes freely, but the door in it can be battered down
+  (a party of Uruk-hai breaks it in a minute or two). Attackers who hold the keep end of the wall
+  make for it, and after a fall-back the climbers on the empty wall go for whichever back door is
+  nearer. Men on the curtain wall above the junction, and in the court behind the arch, hold it.
+- **Siege engines are timber with a crew.** Small arms cannot hurt a ladder, ram, tower or
+  catapult, only the Uruk-hai and trolls moving it. It slows as they fall and is set down when too
+  few are left; others nearby step in, and a later wave can pick up an abandoned one. Marksmen pick
+  out the carriers. Grenades, mortars, rockets and air strikes destroy the engine itself.
+- **Ladders can be thrown down.** Defenders at a ladder head, with no attacker yet on the wall
+  beside them, heave it off; it lies at the foot until it is raised again.
+- **Shield walls.** Inside the reach of the garrison's small arms the Uruk-hai lock shields:
+  slower, but most bullets from the front are stopped. Riflemen hold their fire on a distant shield
+  wall rather than waste it (machine guns keep it pinned). Mortars, grenades and fire from the
+  flank are the answer; wire breaks the formation. Beyond small-arms reach they come on fast in
+  open order.
+- **Their fire pins you too.** Crossbow volleys and catapult rocks pin the platoons they land on:
+  a slower, wilder fire until it lifts. A commander nearby steadies them. Catapults have missions
+  (your mortars, the stretch of wall the trolls are battering, the escalade's sector, your
+  ammunition points) and keep out of rocket reach once one has been lost to a rocket.
 - Siege towers carry 50 attackers each and unload them onto the wall walk when they dock.
-  Catapults batter the wall and counter-battery mortars that keep firing from one place.
 - Alerts warn before the damage is done — a ram on the causeway, sappers running for the
   culvert, ladder crews closing, the gate at half strength, a sector out of ammunition.
 - A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
@@ -173,7 +231,8 @@ closer.
 
 - `src/sim/` — the simulation, with no DOM dependencies (`morale.js` holds morale and
   suppression, `support.js` the support calls and Command Points, `director.js` the pacing of
-  the horde's waves). Units live in typed arrays, find each
+  the horde's waves, `warlord.js` the horde's battle plan, `engines.js` crewed siege engines and
+  ladder throw-down). Units live in typed arrays, find each
   other through uniform grids, and the horde navigates with a congestion-aware flow field that
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
   renderer interpolates between them.
@@ -211,16 +270,50 @@ plays out the same way:
 
 ```bash
 node tools/headless.js garrison                       # preset, nobody giving orders
-node tools/headless.js --preset recon --policy auto   # with a stand-in commander
+node tools/headless.js --preset first-night --policy auto   # with a stand-in commander
 node tools/headless.js --preset garrison --seed 3 --opt cpRate=0.05 --json --verify
-npm run matrix                                        # every challenge preset x policy x seed, as a table
+npm run matrix                                        # every challenge x policy x seed, as a table
+npm run checks                                        # does the siege behave? pass or fail, with numbers
 ```
 
-Presets are `garrison`, `three-hundred`, `combined`, `recon` and `empty`. `--policy auto` plays
+Presets are `first-night`, `garrison`, `three-hundred` and `empty`, plus `benchmark` (thirty
+thousand against a reinforced garrison, not offered in the game; `?bench` uses it). `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
 `--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
 `--json` prints one summary line including the score, and `--verify` runs twice and checks the
-state hashes match. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
-and survivors per scenario — the tuning target is that giving no orders loses, and the
-stand-in commander wins without it being a walkover.
+state hashes match. Each run also reports how the siege went: ladders raised and thrown down,
+engines dropped and picked up again, when the first attacker reached the wall and when the first
+foothold was won, how far from the works each kind of attacker fell, and the cost of the dearest
+ten steps. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
+and survivors per scenario.
+
+**How difficulty is judged.** The yardstick is the stand-in commander, who calls support sensibly
+but never moves a man, marks a target or changes a stance; a player can do all of those. Over ten
+seeds:
+
+| | Stand-in commander | Nobody giving orders |
+| --- | --- | --- |
+| Easy | wins nearly every night with about half the garrison left | usually loses, late in the night |
+| Medium | wins most nights with about a third left | always loses |
+| Hard | wins fewer than half | always loses, with a third of the night to go |
+
+Hard is meant to need more than the stand-in gives.
+
+**Falling back at once.** Ordering the whole garrison into the Hornburg in the first second is no
+longer a free win on Medium or Hard: the horde comes round through the Deep and over the empty wall,
+breaks the postern and the door from the wall, and pours into the court from two sides. In the check
+battles it loses Medium two nights in three and wins Hard with only a twentieth of the garrison
+left. Easy is still won with nearly everyone alive (its horde is too small to force the doors in
+time), so `npm run checks` still reports this as OPEN.
+
+`tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
+pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left
+crewless, ladders thrown down the instant they go up, riflemen who never fire, platoons pinned for
+the whole fight, captains who cannot be killed or who bunch together, warg riders who never
+leave the reserve, forces going back and forth, alert floods, surges at a sector that is still
+firing, an empty stretch of wall ignored, soldiers stuck for good, troops in front of the wall
+walked past, a horde that will not come round through the Deep for the postern (or does while the
+wall is manned), a door from the wall that is never battered or is walked through while it holds,
+hordes too big to fit, shots fired through friends or along a wall, men left with no line of fire
+or fidgeting between places, defenders packed into one spot, and the keep used as a free win.

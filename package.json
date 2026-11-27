@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server.js",
     "sim": "node tools/headless.js",
-    "matrix": "node tools/matrix.js"
+    "matrix": "node tools/matrix.js",
+    "checks": "node tools/checks.js"
   }
 }

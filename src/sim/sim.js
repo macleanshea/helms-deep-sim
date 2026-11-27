@@ -2,7 +2,7 @@
 // Units live in structure-of-arrays typed buffers; visual effects are reported
 // through the `fx` interface and UI notifications through `events`.
 
-import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
+import { WORLD_W, WORLD_H, CELL, GW, GH, DT, DEF, ORC, T, OB, STEP, UNITS, U, WEAPONS, ARMOR_MULT, A, K, R, C, TR, SUPPORT, BOUNTY, BOUNTY_SHARE, DEFAULT_OPTIONS } from '../config.js';
 import { FlowSolver, DXN, DYN } from './flow.js';
 import { groupPositions } from '../scenarios.js';
 import { mulberry } from '../rng.js';
@@ -10,11 +10,18 @@ import { KEEP, N_WALL } from '../map.js';
 import { supportMethods } from './support.js';
 import { moraleMethods } from './morale.js';
 import { directorMethods } from './director.js';
+import { warlordMethods } from './warlord.js';
+import { engineMethods } from './engines.js';
+import { postMethods } from './posts.js';
 
 export const MAX_UNITS = 1 << 16;
 const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast grid
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;    // coarse grid of defenders
+const BCS = 8, BW = WORLD_W / BCS, BH = WORLD_H / BCS;    // grid of big bodies (trolls, engines)
+const CAP = 4;            // most foot soldiers that fit in one fine cell (about one a square metre)
+const GATE_HP = 7800, POSTERN_HP = 1300, DOOR_HP = 1300, DOOR_COST = 310; // the Hornburg's doors and the crossing price of the door in a path (map.js holds the stone defaults)
+export const FINE_CELL = FINE, FINE_W = FW, FINE_H = FH;
 export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 
 export const S_IDLE = 0, S_MOVE = 1, S_ACT = 2, S_DONE = 3, S_FLEE = 4, S_WAIT = 5, S_CLIMB = 6;
@@ -53,6 +60,19 @@ export class Sim {
     this.gen = new Uint16Array(N);      // bumped each time a slot is reused, so a stored unit reference can be checked
     this.holdR = new Float32Array(N);   // fire discipline: 0 fire at will, >0 hold until the enemy is this close (m), <0 hold fire
     this.n = 0; this.free = [];
+    // crewed engines: which engine a soldier is carrying or pushing (with the engine's generation), and his place on it
+    this.crewOf = new Int32Array(N).fill(-1); this.crewGen = new Uint16Array(N); this.slot = new Uint8Array(N);
+    this.crewAcc = new Float32Array(N); this.crewPts = new Float32Array(N);     // crew strength in place (this tick / last tick)
+    this.haveAcc = new Float32Array(N); this.crewHave = new Float32Array(N);    // crew strength assigned, in place or running up
+    this.slotAcc = new Uint32Array(N); this.slotMask = new Uint32Array(N);
+    this.eHalt = new Float32Array(N); this.eIdle = new Float32Array(N); this.eEver = new Uint8Array(N); this.eNoDraft = new Float32Array(N);
+    this.stuck = new Uint8Array(N);
+    // lines of fire: a standing defender's rank (3: no line of fire) and posture (1 kneeling, 2 prone), the post he keeps near, when he may next look for a place
+    this.rank = new Uint8Array(N); this.pose = new Uint8Array(N); this.ax = new Float32Array(N); this.ay = new Float32Array(N); this.seekT = new Float32Array(N); this.snagT = new Float32Array(N);
+    this.resT = new Float32Array(FW * FH); this._arcOn = false; this._anx = 0; this._any = 0;
+    this.engines = [];
+    this.occ = new Uint8Array(FW * FH * 2); this.blk = new Int32Array(FW * FH); this.blkList = [];
+    this.bigHead = new Int32Array(BW * BH).fill(-1); this.bnext = new Int32Array(N);
 
     this.head = new Int32Array(FW * FH);
     this.ocHead = new Int32Array(OW * OH); this.ocCount = new Uint16Array(OW * OH);
@@ -65,6 +85,10 @@ export class Sim {
     // fortification state
     const NC = GW * GH;
     this.segs = map.segments.map((s) => ({ ...s, hp: s.maxHp, breached: false, ladders: 0, claimed: 0 }));
+    // a gate built to face the valley, and a lighter door at the back that opens on the Deep
+    { const gs = this.segs[map.GATE], ps = this.segs[map.POSTERN]; gs.maxHp = gs.hp = GATE_HP; ps.maxHp = ps.hp = POSTERN_HP; }
+    // the arch from the Deeping Wall walk into the court has leaves: the garrison passes, the horde has to break them
+    { const ds = this.segs[map.DOOR]; ds.maxHp = ds.hp = DOOR_HP; ds.leaves = true; }
     this.segTop = new Float32Array(this.segs.map((s) => s.top));
     this.elev = new Uint8Array(NC);   // wall group + 1 where a wall (or a shut gate) still stands
     this.elevD = this.elev;           // the garrison keeps its gates barred, so both sides see the same walls
@@ -101,7 +125,8 @@ export class Sim {
     this.hvt = []; this.caches = []; this.heavy = []; this.cmds = [[], []];
     this.count = [0, 0]; this.initial = [0, 0]; this.defCombat = 0;
     this.result = null; this.routing = false; this.routT = 0;
-    this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0 };
+    this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0,
+      laddersUp: 0, towersUp: 0, thrown: 0, dropped: 0, recovered: 0, footholdT: -1, blocked: 0, pinnedDef: 0, rallied: 0, reposts: 0 };
     this.support = {};
     const sb = !!this.opt.sandbox;
     for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
@@ -122,12 +147,14 @@ export class Sim {
       return { name, short, x: sg.x, y: sg.y };
     });
     this._alertT = new Map();
+    this._initWarlord();
 
     // later waves of the horde wait beyond the valley mouth until the director brings them on
     const reserve = [];
     for (const g of setup.groups) { if (g.team === ORC && g.phase > 0) reserve.push(g); else this._spawnGroup(g); }
     for (let i = 0; i < this.n; i++) { const d = UNITS[this.type[i]]; const b = d.team === DEF ? this.stats.startDef : this.stats.startOrc; b[d.key] = (b[d.key] || 0) + 1; }
     this._initDirector(setup.groups, reserve);
+    this._wlStart(setup.groups);
     this.initial[0] = this.defCombat; this.initial[1] = this.count[1];
     this._findArtillery();
     // what one bounty point is worth: the pool divided over every engine, troll and captain the horde has
@@ -141,20 +168,22 @@ export class Sim {
 
   /** Put a formation on the field. `atX` overrides where (late arrivals); returns how many found room. */
   _spawnGroup(g, atX, marching) {
-    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX });
+    const pos = groupPositions(this.map, atX === undefined ? g : { ...g, x: atX }, true);
     const ti = U[g.type], d = UNITS[ti];
     const n = Math.min(g.count, pos.length / 2);
     if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
     if (!n) return 0;
     const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
     if (d.fearless) this.gFearless[gid] = 1;
+    this.gType[gid] = ti; this.gWave[gid] = g.phase || 0;
+    if (d.team === ORC) this._wlAdd(gid, g);
     const face = d.team === DEF ? Math.PI : 0;
     let made = 0;
     for (let k = 0; k < n; k++) {
       const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], face + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
       if (i < 0) break;
       made++;
-      if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; }
+      if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; if (d.crew) { this.cd2[i] = 0; this.eIdle[i] = this.time; } }
     }
     return made;
   }
@@ -169,20 +198,26 @@ export class Sim {
     this.x[i] = this.px[i] = x; this.y[i] = this.py[i] = y; this.vx[i] = this.vy[i] = 0; this.sepx[i] = this.sepy[i] = 0;
     this.bx[i] = x; this.by[i] = y;
     this.rot[i] = rot; this.trot[i] = rot;
-    this.hp[i] = d.hp; this.rad[i] = d.rad;
+    this.hp[i] = d.crew && d.crew.hp ? d.crew.hp : d.hp; this.rad[i] = d.rad;
     this.cd[i] = this.rand() * 1.2; this.cd2[i] = this.rand();
     const am = this.opt.ammoMult;
     this.ammo[i] = d.pool ? d.pool : d.carry ? d.carry : d.ammo ? (am > 50 ? 1e9 : Math.ceil(d.ammo * am)) : 0;
     this.ammo2[i] = d.ammo2 ? (am > 50 ? 1e9 : d.ammo2 * am) : 0;
-    this.target[i] = this.target2[i] = -1; this.aux[i] = 0; this.aux2[i] = -1; this.hitT[i] = -10; this.fireT[i] = -10; this.linkT[i] = 0;
+    this.target[i] = this.target2[i] = -1; this.aux[i] = 0; this.aux2[i] = -1; this.hitT[i] = -10; this.fireT[i] = -10; this.linkT[i] = 0; this.snagT[i] = 0;
+    this.crewOf[i] = -1; this.crewAcc[i] = this.crewPts[i] = this.haveAcc[i] = this.crewHave[i] = 0; this.slotAcc[i] = this.slotMask[i] = 0;
+    this.eHalt[i] = 0; this.eIdle[i] = 0; this.eEver[i] = 0; this.eNoDraft[i] = 0; this.stuck[i] = 0;
+    this.rank[i] = 0; this.pose[i] = 0; this.ax[i] = x; this.ay[i] = y; this.seekT[i] = 0;
     const c = this.map.cellOf(x, y);
     this.el[i] = (d.team === DEF ? this.elevD[c] : this.elev[c]) ? 1 : 0;
     if (g < 0) g = this.miscGroup[d.team];
     this.grp[i] = g; this.gAlive[g]++; this.gN0[g]++;
-    this.count[d.team] += 1 + (d.carry || 0);
+    this.count[d.team] += this._per(d);
     if (d.team === DEF && d.cls !== C.CACHE) this.defCombat++;
     return i;
   }
+
+  /** How many a unit of this kind counts for in its side's strength. A crewed engine is timber, not troops. */
+  _per(d) { return (d.crew ? 0 : 1) + (d.carry || 0); }
 
   maxAmmo(i) { const d = UNITS[this.type[i]]; return d.pool ? d.pool : Math.ceil((d.ammo || 0) * Math.min(this.opt.ammoMult, 50)); }
 
@@ -220,7 +255,8 @@ export class Sim {
   damage(i, dmg, w) {
     if (!this.alive[i]) return;
     const d = UNITS[this.type[i]];
-    if (w) dmg *= ARMOR_MULT[w.kind][d.armor];
+    if (w) dmg *= ARMOR_MULT[w.kind][d.crew ? A.ENGINE : d.armor];
+    if (dmg <= 0) return;
     this.hitT[i] = this.time;
     if ((this.hp[i] -= dmg) <= 0) this.kill(i, w);
   }
@@ -229,7 +265,8 @@ export class Sim {
     if (!this.alive[i]) return;
     this.alive[i] = 0;
     const d = UNITS[this.type[i]], team = d.team, x = this.x[i], y = this.y[i];
-    this.count[team]--;
+    this.count[team] -= d.crew ? 0 : 1;
+    if (w && w.key === 'rocket' && d.role === R.CATAPULT) this.catWary = true; // the rest learn to keep their distance
     const g = this.grp[i];
     this.gAlive[g]--;
     const key = w ? w.key : 'other';
@@ -344,27 +381,44 @@ export class Sim {
     this.propAt[c] = -1;
   }
 
-  // mode: 0 attacker, 1 defender;  sz: 0 foot, 1 big, 2 heavy
-  _move(i, dirx, diry, speed, sz, mode) {
+  // mode: 0 attacker, 1 defender;  sz: 0 foot, 1 big, 2 heavy;  free: not held up by the press (routers, crews running to their engine)
+  _move(i, dirx, diry, speed, sz, mode, free) {
     const x = this.x[i], y = this.y[i];
     const fx = (x / FINE) | 0, fy = (y / FINE) | 0;
     const ph = this.tick + i;
     if ((ph & 1) === 0 && ((ph & 2) === 0 || this.sepx[i] !== 0 || this.sepy[i] !== 0)) {
       let sx = 0, sy = 0, cnt = 0;
       const ri = this.rad[i], head = this.head, next = this.next, X = this.x, Y = this.y, RAD = this.rad, EL = this.el, ei = EL[i];
+      const gap = this.gOpen[this.grp[i]] && !ei ? 1.5 : 0.42; // a company in open order keeps wide intervals
       const y0 = fy > 0 ? fy - 1 : 0, y1 = fy < FH - 1 ? fy + 1 : FH - 1, x0 = fx > 0 ? fx - 1 : 0, x1 = fx < FW - 1 ? fx + 1 : FW - 1;
       for (let cy = y0; cy <= y1 && cnt < 26; cy++) {
         for (let cx = x0; cx <= x1; cx++) {
           for (let j = head[cy * FW + cx]; j >= 0; j = next[j]) {
             if (j === i || EL[j] !== ei) continue;
+            if (RAD[j] > 1 || ri > 1) continue; // big bodies are handled below: they shove the small, never the reverse
             cnt++;
             const dx = x - X[j], dy = y - Y[j];
-            const rr = ri + RAD[j] + 0.42;
+            const rr = ri + RAD[j] + gap;
             const d2 = dx * dx + dy * dy;
             if (d2 < rr * rr) {
               if (d2 > 1e-4) { const d = Math.sqrt(d2), f = (rr - d) / (rr * d); sx += dx * f; sy += dy * f; }
               else { sx += ((i * 7 + j) % 5) - 2; sy += ((i * 3 + j * 5) % 5) - 2; }
             }
+          }
+        }
+      }
+      {
+        // trolls and engines are found through their own coarse grid, whatever their radius
+        const bh = this.bigHead, bn = this.bnext, ST = this.state, mine = this.crewOf[i];
+        const bx = (x / BCS) | 0, by = (y / BCS) | 0;
+        const by0 = by > 0 ? by - 1 : 0, by1 = by < BH - 1 ? by + 1 : BH - 1, bx0 = bx > 0 ? bx - 1 : 0, bx1 = bx < BW - 1 ? bx + 1 : BW - 1;
+        for (let cy = by0; cy <= by1; cy++) for (let cx = bx0; cx <= bx1; cx++) {
+          for (let j = bh[cy * BW + cx]; j >= 0; j = bn[j]) {
+            if (j === i || EL[j] !== ei || j === mine || ST[j] === S_DONE) continue;
+            const dx = x - X[j], dy = y - Y[j];
+            const rr = ri + RAD[j] + 0.42;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < rr * rr && d2 > 1e-4) { const d = Math.sqrt(d2), f = (rr - d) / (rr * d) * (ri > 1 ? 0.6 : 1.6); sx += dx * f; sy += dy * f; }
           }
         }
       }
@@ -390,6 +444,11 @@ export class Sim {
     }
     const k = 1.7 * (speed > 1 ? speed : 1);
     let vx = this.vx[i], vy = this.vy[i];
+    if (!mode && this.sepx[i] * dirx + this.sepy[i] * diry < -0.35) {
+      // somebody standing square in his way pushes back exactly as hard as he pushes on: step round
+      const sd = i & 1 ? 0.7 : -0.7, ox = dirx;
+      dirx -= diry * sd; diry += ox * sd;
+    }
     vx += (dirx * speed + this.sepx[i] * k - vx) * 0.42;
     vy += (diry * speed + this.sepy[i] * k - vy) * 0.42;
     const vm = vx * vx + vy * vy, lim = speed * 1.25 + 0.6;
@@ -401,19 +460,48 @@ export class Sim {
     const c1 = ((ny / CELL) | 0) * GW + ((nx / CELL) | 0);
     if (c1 !== c0) {
       const orc = !mode;
-      if (!this.canEnter(c0, c1, sz, orc)) {
+      // (someone shoved onto the edge of a rock face may always step off it onto open ground)
+      if (!this.canEnter(c0, c1, sz, orc) && !(t0 === T.CLIFF && this.mtype[c1] !== T.CLIFF && !this.elev[c1])) {
         blocked = c1;
         const ca = ((y / CELL) | 0) * GW + ((nx / CELL) | 0);
         if (ca === c0 || this.canEnter(c0, ca, sz, orc)) { ny = y; vy *= 0.3; }
         else {
           const cb = ((ny / CELL) | 0) * GW + ((x / CELL) | 0);
           if (cb === c0 || this.canEnter(c0, cb, sz, orc)) { nx = x; vx *= 0.3; }
-          else { nx = x; ny = y; vx = 0; vy = 0; }
+          else {
+            nx = x; ny = y;
+            // boxed in on both sides: if the way lies through the corner of the cell (the foot of a ramp), make for the corner itself
+            const gx0 = (x / CELL) | 0, gy0 = (y / CELL) | 0, qx = dirx > 0.2 ? 1 : dirx < -0.2 ? -1 : 0, qy = diry > 0.2 ? 1 : diry < -0.2 ? -1 : 0;
+            if (orc && qx && qy && gx0 + qx >= 0 && gx0 + qx < GW && gy0 + qy >= 0 && gy0 + qy < GH && this.canEnter(c0, (gy0 + qy) * GW + gx0 + qx, sz, true)) {
+              const ex = (gx0 + (qx > 0 ? 1 : 0)) * CELL + qx * 0.2 - x, ey = (gy0 + (qy > 0 ? 1 : 0)) * CELL + qy * 0.2 - y, el2 = Math.sqrt(ex * ex + ey * ey) || 1, stp = Math.min(el2, speed * DT + 0.05);
+              nx = x + (ex / el2) * stp; ny = y + (ey / el2) * stp; blocked = -1;
+            } else { vx = 0; vy = 0; }
+          }
         }
       } else if (orc && this.mines[c1] && this.rand() < 0.55) {
         this.mines[c1]--;
         const mx = nx, my = ny;
         this.timed.push({ t: this.time, f: () => this.explode(mx, my, W.mine.aoe, W.mine.dmg, W.mine, DEF, false) });
+      }
+    }
+    if (!mode && !sz) {
+      // only so many bodies fit in one place: the rest slide along the press or wait their turn
+      const f0 = fy * FW + fx, f1 = ((ny / FINE) | 0) * FW + ((nx / FINE) | 0);
+      if (f1 !== f0) {
+        // (the level he is stepping onto, which is not his own when he comes down off a wall into a breach)
+        const lv = this.el[i], lt = this.elev[((ny / CELL) | 0) * GW + ((nx / CELL) | 0)] ? 1 : 0, occ = this.occ, wt = this.rad[i] > 0.7 ? 2 : 1;
+        let to = f1;
+        if (!free && !this._room(f1, lt, i)) {
+          const fa = fy * FW + ((nx / FINE) | 0), fb = ((ny / FINE) | 0) * FW + fx;
+          if (fa !== f0 && this._room(fa, lt, i)) { ny = y; vy *= 0.3; to = fa; }
+          else if (fb !== f0 && this._room(fb, lt, i)) { nx = x; vx *= 0.3; to = fb; }
+          else { nx = x; ny = y; vx *= 0.25; vy *= 0.25; to = f0; if (this.stuck[i] < 250) this.stuck[i]++; }
+        }
+        if (to !== f0) {
+          this.stuck[i] = 0;
+          const a = f0 * 2 + lv, b = to * 2 + lt;
+          occ[a] = occ[a] > wt ? occ[a] - wt : 0; if (occ[b] < 250) occ[b] += wt;
+        }
       }
     }
     this.x[i] = nx; this.y[i] = ny; this.vx[i] = vx; this.vy[i] = vy;
@@ -425,19 +513,33 @@ export class Sim {
     return blocked;
   }
 
-  /** Smoothly interpolated flow direction at a point; result in this.fdx / this.fdy. */
-  _flow(x, y) {
+  /** Is there room for one more in fine cell f on level lv? A soldier stuck for some seconds may squeeze in. */
+  _room(f, lv, i) {
+    const b = this.blk[f];
+    if (b && b - 1 !== this.crewOf[i] && !lv && this.stuck[i] <= 20) return false; // (after a couple of seconds he clambers past timber left lying)
+    return this.occ[f * 2 + lv] < CAP + (this.stuck[i] > 30 ? 3 : 0);
+  }
+
+  /** Smoothly interpolated flow direction at a point; result in this.fdx / this.fdy. `d` is the field to read (the horde's own by default). */
+  _flow(x, y, d = this.orcDir, own = false) {
     const gx = x / CELL - 0.5, gy = y / CELL - 0.5;
     let ix = Math.floor(gx), iy = Math.floor(gy);
     const fx = gx - ix, fy = gy - iy;
     if (ix < 0) ix = 0; else if (ix > GW - 2) ix = GW - 2;
     if (iy < 0) iy = 0; else if (iy > GH - 2) iy = GH - 2;
-    const d = this.orcDir, c = iy * GW + ix;
+    const c = iy * GW + ix;
     let sx = 0, sy = 0, k;
     if ((k = d[c]) !== 255) { const w = (1 - fx) * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + 1]) !== 255) { const w = fx * (1 - fy); sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW]) !== 255) { const w = (1 - fx) * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW + 1]) !== 255) { const w = fx * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
+    if ((own || sx * sx + sy * sy < 0.36)) {
+      // where the neighbouring cells pull against each other (beside a ramp, round a corner) the blend
+      // cancels out and he would dither on the spot, or (`own`) it has just walked him into ground he
+      // cannot step onto, off the edge of a causeway: go by the cell he is standing on
+      const c0 = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
+      if ((k = d[c0]) !== 255) { sx = DXN[k]; sy = DYN[k]; }
+    }
     // far from the fight the host marches up the valley in its ranks; close in, it follows the flow
     const far = this.defBox[0] - 200 - x;
     if (far > 0) { const w = far > 120 ? 2.2 : (far / 120) * 2.2; sx += w; }
@@ -465,14 +567,21 @@ export class Sim {
     head.fill(-1); ocHead.fill(-1); ocCount.fill(0); dcHead.fill(-1); dcCount.fill(0);
     let bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9, ox1 = -1e9;
     const lt = U.ladder, tt = U.tower;
+    const occ = this.occ, bigHead = this.bigHead, bnext = this.bnext, rad = this.rad, el = this.el;
+    occ.fill(0); bigHead.fill(-1);
     for (let i = 0, n = this.n; i < n; i++) {
       if (!alive[i]) continue;
       const xi = x[i], yi = y[i];
       const f = ((yi / FINE) | 0) * FW + ((xi / FINE) | 0);
       next[i] = head[f]; head[f] = i;
+      {
+        if (rad[i] > 1) { const b = ((yi / BCS) | 0) * BW + ((xi / BCS) | 0); bnext[i] = bigHead[b]; bigHead[b] = i; }
+        else { const o = f * 2 + el[i]; if (occ[o] < 250) occ[o] += rad[i] > 0.7 ? 2 : 1; }
+      }
       if (team[i] === ORC) {
         const ty = this.type[i];
         if ((ty === lt || ty === tt) && this.state[i] === S_DONE) continue; // raised works are not rifle targets
+        if (UNITS[ty].crew) continue;                                // nor is the timber of an engine: its carriers are
         const c = ((yi / OCS) | 0) * OW + ((xi / OCS) | 0);
         cnext[i] = ocHead[c]; ocHead[c] = i; ocCount[c]++;
         if (xi > ox1) ox1 = xi;
@@ -491,10 +600,27 @@ export class Sim {
       const gx = (x[i] / CELL) | 0, gy = (y[i] / CELL) | 0;
       for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { const xx = gx + ox, yy = gy + oy; if (xx >= 0 && yy >= 0 && xx < GW && yy < GH) dyn[yy * GW + xx] = 1; }
     }
+    {
+      // an engine on the move fills the ground under it
+      const blk = this.blk, st = this.blkList;
+      for (let k = 0; k < st.length; k++) blk[st[k]] = 0;
+      st.length = 0;
+      for (const e of this.engines) {
+        const cr = UNITS[this.type[e]].crew; // (the list is a few ticks old: a slot may have changed hands)
+        if (!alive[e] || !cr || this.state[e] === S_DONE || this.el[e]) continue;
+        const bxs = cr.box, c = Math.cos(this.rot[e]), sn = Math.sin(this.rot[e]);
+        for (let a = -bxs[0]; a <= bxs[0] + 0.01; a += 1.4) for (let b = -bxs[1]; b <= bxs[1] + 0.01; b += 1.4) {
+          const px = x[e] + c * a - sn * b, py = y[e] + sn * a + c * b;
+          if (px < 0 || py < 0 || px >= WORLD_W || py >= WORLD_H) continue;
+          const bc = ((py / FINE) | 0) * FW + ((px / FINE) | 0);
+          blk[bc] = e + 1; st.push(bc);
+        }
+      }
+    }
   }
 
   _buildAux() {
-    const hv = this.hvt, ca = this.caches, he = this.heavy; hv.length = 0; ca.length = 0; he.length = 0;
+    const hv = this.hvt, ca = this.caches, he = this.heavy, en = this.engines; hv.length = 0; ca.length = 0; he.length = 0; en.length = 0;
     this.cmds[0].length = 0; this.cmds[1].length = 0;
     const dg = this.danger; dg.fill(0);
     for (let i = 0, n = this.n; i < n; i++) {
@@ -503,7 +629,9 @@ export class Sim {
       if (d.cmd) this.cmds[d.team].push(i);
       if (d.team === ORC) {
         if (d.hvt && (this.state[i] !== S_DONE || d.role === R.TOWER)) hv.push(i);
+        else if (this.crewOf[i] >= 0 && !d.hvt) hv.push(i); // whoever is carrying an engine is a marksman's target
         if (d.sz === 2) he.push(i);
+        if (d.crew) en.push(i);
         continue;
       }
       if (d.cls === C.CACHE) ca.push(i);
@@ -533,12 +661,12 @@ export class Sim {
     }
     for (let c = 0, n = GW * GH; c < n; c++) {
       const t = mt[c];
-      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = 0; continue; }
+      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR ? DOOR_COST : 0; continue; } // (a door to batter down: a way through, at a price)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
       if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
       const k = cnt[c];
-      cost[c] = v + (k > 8 ? 32 : k * 4);
+      cost[c] = v + (k > 20 ? 100 : k * 5);
     }
     if (ns > 0) this.solver.solve(cost, src, ns, this.orcDir, this.navOrc);
     if (this.gateDirty) {
@@ -557,8 +685,10 @@ export class Sim {
     if (!this.opt.sandbox && this.cp < this.opt.cpCap) { const inc = Math.min(this.opt.cpCap - this.cp, this.opt.cpRate * DT); this.cp += inc; this.cpStats.earned += inc; }
     if (this.tick % 5 === 1) this._buildAux();
     this._buildGrids();
-    if ((this.navDirty && this.tick - this.lastNav >= 3) || this.tick - this.lastNav >= 20) this._nav();
+    // (with ladders going up and coming down all along the wall, the paths are re-solved at most once a second)
+    if ((this.navDirty && this.tick - this.lastNav >= 10) || this.tick - this.lastNav >= 20) this._nav();
     const { alive, team, px, py, x, y } = this;
+    this._crewTick();
     for (let i = 0, n = this.n; i < n; i++) {
       if (!alive[i]) continue;
       px[i] = x[i]; py[i] = y[i];
@@ -582,6 +712,8 @@ export class Sim {
     if (this.clays.length && this.tick % 3 === 0) this._claymores();
     if (this.tick % 5 === 2) this._morale();
     if (this.dir && this.tick % 5 === 4) this._director();
+    if (this.tick % 10 === 6) this._warlord();
+    if (this.fieldQ.length && this.tick % 4 === 1 && this.lastNav !== this.tick) this._fieldSolve();
     if (this.focus && this.time > this.focus.until) this.focus = null;
     if (this.tick % 5 === 0) this._checkEnd();
   }
@@ -663,8 +795,15 @@ export class Sim {
   _orc(i) {
     const d = UNITS[this.type[i]];
     const st = this.state[i];
-    if (st === S_WAIT) { if (this.time >= this.aux[i]) { this.state[i] = S_MOVE; this.linkT[i] = this.time; } return; }
+    const crewed = d.crew; // an engine that needs hands to move it
+    if (st === S_WAIT) {
+      if (this.time >= this.aux[i]) { this.state[i] = S_MOVE; this.linkT[i] = this.time; }
+      else if (crewed) this._engineSpeed(i, d, 0);
+      else if (this.crewOf[i] >= 0) this.state[i] = S_MOVE;
+      return;
+    }
     if (st === S_CLIMB) { this._climb(i); return; }
+    if (this.crewOf[i] >= 0 && this._crewStep(i, d)) return;
     const x = this.x[i], y = this.y[i];
     if (this.cd[i] > 0) this.cd[i] -= DT;
     const c = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
@@ -674,14 +813,37 @@ export class Sim {
     if (st === S_FLEE || (gs >= 2 && !el && x < 930)) {
       // broken: run for the valley mouth
       if (st === S_DONE) return;
-      this._move(i, -1, ((i % 9) - 4) * 0.05, d.speed * 1.15, d.sz, 0);
+      if (crewed) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return; } // nobody carries timber in a rout
+      if (gs === 2 && st !== S_FLEE && this.gRallyX[g] >= 0 && this.gRallyX[g] < x + 40) {
+        // a broken company falls back on its captain rather than quitting the field
+        const rx = this.gRallyX[g] - x, ry = this.gRallyY[g] - y, rl = Math.sqrt(rx * rx + ry * ry);
+        if (rl < 30) { this._move(i, 0, 0, 0, d.sz, 0); return; } // gathered about him: stand, and keep a body's room
+        this._move(i, rx / rl, ry / rl, d.speed * 1.15, d.sz, 0, rl > 60);
+        return;
+      }
+      this._move(i, -1, ((i % 9) - 4) * 0.05, d.speed * 1.15, d.sz, 0, 1);
       if (x < 10) { if (st === S_FLEE || gs === 3) { this.stats.fled++; this.kill(i, null, true); } else { this.vx[i] = 0; this.vy[i] = 0; } }
       return;
     }
     let speed = d.speed;
     const pin = this.gPin[g];
-    if (pin) speed *= d.cav ? (pin === 2 ? 0.6 : 0.85) : pin === 2 ? 0.3 : 0.65; // heads down under fire; cavalry keeps more of its pace
+    if (pin) speed *= d.cav ? (pin === 2 ? 0.6 : 0.85) : this.gShield[g] ? (pin === 2 ? 0.75 : 0.9) : pin === 2 ? 0.3 : 0.65; // heads down under fire; cavalry, and men behind locked shields, keep more of their pace
     if (this.gConf[g] > this.time) { if (((this.tick + i) & 7) < 5) { this.vx[i] *= 0.6; this.vy[i] *= 0.6; return; } speed *= 0.5; }
+    if (crewed) speed = this._engineSpeed(i, d, speed);
+    // the warlord's orders to this company: 1 hold in reserve, 2 fall back and regroup
+    const ord = this.gOrder[g];
+    if (ord && !el && st !== S_DONE && st !== S_ACT && !crewed) {
+      const hx = this.gHoldX[g];
+      if (x > hx + 3) this._move(i, -1, ((i % 9) - 4) * 0.04, ord === 2 ? d.speed : speed, d.sz, 0, 1);
+      else { this.vx[i] *= 0.6; this.vy[i] *= 0.6; }
+      return;
+    }
+    const shut = this.gShield[g] !== 0 || this.time < this.gShieldT[g]; // shields locked, or still coming down
+    if (this.gShield[g]) speed *= 0.7;
+    else if (x > this.gCapX[g] && speed > 3.3) speed = 3.3; // keeping behind the shield wall
+    if (d.cmd && !el && this._captain(i, d, g, x, y, speed)) return;
+    // (on a wall walk the fight there leads, except for those coming round to the postern: they go down into the Deep)
+    const fld = this.gField[g] && (!el || this._viaDeep(g)) ? this._fieldFor(g, c, d.sz > 0) : this.orcDir;
     switch (d.role) {
       case R.ARCHER: {
         let t = this.target[i];
@@ -695,8 +857,11 @@ export class Sim {
                 this.cd[i] = w.reload * (0.8 + 0.4 * this.rand()); this.fireT[i] = this.time;
                 this.rot[i] = Math.atan2(dy, dx);
                 let acc = w.acc; if (this.el[t] && !el) acc *= 0.22;
+                { const pt = this.gPin[this.grp[t]]; if (pt) acc *= pt === 2 ? 0.25 : 0.5; } // men keeping their heads down are hard to hit
+                if (this.pose[t]) acc *= this.pose[t] === 2 ? 0.6 : 0.75; // and so is a man kneeling at the parapet or lying prone
                 const hit = this.rand() < acc, zt = this.unitZ(t) + 1.2;
                 this.fx.tracer(x, y, this.unitZ(i) + 1.3, this.x[t] + (hit ? 0 : (this.rand() - 0.5) * 8), this.y[t] + (hit ? 0 : (this.rand() - 0.5) * 8), zt + (hit ? 0 : this.rand() * 2), TR.ARROW, hit ? 1 : 0);
+                this.gSup[this.grp[t]] += 0.5; // bolts rattling off the merlons keep heads down
                 if (hit) this.damage(t, w.dmg, w);
               }
               return;
@@ -712,7 +877,7 @@ export class Sim {
           }
         }
         let blk = -1;
-        if (this._flow(x, y)) blk = this._move(i, this.fdx, this.fdy, speed, 0, 0); else this._move(i, 0, 0, 0, 0, 0);
+        if (this._flow(x, y, fld)) blk = this._move(i, this.fdx, this.fdy, speed, 0, 0); else this._move(i, 0, 0, 0, 0, 0);
         if (blk >= 0 && this.lad[blk] && !el) this._startClimb(i, blk);
         return;
       }
@@ -727,7 +892,7 @@ export class Sim {
           if (this.el[t] === el) {
             if (d2 < reach * reach) {
               this.vx[i] *= 0.4; this.vy[i] *= 0.4;
-              if (this.cd[i] <= 0) {
+              if (this.cd[i] <= 0 && !shut) {
                 this.cd[i] = d.mreload * (0.85 + 0.3 * this.rand()); this.fireT[i] = this.time;
                 this.rot[i] = Math.atan2(dy, dx);
                 const xt = this.x[t], yt = this.y[t], zt = this.unitZ(t);
@@ -740,17 +905,52 @@ export class Sim {
             if (d2 < (7 + tr) * (7 + tr)) { const l = Math.sqrt(d2); dirx = dx / l; diry = dy / l; direct = true; }
           }
         }
+        if (!el && !d.sz && ((this.tick + i) & 63) === 0) {
+          // a man who has got nowhere in six seconds, with nobody to fight, has lost the way: for a while
+          // he makes straight for where his force is bound instead of following the path
+          const wx = x - this.bx[i], wy = y - this.by[i];
+          if (wx * wx + wy * wy < 4 && t < 0 && this.gPin[g] < 2 && !this.gOrder[g]) this.aux2[i] = this.tick + 90;
+          this.bx[i] = x; this.by[i] = y;
+        }
+        if (!direct && this.aux2[i] > this.tick && this.snagT[i] <= this.time) { // (unless that has just walked him to the edge of a drop)
+          const o = this._objOf(g);
+          if (o) { const wx = o.x - x, wy = o.y - y, wl = Math.sqrt(wx * wx + wy * wy); if (wl > 6) { dirx = wx / wl; diry = wy / wl; direct = true; } }
+        }
+        if (!direct && !el && this._viaDeep(g)) {
+          // at the head of the ramp from the Deep: straight at the postern door, to batter it
+          const ps = this.segs[this.map.POSTERN];
+          if (!ps.breached) { const px = ps.x - x, py = ps.y - y, pl = Math.sqrt(px * px + py * py); if (pl < 20 && pl > 0.1) { dirx = px / pl; diry = py / pl; direct = true; } }
+        }
+        if (!direct && (this._viaDeep(g) || el)) {
+          // on the wall walk by the keep: straight at the door from the wall into the court
+          const ds = this.segs[this.map.DOOR];
+          if (!ds.breached) { const px = ds.x - x, py = ds.y - y, pl = Math.sqrt(px * px + py * py); if (pl < 20 && pl > 0.1) { dirx = px / pl; diry = py / pl; direct = true; } }
+        }
+        if (!direct && d.role === R.TROLL && !el) {
+          // trolls mass on the one stretch of wall the horde means to bring down
+          const bs = this._trollSeg(g);
+          if (bs >= 0) { const sg = this.segs[bs], bx = sg.x - x, by = sg.y - y, bl = Math.sqrt(bx * bx + by * by); if (bl < 140) { dirx = bx / bl; diry = by / bl; direct = true; } }
+        }
         if (!direct) {
-          if (this._flow(x, y)) { dirx = this.fdx; diry = this.fdy; }
+          if (this._flow(x, y, fld, this.snagT[i] > this.time)) { dirx = this.fdx; diry = this.fdy; }
           else if (t >= 0 && this.alive[t]) { const dx = this.x[t] - x, dy = this.y[t] - y, l = Math.sqrt(dx * dx + dy * dy) || 1; dirx = dx / l; diry = dy / l; }
+          // somewhere his own path does not reach (inside the walls, on ground it was never laid over): make for the garrison
+          else if (fld !== this.orcDir && this._flow(x, y, this.orcDir, this.snagT[i] > this.time)) { dirx = this.fdx; diry = this.fdy; }
         }
         const blk = this._move(i, dirx, diry, speed, d.sz, 0);
+        if (blk >= 0 && !this.elev[blk] && !this.orcBlock[blk]) this.snagT[i] = this.time + 2; // the ground refused him: see the path note in _flow
+        if (blk >= 0 && this.orcBlock[blk] && this.mtype[blk] === T.DOOR && this.cd[i] <= 0 && !shut) {
+          // the door from the wall into the court
+          this.cd[i] = d.mreload * 1.2; this.fireT[i] = this.time;
+          this.fx.melee(x + dirx * 1.5, y + diry * 1.5, this.unitZ(i) + 1.2);
+          this.damageSeg(this.map.DOOR, d.sdmg || 8);
+        }
         if (blk >= 0 && this.elev[blk]) {
-          if (this.lad[blk] && !d.sz && !el) { this._startClimb(i, blk); return; }
+          if (this.lad[blk] && !d.sz && !el && !shut && !d.cav) { this._startClimb(i, blk); return; }
           if (this.cd[i] <= 0) {
             // hack at whatever masonry or timber bars the way
             const k = this.mseg[blk], s = this.segs[k];
-            const dmg = d.sdmg ? (s.maxHp > 1e8 ? 0 : d.sdmg) : (s.kind === 'gate' || s.kind === 'postern' ? 5 : 0);
+            const dmg = d.sdmg ? (s.maxHp > 1e8 ? 0 : d.sdmg) : (s.kind === 'gate' ? 5 : s.kind === 'postern' ? 8 : 0);
             if (dmg) {
               this.cd[i] = d.mreload * 1.2; this.fireT[i] = this.time;
               if (d.sdmg) { this.fx.dust(x + dirx * 3, y + diry * 3, this.unitZ(i) + 2, 4); this.fx.sound('thud', x, y, 0.7); } else this.fx.melee(x + dirx * 1.5, y + diry * 1.5, this.unitZ(i) + 1.2);
@@ -762,14 +962,16 @@ export class Sim {
       }
       case R.LADDER:
       case R.TOWER: {
-        if (st === S_DONE) { if (d.role === R.TOWER) this._towerUnload(i); return; }
+        if (st === S_DONE) { if (d.role === R.TOWER) this._towerUnload(i); else this._throwCheck(i); return; }
         const tower = d.role === R.TOWER;
         let k = this.aux2[i];
         if (st === S_ACT) {
+          if (crewed && !tower && this.crewPts[i] < d.crew.min) { this.aux[i] += DT; return; } // nobody left to heave it up
           if (this.time >= this.aux[i]) {
             const s = this.segs[k];
             if (s.breached) { this.state[i] = S_MOVE; s.claimed--; this.aux2[i] = -1; return; }
-            this.state[i] = S_DONE; s.ladders++; s.claimed--;
+            this.state[i] = S_DONE; s.ladders++; s.claimed--; this.cd2[i] = 0;
+            if (tower) this.stats.towersUp++; else this.stats.laddersUp++;
             const off = tower ? 4.6 : 2.8;
             this.x[i] = s.x + s.nx * (s.half + off); this.y[i] = s.y + s.ny * (s.half + off);
             this.px[i] = this.x[i]; this.py[i] = this.y[i];
@@ -788,10 +990,11 @@ export class Sim {
         if (k < 0 || this.segs[k].breached) {
           if (k >= 0) this.segs[k].claimed--;
           // most crews of a wave make for the stretch of wall it has been aimed at
-          const aim = this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
+          const fy = this._forceAimY(g);
+          const aim = fy >= 0 ? (i % 5 < 4 ? fy : y) : this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
           k = this._pickLadderSeg(aim); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++;
         }
-        if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, d.sz, 0); return; }
+        if (k < 0) { if (speed > 0 && this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, d.sz, 0); return; }
         const s = this.segs[k];
         const ax = s.ox + (tower ? s.nx * 2.2 : 0), ay = s.oy + (tower ? s.ny * 2.2 : 0);
         const dx = ax - x, dy = ay - y, l = Math.sqrt(dx * dx + dy * dy);
@@ -802,17 +1005,30 @@ export class Sim {
           if (tower) this._alert(null, 0, `A siege tower is closing on ${where}`, 'warn', x, y);
           else this._alert('ladIn' + this.segSector(k), 30, `Ladder crews are making for ${where}`, 'warn', x, y);
         }
-        if (l < 2.5) { this.state[i] = S_ACT; this.aux[i] = this.time + (tower ? 3 : 4); this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-s.ny, -s.nx); return; }
-        const bc = this._move(i, dx / l, dy / l, speed, d.sz, 0);
+        if (l < 2.5) {
+          if (crewed && (speed <= 0 || this.gShield[g])) { this.vx[i] = this.vy[i] = 0; return; } // set down at the foot of the wall until there are hands to raise it
+          this.state[i] = S_ACT; this.aux[i] = this.time + (tower ? 3 : 4); this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-s.ny, -s.nx); return;
+        }
+        let bc = -1;
+        if (crewed && speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; }
+        else {
+          let mx = dx / l, my = dy / l;
+          // far out, follow the path to that stretch of wall; close in, make straight for the chosen spot
+          if (!tower && l > 90) { const fl = this._sectorField(this.segSector(k), c); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
+          bc = this._move(i, mx, my, speed, d.sz, 0);
+        }
         if (tower) {
           // the crew drag anti-vehicle obstacles aside, slowly
           if (bc >= 0 && (this.ob[bc] & OB.AV) && this.rand() < 0.025) { this._clearOb(bc, OB.AV); this.fx.dust((bc % GW) * CELL + 2, ((bc / GW) | 0) * CELL + 2, this.cz[bc], 3); }
           // a tower that cannot get forward lets its company out where it stands
           if (Math.abs(this.x[i] - this.bx[i]) + Math.abs(this.y[i] - this.by[i]) > 1.5) { this.bx[i] = this.x[i]; this.by[i] = this.y[i]; this.linkT[i] = this.time; }
-          else if (this.time - this.linkT[i] > 9) {
-            this._alert(null, 0, 'A siege tower is stuck — its company dismounts', 'good', x, y);
-            this.fx.death(this.type[i], x, y, this.map.groundZ(x, y), this.rot[i], NaN, 0, 0);
-            this.kill(i, null, true);
+          else if (this.time - this.linkT[i] > (crewed ? 40 : 9)) {
+            if (crewed && speed <= 0) { if (this.ammo[i] >= 1) { this._alert(null, 0, 'A siege tower stands abandoned — its company climbs down', 'good', x, y); this._towerSpill(i); } this.linkT[i] = this.time; }
+            else {
+              this._alert(null, 0, 'A siege tower is stuck — its company dismounts', 'good', x, y);
+              this.fx.death(this.type[i], x, y, this.map.groundZ(x, y), this.rot[i], NaN, 0, 0);
+              this.kill(i, null, true);
+            }
           }
         }
         return;
@@ -820,8 +1036,8 @@ export class Sim {
       case R.RAM: {
         const gseg = this.segs[this.map.GATE];
         if (this.gateDir[c] !== 255) this.linkT[i] = this.time;
-        if (gseg.breached || this.time - this.linkT[i] > 12) {
-          for (let k = 0; k < 8; k++) { const j = this.spawn(U.uruk, x + (this.rand() - 0.5) * 6, y + (this.rand() - 0.5) * 6, this.rot[i], g); if (j >= 0) this.state[j] = S_MOVE; }
+        if (gseg.breached || (!crewed && this.time - this.linkT[i] > 12)) {
+          if (!crewed) for (let k = 0; k < 8; k++) { const j = this.spawn(U.uruk, x + (this.rand() - 0.5) * 6, y + (this.rand() - 0.5) * 6, this.rot[i], g); if (j >= 0) this.state[j] = S_MOVE; }
           this.kill(i, null, true);
           return;
         }
@@ -830,14 +1046,15 @@ export class Sim {
         if (l < 5.5) {
           this.linkT[i] = this.time;
           this.vx[i] = this.vy[i] = 0; this.rot[i] = Math.atan2(-gseg.ny, -gseg.nx);
-          if (this.cd[i] <= 0) {
-            this.cd[i] = 2.5; this.fireT[i] = this.time;
+          if (this.cd[i] <= 0 && !(crewed && this.crewPts[i] < d.crew.min)) {
+            this.cd[i] = crewed ? 2.5 * d.crew.need / Math.min(d.crew.need, this.crewPts[i]) : 2.5; this.fireT[i] = this.time;
             this.fx.dust(gseg.ox - gseg.nx * 3, gseg.oy - gseg.ny * 3, this.cz[c] + 2, 4); this.fx.sound('ram', gseg.ox, gseg.oy, 1);
             this.damageSeg(this.map.GATE, d.sdmg);
           }
           return;
         }
         const k = this.gateDir[c];
+        if (crewed && speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
         if (k !== 255 && l > 10) this._move(i, DXN[k], DYN[k], speed, 2, 0); else this._move(i, dx / l, dy / l, speed, 2, 0);
         return;
       }
@@ -848,36 +1065,54 @@ export class Sim {
           if (this.time >= this.aux[i]) this._detonate(i, k);
           return;
         }
-        if (k < 0 || this.segs[k].breached) {
-          const cu = this.segs[this.map.CULVERT];
-          k = !cu.breached ? this.map.CULVERT : this._pickLadderSeg(y, true);
+        // with the Deeping Wall given up there is nothing to gain by breaching it: the charge goes to the keep,
+        // round through the Deep: the culvert first, then the postern, then the gate
+        const cu = this.segs[this.map.CULVERT], G = this.map.GATE, P = this.map.POSTERN;
+        let keepK = -1;
+        if (this.wl.abandoned) {
+          keepK = !cu.breached ? this.map.CULVERT : !this.segs[P].breached ? P : !this.segs[G].breached ? G : -1;
+        }
+        if (k < 0 || this.segs[k].breached || (keepK >= 0 && k !== keepK)) {
+          k = keepK >= 0 ? keepK : !cu.breached ? this.map.CULVERT : this._pickLadderSeg(y, true);
           this.aux2[i] = k;
         }
         if (k < 0) { if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, 0, 0); return; }
-        const s = this.segs[k];
-        const dx = s.ox - x, dy = s.oy - y, l = Math.sqrt(dx * dx + dy * dy);
-        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
+        const s = this.segs[k], at = k === P ? this._postFoot() : null; // (the postern is reached up the ramp from the Deep)
+        const dx = (at ? at.x : s.ox) - x, dy = (at ? at.y : s.oy) - y, l = Math.sqrt(dx * dx + dy * dy);
+        if (l < 160 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('sapIn', 25, s.culvert ? 'Sappers are running for the culvert' : k === this.map.POSTERN ? 'Sappers are running for the postern' : `Sappers are running for ${this.sectors[this.segSector(k)].name}`, 'bad', x, y); }
         if (l < 3) { this.state[i] = S_ACT; this.aux[i] = this.time + 1.6; this.vx[i] = this.vy[i] = 0; this.fx.sound('fuse', x, y, 0.8); return; }
         if ((this.tick + i) % 6 === 0) this.fx.spark(x, y, this.unitZ(i) + 1.5);
-        this._move(i, dx / l, dy / l, speed, 0, 0);
+        let mx = dx / l, my = dy / l;
+        if (l > 60) { const fl = k === this.map.GATE ? this.gateDir : k === this.map.POSTERN ? this._posternField(c) : s.culvert ? this._culvertField() : this._sectorField(this.segSector(k), c); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
+        // he keeps to the pace of the ranks around him, then breaks from them and sprints
+        speed = l > 110 ? Math.min(speed, 4.8) : speed * 1.15;
+        this._move(i, mx, my, speed, 0, 0, l <= 110);
         return;
       }
       case R.CATAPULT: {
         const w = d.wdef;
         if (st === S_ACT) {
           if (this.cd[i] > 0) return;
+          if (crewed && this.crewPts[i] < d.crew.min) return; // nobody to wind it
           if (!this._catTarget(i, w)) { this.state[i] = S_MOVE; return; }
-          this.cd[i] = w.reload * (0.9 + 0.2 * this.rand()); this.fireT[i] = this.time;
+          this.cd[i] = w.reload * (0.9 + 0.2 * this.rand()) * (crewed ? d.crew.need / Math.min(d.crew.need, this.crewPts[i]) : 1); this.fireT[i] = this.time;
           const tx = this.tx[i] + (this.rand() - 0.5) * 2 * w.scatter, ty = this.ty[i] + (this.rand() - 0.5) * 2 * w.scatter;
           this.rot[i] = Math.atan2(ty - y, tx - x);
           this._launch(x, y, this.cz[c] + 3, tx, ty, this.surfZ(tx, ty), w, ORC, 3, w.flight);
           this.fx.sound('catapult', x, y, 0.7);
           // the alert points at the engine, not at where its rocks land: that is the thing to strike
           const sec = this.sectorAt(tx, ty);
-          this._alert('catFire' + sec, 75, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
+          this._alert('catFire' + sec, 240, `Catapults are bombarding ${this.sectors[sec].name}`, 'warn', x, y);
           return;
         }
         if ((this.tick + i) % 10 === 0 && this._catTarget(i, w)) { this.state[i] = S_ACT; this.vx[i] = this.vy[i] = 0; this.cd[i] = 2 + this.rand() * 3; return; }
+        if (crewed && speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
+        if (this.catWary) {
+          // rockets have found one of them: the rest keep beyond their reach
+          const fd = this._fortDist(x, y);
+          if (fd < 392) { this._move(i, -1, 0, speed, 2, 0); return; }
+          if (fd < 402) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
+        }
         if (this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, 2, 0);
         return;
       }
@@ -906,6 +1141,7 @@ export class Sim {
   }
 
   _pickLadderSeg(y, any) {
+    // (an empty wall is still worth a ladder: it is the quickest way into the Deep, and on to the back doors of the keep)
     let best = -1, bs = 1e9;
     for (let tries = 0; tries < 6; tries++) {
       const k = (this.rand() * this.map.GATE) | 0;
@@ -927,10 +1163,25 @@ export class Sim {
   _catTarget(i, w) {
     const x = this.x[i], y = this.y[i];
     const b = this.defBox;
-    if (x < b[0] - w.range || x > b[2] + w.range) return false;
+    const range = w.range * 1.05, wary = this.catWary;
+    if (x < b[0] - range || x > b[2] + range) return false;
+    if (wary && this._fortDist(x, y) < 390) return false; // inside rocket reach: pull back before shooting again
+    {
+      const m = i % 3;
+      if (m === 1 && this.wl.breachSeg >= 0) {
+        // battering mission: the stretch of wall the trolls are working on
+        const sg = this.segs[this.wl.breachSeg], dx = sg.x - x, dy = sg.y - y, d2 = dx * dx + dy * dy;
+        if (!sg.breached && d2 <= range * range && d2 >= w.min * w.min) { this.tx[i] = sg.x; this.ty[i] = sg.y; return true; }
+      } else if (m === 2 && this.caches.length && this.rand() < 0.4) {
+        // the garrison's ammunition
+        let best = -1, bd = range * range;
+        for (const ci of this.caches) { if (!this.alive[ci]) continue; const dx = this.x[ci] - x, dy = this.y[ci] - y, d2 = dx * dx + dy * dy; if (d2 < bd && d2 >= w.min * w.min) { bd = d2; best = ci; } }
+        if (best >= 0) { this.tx[i] = this.x[best]; this.ty[i] = this.y[best]; this._alert('catAmmo', 90, 'Catapults are ranging on an ammunition point', 'warn', this.tx[i], this.ty[i]); return true; }
+      }
+    }
     // counter-battery: every other catapult hunts the mortars and guns that keep firing from one place
     if ((i & 1) === 0 && this.hotList.length) {
-      const r2c = w.range * w.range, m2c = w.min * w.min;
+      const r2c = range * range, m2c = w.min * w.min;
       let bestH = -1, bd = 1e12;
       for (const c of this.hotList) {
         const dx = (c % OW) * OCS + 8 - x, dy = ((c / OW) | 0) * OCS + 8 - y, d2 = dx * dx + dy * dy;
@@ -941,18 +1192,21 @@ export class Sim {
         this._alert('cbat', 45, 'Catapults are ranging on your mortars — move them, hold them (T), or kill the catapults', 'warn', this.tx[i], this.ty[i]);
         return true;
       }
-      if (x < b[0] - 150) return false; // keep rolling forward until the guns are in reach
+      if (x < b[0] - 150 && !wary) return false; // keep rolling forward until the guns are in reach
     }
-    const x0 = Math.max(0, ((x - w.range) / DCS) | 0), x1 = Math.min(DW - 1, ((x + w.range) / DCS) | 0);
-    const y0 = Math.max(0, ((y - w.range) / DCS) | 0), y1 = Math.min(DH - 1, ((y + w.range) / DCS) | 0);
-    const r2 = w.range * w.range, m2 = w.min * w.min;
+    const x0 = Math.max(0, ((x - range) / DCS) | 0), x1 = Math.min(DW - 1, ((x + range) / DCS) | 0);
+    const y0 = Math.max(0, ((y - range) / DCS) | 0), y1 = Math.min(DH - 1, ((y + range) / DCS) | 0);
+    const r2 = range * range, m2 = w.min * w.min;
+    // a pinning mission favours the sector the escalade is going in against
+    const aimY = i % 3 !== 1 ? this.wl.mainY : -1;
     let best = -1, bs = 0;
     for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) {
       const n = this.dcCount[yy * DW + xx];
       if (!n) continue;
       const dx = xx * DCS + 4 - x, dy = yy * DCS + 4 - y, d2 = dx * dx + dy * dy;
       if (d2 > r2 || d2 < m2) continue;
-      const sc = (n + 1) * (0.4 + this.rand());
+      let sc = (n + 1) * (0.4 + this.rand());
+      if (aimY >= 0 && Math.abs(yy * DCS + 4 - aimY) < 70) sc *= 1.25;
       if (sc > bs) { bs = sc; best = yy * DW + xx; }
     }
     if (best < 0) return false;
@@ -963,6 +1217,12 @@ export class Sim {
   _detonate(i, k) {
     this.kill(i, null, true);
     const s = this.segs[k];
+    if (s.kind === 'gate' || s.kind === 'postern') {
+      // the gate facing the valley is built to take six charges; the postern goes at the first
+      this.explode(s.ox, s.oy, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
+      this.damageSeg(k, s.kind === 'gate' ? GATE_HP / 6 : 2600);
+      return;
+    }
     const fresh = !s.breached;
     for (let j = k - 1; j <= k + 1; j++) { const q = this.segs[j]; if (q && q.kind === 'wall') this.breachSeg(j, j !== k); }
     this.explode(s.x, s.y, W.blast.aoe, W.blast.dmg, W.blast, ORC, true);
@@ -976,16 +1236,18 @@ export class Sim {
     s.hp -= dmg;
     if (s.hp <= 0) {
       this.breachSeg(k);
-      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
+      const txt = s.kind === 'gate' ? 'The Hornburg gate has fallen!' : s.kind === 'postern' ? 'The postern door is broken!' : s.kind === 'door' ? 'The door from the wall into the keep is broken!' : `A section of ${this.sectors[this.segSector(k)].name} has collapsed!`;
       this._alert(null, 0, txt, 'bad', s.x, s.y, true, s.kind === 'gate');
       return;
     }
     // warn while there is still something to be done about it
     const now = s.hp / s.maxHp;
-    if (s.kind === 'gate' || s.kind === 'postern') {
-      const what = s.kind === 'gate' ? 'The gate' : 'The postern door';
-      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, true);
-      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, true);
+    if (s.kind === 'gate' || s.kind === 'postern' || s.kind === 'door') {
+      const what = s.kind === 'gate' ? 'The gate' : s.kind === 'postern' ? 'The postern door' : 'The door from the wall';
+      // (the light doors at the back go from splintering to broken in seconds: their warnings go to the log, not the banner)
+      const loud = s.kind === 'gate';
+      if (before > 0.5 && now <= 0.5) this._alert(null, 0, `${what} is splintering — half its strength is gone`, 'bad', s.x, s.y, loud);
+      else if (before > 0.25 && now <= 0.25) this._alert(null, 0, `${what} is about to give way`, 'bad', s.x, s.y, loud);
       else if (before >= 1) this._alert(null, 0, `${what} is under attack`, 'warn', s.x, s.y);
     } else if (before > 0.5 && now <= 0.5) this._alert('wallHp' + this.segSector(k), 30, `${this.sectors[this.segSector(k)].name.replace(/^t/, 'T')} is being battered down`, 'warn', s.x, s.y);
   }
@@ -994,6 +1256,7 @@ export class Sim {
     const s = this.segs[k];
     if (s.breached) return;
     s.breached = true; s.hp = 0; s.ladders = 0;
+    if (s.kind === 'door') for (let c = 0, n = GW * GH; c < n; c++) if (this.mtype[c] === T.DOOR) this.orcBlock[c] = 0; // the arch stands open
     this._syncWalls();
     this.navDirty = true; this.gateDirty = true; this.structVersion++; this.stats.breaches++;
     this.fx.breach(s, quiet);
@@ -1013,9 +1276,13 @@ export class Sim {
     const c = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
     const eg = this.elevD[c], el = eg ? 1 : 0;
     this.el[i] = el;
+    const lanes = d.cls === C.INF;
     if (this.state[i] === S_MOVE) {
       const dx = this.tx[i] - x, dy = this.ty[i] - y, d2 = dx * dx + dy * dy;
+      // a man lying or kneeling takes a moment to get up before he goes anywhere
+      if (this.pose[i]) { this.linkT[i] = this.time + (this.pose[i] === 2 ? 1 : 0.5); this.pose[i] = 0; }
       if (d2 < 1 || this.time > this.aux[i]) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; }
+      else if (lanes && this.time < this.linkT[i]) { this.vx[i] = this.vy[i] = 0; }
       else {
         let dirx, diry;
         const l = Math.sqrt(d2);
@@ -1040,10 +1307,17 @@ export class Sim {
       if (d.cls !== C.VEH) { if (this.cd[i] > 0) this.cd[i] -= DT; return; }
     }
     const g = this.grp[i];
-    const slow = this.gState[g] >= 1 || this.gConf[g] > this.time ? 0.6 : 1;
+    let slow = this.gState[g] >= 1 || this.gConf[g] > this.time ? 0.6 : 1;
+    if (this.gPin[g]) slow *= this.gPin[g] === 2 ? 0.45 : 0.75; // heads down under volleys and rocks
     const w = d.wdef;
+    if (lanes && (this.tick + i) % 5 === 0) this._post(i, d, x, y, eg, c);
     if (this.cd[i] > 0) this.cd[i] -= DT * slow;
-    else if (this.ammo[i] >= 1) this._fire(i, d, w, 0, eg, x, y, c);
+    else if (this.ammo[i] >= 1) {
+      // nobody shoots through the men in front of him: without a line of fire he goes looking for one
+      // (grenades and mortar bombs go over their heads)
+      if (lanes && this.rank[i] > 2 && !w.arc && w.key !== 'gl') { this.cd[i] = 0.4; if (this.time >= this.seekT[i] && x - this.orcMaxX < w.range * 1.5) this._seek(i, d, x, y, eg, c); }
+      else this._fire(i, d, w, 0, eg, x, y, c);
+    }
     else if (d.cls === C.INF) this._bayonet(i, x, y);
     if (d.w2def) {
       if (this.cd2[i] > 0) this.cd2[i] -= DT * slow;
@@ -1108,9 +1382,12 @@ export class Sim {
     // holding fire to a set distance shortens the reach but not the accuracy curve: close shots hit far more often
     const reach = hold > 0 && hold < range ? Math.max(hold, (w.min || 0) + 15) : range;
     let t = tA[i], dx = 0, dy = 0, d2 = 0, ok = false;
+    // on a wall he covers the ground before him, not along it
+    this._arcOn = !!eg;
+    if (this._arcOn) { const sg = this.segs[this.mseg[c]]; this._anx = sg.nx; this._any = sg.ny; }
     if (t >= 0 && this.alive[t] && this.team[t] === ORC) {
       dx = this.x[t] - x; dy = this.y[t] - y; d2 = dx * dx + dy * dy;
-      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0);
+      ok = d2 <= reach * reach && d2 >= (w.min || 0) * (w.min || 0) && this._arc(t, dx, dy, d2);
     }
     if (!ok) {
       t = this._acquireDirect(i, w, reach, eg, x, y);
@@ -1124,6 +1401,7 @@ export class Sim {
     if (slot) this.ammo2[i]--; else this.ammo[i]--;
     cdA[i] = w.reload * (0.85 + 0.3 * this.rand());
     this.fireT[i] = this.time; this.stats.shots++;
+    this.wl.heat[this.sectorAt(x, y)]++; // the horde listens to where the firing comes from
     const mr = d.rad + (d.cls === C.VEH ? 2.5 : 0.7);
     const mx = x + Math.cos(ang) * mr, my = y + Math.sin(ang) * mr;
     this.fx.muzzle(mx, my, z0, ang, w.flash, 0);
@@ -1147,21 +1425,52 @@ export class Sim {
         if (this.cover[c2] | this.dyn[c2] | this.cover[tc]) acc *= el ? 0.7 : 0.5;
       }
     }
-    if (w.sup) this.gSup[this.grp[t]] += w.sup; // near misses keep heads down too
+    if (w.sup) this.gSup[this.grp[t]] += this.gShield[this.grp[t]] ? w.sup * 0.5 : w.sup; // near misses keep heads down too (less so behind shields)
+    const pinD = this.gPin[this.grp[i]];
+    if (pinD) acc *= pinD === 2 ? 0.7 : 0.85;
+    const ce = this.crewOf[t];
+    if (el && ce >= 0 && this.gen[ce] === this.crewGen[t] && this.alive[ce]) { const cr = UNITS[this.type[ce]].crew; if (cr && cr.roof) acc *= 0.45; } // under the ram's roof
     const hit = this.rand() < acc;
-    if (hit) this.damage(t, w.dmg, w);
+    if (hit) this._bullet(td.cmd ? this._guard(t) : t, w, x, y);
     else if (this.rand() < 0.3) {
       // a miss into a packed formation still finds somebody
       const oc = ((yt / OCS) | 0) * OW + ((xt / OCS) | 0);
       const j = this.ocHead[oc];
-      if (j >= 0 && j !== t && this.ocCount[oc] > 12) this.damage(j, w.dmg, w);
+      if (j >= 0 && j !== t && this.ocCount[oc] > 12) this._bullet(j, w, x, y);
     }
-    if (w.multi && this.rand() < w.multi) { const j = this.cnext[t]; if (j >= 0 && this.alive[j] && this.team[j] === ORC) this.damage(j, w.dmg, w); }
+    if (w.multi && this.rand() < w.multi) { const j = this.cnext[t]; if (j >= 0 && this.alive[j] && this.team[j] === ORC) this._bullet(j, w, x, y); }
     if (hit) this.fx.tracer(mx, my, z0, xt, yt, zt, w.tracer, 1);
     else {
       const ex = xt + (dx / dist) * 22 + (this.rand() - 0.5) * 5, ey = yt + (dy / dist) * 22 + (this.rand() - 0.5) * 5;
       this.fx.tracer(mx, my, z0, ex, ey, this.surfZ(ex, ey), w.tracer, 0);
     }
+  }
+
+  /** A bullet arriving at attacker t from sx,sy: locked shields and pavises stop most of what comes from the front. */
+  _bullet(t, w, sx, sy) {
+    const g = this.grp[t];
+    let p = 0;
+    if (this.gShield[g]) p = this.crewOf[t] < 0 ? 0.7 : 0.45;                                    // carriers have their hands full: only their neighbours' shields cover them
+    else if (this.type[t] === U.archer && this.time - this.fireT[t] < 6 && !this.el[t]) p = 0.5;  // a pavise, once he has halted to shoot
+    if (p && !(this.ob[((this.y[t] / CELL) | 0) * GW + ((this.x[t] / CELL) | 0)] & OB.WIRE)) {
+      const dx = sx - this.x[t], dy = sy - this.y[t], r = this.rot[t];
+      if (Math.cos(r) * dx + Math.sin(r) * dy > 0.17 * Math.sqrt(dx * dx + dy * dy) && this.rand() < p) { this.stats.blocked++; return; }
+    }
+    this.damage(t, w.dmg, w);
+  }
+
+  /** Who takes a shot aimed at captain t: usually one of the company pressed around him. */
+  _guard(t) {
+    const x = this.x[t], y = this.y[t], el = this.el[t];
+    const fx = (x / FINE) | 0, fy = (y / FINE) | 0;
+    let n = 0, pick = -1;
+    for (let cy = Math.max(0, fy - 3); cy <= Math.min(FH - 1, fy + 3); cy++) for (let cx = Math.max(0, fx - 3); cx <= Math.min(FW - 1, fx + 3); cx++) {
+      for (let j = this.head[cy * FW + cx]; j >= 0; j = this.next[j]) {
+        if (j === t || this.team[j] !== ORC || this.el[j] !== el || this.rad[j] > 1 || UNITS[this.type[j]].cmd) continue;
+        n++; if (pick < 0 || ((n * 7 + this.tick) & 3) === 0) pick = j;
+      }
+    }
+    return n && this.rand() < Math.min(0.85, n * 0.085) ? pick : t;
   }
 
   _randOrcInCell(c) {
@@ -1196,13 +1505,14 @@ export class Sim {
           let best = -1, bs = 1e18;
           for (let k = 0; k < hv.length; k++) {
             const j = hv[k];
-            if (!this.alive[j] || !(UNITS[this.type[j]].hvt & w.pref)) continue;
+            if (!this.alive[j] || !((UNITS[this.type[j]].hvt || (this.crewOf[j] >= 0 ? 1 : 0)) & w.pref)) continue;
+            if (UNITS[this.type[j]].crew && w.kind === K.BULLET) continue;
             const fx = this.x[j] - f.x, fy = this.y[j] - f.y;
             if (fx * fx + fy * fy > f2) continue;
             const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
             if (e2 > r2 || e2 < m2) continue;
             const sc = e2 * (0.5 + this.rand());
-            if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+            if (sc < bs && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
           }
           if (best >= 0) return best;
         }
@@ -1210,7 +1520,7 @@ export class Sim {
           const j = this._randOrcNear(f.x, f.y, f.r);
           if (j < 0) break;
           const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
-          if (e2 <= r2 && e2 >= m2 && (!w.prefOnly || (UNITS[this.type[j]].hvt & w.pref)) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) return j;
+          if (e2 <= r2 && e2 >= m2 && (!w.prefOnly || (UNITS[this.type[j]].hvt & w.pref)) && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) return j;
         }
       }
     }
@@ -1221,11 +1531,14 @@ export class Sim {
         const j = hv[k];
         if (!this.alive[j]) continue;
         const td = UNITS[this.type[j]];
-        if (!(td.hvt & w.pref)) continue;
+        const carrier = !td.hvt && this.crewOf[j] >= 0;
+        if (!((carrier ? 1 : td.hvt) & w.pref)) continue;
+        if (td.crew && w.kind === K.BULLET) continue; // bullets do nothing to the timber
         const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
         if (e2 > r2 || e2 < m2) continue;
-        const sc = e2 * (0.5 + this.rand()) * (td.pri || 1);
-        if (sc < bs && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
+        if (td.cmd && e2 > 22500) continue;        // a captain is not picked out of the host unless close or marked
+        const sc = e2 * (0.5 + this.rand()) * (carrier ? 1.2 : td.pri || 1);
+        if (sc < bs && this._arc(j, ex, ey, e2) && (el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) { bs = sc; best = j; }
       }
       if (best >= 0 || w.prefOnly) return best;
     }
@@ -1250,9 +1563,13 @@ export class Sim {
       if (j < 0) continue;
       const ex = this.x[j] - x, ey = this.y[j] - y, e2 = ex * ex + ey * ey;
       if (e2 > r2 || e2 < m2) continue;
-      if (!(el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) continue;
+      if (!this._arc(j, ex, ey, e2) || !(el || this.el[j] || this._los(x, y, this.x[j], this.y[j]))) continue;
       // prefer targets that are not tucked in under one's own wall
       if (eg && !w.speed && this.deadG[((this.y[j] / CELL) | 0) * GW + ((this.x[j] / CELL) | 0)] === eg && this.state[j] !== S_CLIMB) { fallback = j; continue; }
+      if (e2 > 22500 && !f && UNITS[this.type[j]].cmd) continue; // a captain is not picked out of the host at long range
+      // and ones that are not behind locked shields: at long range rifles hold their fire rather than waste it on a
+      // shield wall (machine guns keep it pinned, and a focus-fire order overrides this)
+      if (!w.speed && this.gShield[this.grp[j]] && this.crewOf[j] < 0) { if (fallback < 0 && (e2 < 14400 || w.sup >= 1 || f)) fallback = j; continue; }
       return j;
     }
     return fallback;
@@ -1268,6 +1585,16 @@ export class Sim {
         this.tx[i] = f.x + Math.cos(a) * rr; this.ty[i] = f.y + Math.sin(a) * rr;
         return true;
       }
+    }
+    if (this.rand() < (w.aoe > 8 ? 0.6 : 0.2)) {
+      // counter-battery: the guns, and now and then the mortars, answer a catapult that has just loosed
+      let best = -1, bd = r2;
+      for (const e of this.engines) {
+        if (!this.alive[e] || this.type[e] !== U.catapult || this.time - this.fireT[e] > 25) continue;
+        const dx = this.x[e] - x, dy = this.y[e] - y, d2 = dx * dx + dy * dy;
+        if (d2 < bd && d2 >= m2) { bd = d2; best = e; }
+      }
+      if (best >= 0) { this.tx[i] = this.x[best]; this.ty[i] = this.y[best]; return true; }
     }
     const x0 = Math.max(0, ((x - w.range) / OCS) | 0), x1 = Math.min(OW - 1, ((x + w.range) / OCS) | 0);
     const y0 = Math.max(0, ((y - w.range) / OCS) | 0), y1 = Math.min(OH - 1, ((y + w.range) / OCS) | 0);
@@ -1320,6 +1647,7 @@ export class Sim {
     const x0 = Math.max(0, ((x - r) / FINE) | 0), x1 = Math.min(FW - 1, ((x + r) / FINE) | 0);
     const y0 = Math.max(0, ((y - r) / FINE) | 0), y1 = Math.min(FH - 1, ((y + r) / FINE) | 0);
     const r2 = r * r, enemy = team === DEF ? ORC : DEF, sup = team === DEF ? w.sup || 0 : 0;
+    const supD = team === ORC && w === W.rock ? 1.5 : 0, lightHE = r < 5 && team === DEF;
     const high = this.elev[this.map.cellOf(x, y)] ? 1 : 0;
     this._bx = x; this._by = y; this._bp = r;
     for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
@@ -1328,11 +1656,13 @@ export class Sim {
         const dx = this.x[j] - x, dy = this.y[j] - y, d2 = dx * dx + dy * dy;
         if (d2 >= r2) continue;
         if (sup && this.team[j] === ORC) this.gSup[this.grp[j]] += sup;
+        if (w === W.blast && this.type[j] === U.sapper) continue; // a charge going off does not set off the next man's
+        if (supD && this.team[j] === DEF) this.gSup[this.grp[j]] += supD;
         // fragmentation is patchy: small targets are either caught or spared, big ones soak the blast
         const f = 1 - Math.sqrt(d2) / r;
         let dm;
         if (this.rad[j] > 1) dm = dmg * (0.25 + 0.75 * f);
-        else if (this.rand() < f * f * 1.15) dm = dmg * (0.6 + 0.4 * f);
+        else if (this.rand() < f * f * 1.15) { dm = dmg * (0.6 + 0.4 * f); if (lightHE && this.gShield[this.grp[j]] && this.team[j] === ORC && this.rand() < 0.25) continue; } // locked shields stop some of the splinters of a small burst
         else continue;
         // a wall between the burst and the target takes most of it
         if (this.el[j] !== high && this.state[j] !== S_CLIMB && r < 15) dm *= 0.35;
@@ -1437,7 +1767,7 @@ export class Sim {
         // keep the whole block on the level that was clicked (all on the wall walk, or all on the ground)
         if (this.mtype[pc] === T.CLIFF || this.elevD[pc] !== te || (isVeh && (this.mtype[pc] === T.STAIR || (this.ob[pc] & OB.AV)))) continue;
         const i = list[k++];
-        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1;
+        this.tx[i] = px; this.ty[i] = py; this.state[i] = S_MOVE; this.ord[i] = fi; this.target[i] = -1; this.ax[i] = px; this.ay[i] = py;
         this.aux[i] = this.time + 30 + Math.hypot(px - this.x[i], py - this.y[i]) / UNITS[this.type[i]].speed * 4;
         any = true;
       }
@@ -1460,6 +1790,8 @@ export class Sim {
       this._keepField = { t: this.time, court: this._orderField(KEEP.cx - 24, KEEP.cy - 34, false, 6), ring: this._orderField(ring, 0, false, 6) };
     }
     const kf = this._keepField, slots = this.map.keepSlots;
+    // the court runs round the inner rock: one path field for each twelfth of it, so that a man is led round the rock to his own place
+    const sect = this._keepSectors(), rk = KEEP.t1;
     let s = this._slotCursor || 0;
     for (const [, i] of list) {
       let slot = null;
@@ -1471,12 +1803,38 @@ export class Sim {
         if (!occ) slot = q;
       }
       if (!slot) slot = { x: KEEP.cx - 30 + (this.rand() - 0.5) * 40, y: KEEP.cy - 34 + (this.rand() - 0.5) * 30 };
-      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1;
+      this.tx[i] = slot.x; this.ty[i] = slot.y; this.state[i] = S_MOVE; this.target[i] = -1; this.ax[i] = slot.x; this.ay[i] = slot.y;
       this.ord[i] = this.elev[this.map.cellOf(slot.x, slot.y)] === 2 ? kf.ring : kf.court;
+      if (sect && this.ord[i] === kf.court) { const o = sect[(((Math.atan2(slot.y - rk.y, slot.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0]; if (o >= 0) this.ord[i] = o; }
       this.aux[i] = this.time + 40 + Math.hypot(slot.x - this.x[i], slot.y - this.y[i]) / UNITS[this.type[i]].speed * 4;
     }
     this._slotCursor = s % slots.length;
     return list.length;
+  }
+
+  /** Path fields into each twelfth of the Hornburg's court (by bearing from the inner rock). Built once: the rock does not move. */
+  _keepSectors() {
+    if (this._keepSect) return this._keepSect;
+    const lists = []; for (let k = 0; k < 12; k++) lists.push([]);
+    const rk = KEEP.t1, seen = new Uint8Array(GW * GH);
+    for (const q of this.map.keepSlots) {
+      const c = this.map.cellOf(q.x, q.y);
+      if (seen[c] || this.elev[c] === 2) continue;
+      seen[c] = 1; lists[(((Math.atan2(q.y - rk.y, q.x - rk.x) + Math.PI) / (2 * Math.PI)) * 12) % 12 | 0].push(c);
+    }
+    const cost = new Uint16Array(GW * GH), mt = this.mtype;
+    for (let c = 0; c < cost.length; c++) cost[c] = mt[c] === T.CLIFF ? 0 : 10;
+    const out = [];
+    for (let k = 0; k < 12; k++) {
+      const src = lists[k];
+      if (!src.length) { out.push(-1); continue; }
+      for (let q = 0; q < src.length; q++) this.srcBuf[q] = src[q];
+      const dir = new Uint8Array(GW * GH);
+      this.solver.solve(cost, this.srcBuf, src.length, dir, this.navDef);
+      this.orders[40 + k] = { dir, x: src, y: 0, r: 6 }; // (beyond the pool of order paths, which is recycled)
+      out.push(40 + k);
+    }
+    return (this._keepSect = out);
   }
 
   /**
@@ -1612,4 +1970,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods);

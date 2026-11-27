@@ -7,7 +7,7 @@
 // abandon their post for the Hornburg. Killing a commander shocks and confuses every
 // company around him.
 
-import { ORC, UNITS, C } from '../config.js';
+import { ORC, UNITS, C, CAPTAIN_REACH } from '../config.js';
 import { KEEP } from '../map.js';
 
 const MAXG = 4096;
@@ -27,6 +27,12 @@ export const moraleMethods = {
     this._gsx = new Float64Array(MAXG); this._gsy = new Float64Array(MAXG); this._gn = new Int32Array(MAXG);
     this.hadCmd = [false, false];
     this._moraleLogT = [0, 0];
+    // what each company is, and what the warlord has told it to do
+    this.gType = new Uint8Array(MAXG); this.gWave = new Uint8Array(MAXG);
+    this.gForce = new Int16Array(MAXG).fill(-1); this.gOrder = new Uint8Array(MAXG); this.gHoldX = new Float32Array(MAXG);
+    this.gField = new Uint8Array(MAXG);
+    this.gShield = new Uint8Array(MAXG); this.gShieldT = new Float32Array(MAXG); this.gOpen = new Uint8Array(MAXG); this.gPinRun = new Uint16Array(MAXG); this.gCapX = new Float32Array(MAXG).fill(1e9);
+    this.gRallyX = new Float32Array(MAXG).fill(-1); this.gRallyY = new Float32Array(MAXG);
   },
 
   /** Register a new company. Exempt groups (vehicles, siege engines, lone specialists) never break. */
@@ -34,6 +40,7 @@ export const moraleMethods = {
     const g = this.ng < MAXG - 1 ? this.ng++ : MAXG - 1;
     this.gTeam[g] = team; this.gExempt[g] = exempt ? 1 : 0; this.gState[g] = G_OK; this.gMorale[g] = 100;
     this.gSup[g] = 0; this.gPin[g] = 0; this.gFearless[g] = 0;
+    this.gForce[g] = -1; this.gOrder[g] = 0; this.gField[g] = 0; this.gShield[g] = 0; this.gShieldT[g] = 0; this.gOpen[g] = 0; this.gCapX[g] = 1e9; this.gRallyX[g] = -1;
     return g;
   },
 
@@ -61,10 +68,25 @@ export const moraleMethods = {
         const s = (this.gSup[g] *= SUP_FADE);
         sup = this.gExempt[g] || this.gFearless[g] ? 0 : Math.min(2.5, s / Math.max(8, cnt));
         this.gPin[g] = sup >= 1.2 ? 2 : sup >= 0.5 ? 1 : 0;
+      } else if (!this.gExempt[g]) {
+        // volleys and rocks pin the platoons they land on: a slower, wilder fire, but never a loss of nerve
+        let lvl = (this.gSup[g] *= SUP_FADE) / Math.max(6, cnt);
+        if (lvl > 0.3) for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { lvl *= 0.6; break; } }
+        let pin = lvl >= 1.0 ? 2 : lvl >= 0.4 ? 1 : 0;
+        // men pinned flat for the best part of a minute get their heads up again for a while, whatever is coming over
+        if (pin === 2) { if (++this.gPinRun[g] > 90) { pin = 1; if (this.gPinRun[g] > 140) this.gPinRun[g] = 0; } } else if (this.gPinRun[g] > 0) this.gPinRun[g]--;
+        if (pin === 2) { this.stats.pinnedDef += cnt * 0.5; if (this.gPin[g] < 2) this._alert('pinD' + this.sectorAt(cx, cy), 60, `Platoons on ${this.sectors[this.sectorAt(cx, cy)].name} are pinned down by volleys`, 'warn', cx, cy); }
+        this.gPin[g] = pin;
+        if (this.gSup[g] > 9 * Math.max(6, cnt)) this.gSup[g] = 9 * Math.max(6, cnt);
       }
       if (this.gExempt[g] || !on) continue;
       let insp = 0;
-      for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { insp = 1; break; } }
+      if (team === ORC) {
+        // the nearest living captain: he steadies the company, and it is to him that it falls back if it breaks
+        let bd = 1e12, bi = -1;
+        for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const dx = this.x[ci] - cx, dy = this.y[ci] - cy, d2 = dx * dx + dy * dy; if (d2 < bd) { bd = d2; bi = ci; } }
+        if (bi >= 0) { const r = UNITS[this.type[bi]].aura * CAPTAIN_REACH; insp = bd < r * r ? 1 : 0; this.gRallyX[g] = this.x[bi]; this.gRallyY[g] = this.y[bi]; } else this.gRallyX[g] = -1;
+      } else for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { insp = 1; break; } }
       this.gInsp[g] = insp;
       const st = this.gState[g];
       const pressure = this.gRecent[g] / Math.max(8, cnt);
@@ -74,12 +96,13 @@ export const moraleMethods = {
       const cap = 100 - 18 * this.gBreaks[g];
       let m = this.gMorale[g] + (regen - pressure * (team === ORC ? 13 : 30) - 6 * Math.min(1.5, sup)) * 0.5;
       if (m > cap) m = cap; else if (m < 0) m = 0;
+      if (team === ORC && insp && m < 30 && pressure < 1.4) m = 30; // under his eye a company stands, short of a massacre
       this.gMorale[g] = m;
       if (st <= G_SHAKEN) {
         if (m <= 20 && (team === ORC || this.time - this.gRoutT[g] > 40 || !this.gBreaks[g])) this._break(g, cnt);
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
-      } else if (st === G_ROUT && m >= 60 && this.time - this.gRoutT[g] > 20) {
-        this.gState[g] = G_OK;
+      } else if (st === G_ROUT && ((m >= 60 && this.time - this.gRoutT[g] > 20) || (team === ORC && insp && this.time - this.gRoutT[g] > 6))) {
+        this.gState[g] = G_OK; if (m < 50) this.gMorale[g] = 50; this.stats.rallied++;
         if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 90; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
       }
     }
@@ -94,7 +117,7 @@ export const moraleMethods = {
       for (let h = 0; h < this.ng; h++) {
         if (h === g || this.gTeam[h] !== ORC || this.gExempt[h] || this.gState[h] >= G_ROUT) continue;
         const dx = this.gCx[h] - this.gCx[g], dy = this.gCy[h] - this.gCy[g];
-        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - 8);
+        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8));
       }
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {
