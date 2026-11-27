@@ -7,11 +7,13 @@ import { UNITS, DEF, ORC, R, C, TR } from '../config.js';
 import { SPR } from './atlas.js';
 
 const MAXP = 30000;
+const FALLEN_MAX = 2500; // bodies kept as models; older ones become marks on the ground
 const G = 26; // gravity for debris, m/s^2
 
 export class Fx {
   constructor(audio) {
     this.audio = audio;
+    this.fallen = []; this.now = 0; this.model3d = null; // the dead who lie as models (kinds that have one: set by the renderer), and the battle's clock
     const n = MAXP, F = () => new Float32Array(n), B = () => new Uint8Array(n);
     this.px = F(); this.py = F(); this.pz = F(); this.vx = F(); this.vy = F(); this.vz = F(); this.grav = F();
     this.w = F(); this.h = F(); this.gw = F(); this.gh = F(); this.rot = F(); this.vr = F(); this.life = F(); this.max = F(); this.del = F();
@@ -28,7 +30,7 @@ export class Fx {
   }
 
   rnd() { this.rs = (this.rs * 16807) % 2147483647; return this.rs / 2147483647; }
-  reset() { this.life.fill(0); this.emitters.length = 0; this.lights.length = 0; this.chunks.length = 0; this.decalCount = 0; this.shake = 0; }
+  reset() { this.life.fill(0); this.emitters.length = 0; this.lights.length = 0; this.chunks.length = 0; this.decalCount = 0; this.shake = 0; this.fallen.length = 0; }
   frame(speed) { this.budget = 900 / Math.max(1, speed * 0.5); this.expBudget = 40; }
   inView(x, y, m = 20) { const v = this.view, dx = x - v.x, dy = y - v.y, r = v.rad + m; return dx * dx + dy * dy < r * r; }
 
@@ -277,6 +279,11 @@ export class Fx {
       }
       if (this.rnd() < 0.45) this.decal(SPR.blood, x, y, 2.2 + this.rnd() * 2, a, orc ? 26 : 110, orc ? 8 : 14, orc ? 8 : 12, 150);
       const v = orc ? 150 + (this.rnd() * 70) | 0 : 235;
+      if (this.model3d && this.model3d[type] && this.model3d[type].clip.die) {
+        // a kind with a model that can fall: he drops where he stood and lies there. The oldest of the fallen become marks on the ground
+        this.fallen.push({ type, x, y, z, rot, t: this.now, v, s: 0.96 + this.rnd() * 0.08 });
+        if (this.fallen.length > FALLEN_MAX) { const c = this.fallen.shift(), cd = UNITS[c.type]; this.decal(cd.team === ORC ? SPR.corpseOrc : SPR.corpseMan, c.x, c.y, cd.size * 0.9, c.rot, c.v, c.v, c.v, 255); }
+      } else
       this.decal(orc ? SPR.corpseOrc : SPR.corpseMan, x, y, d.size * 0.9, a, v, v, v, 255);
       if (this.budget > 0 && this.inView(x, y)) { this.budget -= 0.4; const i = this.p(SPR.blood, x, y, z + 1, 0, 0, 1, 1.2, 1.2, 0.3, orc ? 50 : 120, 10, 10, 0.8, 0); this.gw[i] = this.gh[i] = 5; }
       return;

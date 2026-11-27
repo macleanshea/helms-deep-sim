@@ -235,6 +235,15 @@ ranks are full models while the far end of the same host is boxes and dots; and 
 still spend more than 2.5 million triangles on units, every level is pulled in closer until it
 does not.
 
+### Unit models from files
+
+The Uruk-hai are drawn from a model made outside the game (a painted concept, turned into a rigged,
+animated mesh by Meshy) rather than built in code: `assets/game/` holds its pack (four levels of
+detail and its clips baked to bone matrices) and a small texture, loaded after start-up. Everything
+else still uses the built-in models, and so does the whole game with `?assets=0` or if a pack fails
+to load. `tools/assets/` is the pipeline that makes the packs (`import.js` from the generator's
+files, `build.js` to the game's), and `docs/roadmap.md` describes it.
+
 ## How it works
 
 - `src/sim/` — the simulation, with no DOM dependencies (`morale.js` holds morale and
@@ -246,8 +255,9 @@ does not.
   renderer interpolates between them.
 - `src/render/` — a WebGL2 renderer: a perspective camera whose pitch follows the zoom, a height-field terrain
   mesh, a static shadow map, 3D particles and short-lived lights, a persistent ground decal
-  layer, and bloom post-processing. Everything is generated in code; there are no image or
-  model files.
+  layer, and bloom post-processing. The terrain, the fortress, the materials and most
+  units are generated in code; unit models that come from files are described under Unit models
+  from files above (`assets.js` loads them, and the skinned path in `renderer.js` draws them).
   - `materials.js` generates the surface textures on the GPU at start-up: sixteen tiling
     materials (dressed stone, flagstones, rock, grass, mud, timber, slate, iron, painted steel,
     cloth, camouflage, hide and so on), each with colour detail, a normal map, roughness and

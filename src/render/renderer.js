@@ -16,7 +16,7 @@ import { buildMaterials } from './materials.js';
 import { buildStructures } from './structures.js';
 import { viewProj, orthoMatrix, camState, FOV } from './camera.js';
 import { UNIT_TRI_BUDGET } from './perf.js';
-import { S_DONE, S_CLIMB, LADDER_TIME } from '../sim/sim.js';
+import { S_DONE, S_CLIMB, LADDER_TIME, MAX_UNITS } from '../sim/sim.js';
 import * as SH from './shaders.js';
 import { LAYOUT } from '../layout.js';
 
@@ -80,6 +80,10 @@ export class Renderer {
     this.pBlur = compile(gl, SH.VS_FULL, SH.FS_BLUR);
     this.pComp = compile(gl, SH.VS_FULL, SH.FS_COMPOSITE);
     this.pSky = compile(gl, SH.VS_FULL, SH.FS_SKY);
+    // units from model files: a program for each number of bones a vertex may follow (by level of detail)
+    this.pSkin = { 1: compile(gl, SH.skinVS(1), SH.FS_SKIN), 2: compile(gl, SH.skinVS(2), SH.FS_SKIN), 4: compile(gl, SH.skinVS(4), SH.FS_SKIN) };
+    this.assets = {}; this.unitAsset = UNITS.map(() => null);
+    this.animPhase = new Float32Array(MAX_UNITS); this.animDt = 0; this._simT = 0; // where each soldier is in his stride
 
     // shared quads
     this.quad = gl.createBuffer();
@@ -242,6 +246,72 @@ export class Renderer {
       geo.data = null; // the GPU has it now
     }
     gl.bindVertexArray(null);
+  }
+
+  /**
+   * Take up a unit model built from files (see assets.js and tools/assets/build.js): its levels of detail, its
+   * colours and its clips. From then on every unit of that kind is drawn with it instead of the built-in model.
+   */
+  addUnitAsset(name, pack, image) {
+    const gl = this.gl, unit = UNITS.findIndex((d) => d.key === name);
+    if (unit < 0 || !pack.lods.length || !image) return;
+    const a = { name, clip: pack.clip, height: pack.height, n: 0, gcap: 0, ibuf: gl.createBuffer(), lods: [],
+      lists: [0, 1, 2, 3].map(() => { const idata = new ArrayBuffer(64 * ISTRIDE); return { cap: 64, n: 0, f: new Float32Array(idata), u8: new Uint8Array(idata) }; }) };
+    // every frame of every clip: a row a frame, three texels a bone
+    a.bones = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, a.bones);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, pack.bones * 3, pack.frames, 0, gl.RGBA, gl.FLOAT, pack.anim);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    a.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, a.tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, 4);
+    for (const l of pack.lods) {
+      const vbo = gl.createBuffer(), ibo = gl.createBuffer(), vao = gl.createVertexArray();
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, l.vertexData, gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.BYTE, true, 28, 12);
+      gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 2, gl.UNSIGNED_SHORT, true, 28, 16);
+      gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 4, gl.UNSIGNED_BYTE, false, 28, 20);
+      gl.enableVertexAttribArray(8); gl.vertexAttribPointer(8, 4, gl.UNSIGNED_BYTE, true, 28, 24);
+      this._instAttribs(a.ibuf);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, l.indexData, gl.STATIC_DRAW);
+      a.lods.push({ vao, count: l.triangles * 3, prog: this.pSkin[l.influences] || this.pSkin[4] });
+    }
+    gl.bindVertexArray(null);
+    this.assets[name] = a; this.unitAsset[unit] = a;
+    if (this.fx) this.fx.model3d = this.unitAsset;
+  }
+
+  /** Draw the units that come from model files. In the shadow pass the nearest are drawn one level of detail down. */
+  _drawSkinned(env, shadowPass) {
+    const gl = this.gl, st = this.stats;
+    for (const name in this.assets) {
+      const a = this.assets[name];
+      if (!a.n) continue;
+      gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, a.bones);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, a.tex);
+      for (let t = 0, base = 0, last = null; t < 4; t++) {
+        const n = a.lists[t].n;
+        if (!n) continue;
+        const lod = a.lods[Math.min(a.lods.length - 1, shadowPass ? t + 1 : t)], p = lod.prog;
+        if (p !== last) {
+          last = p;
+          gl.useProgram(p.p); this._common(p.u, env);
+          gl.uniform1f(p.u.uShadowPass, shadowPass ? 1 : 0); gl.uniform1f(p.u.uLift, env.lift);
+          gl.uniform1i(p.u.uTex, 0); gl.uniform1i(p.u.uBones, 6);
+        }
+        gl.bindVertexArray(lod.vao);
+        this._instAttribs(a.ibuf, base * ISTRIDE); base += n;
+        gl.drawElementsInstanced(gl.TRIANGLES, lod.count, gl.UNSIGNED_SHORT, 0, n);
+        st.draws++; if (shadowPass) st.tris.shadows += (lod.count / 3) * n; else st.tris.units += (lod.count / 3) * n;
+      }
+    }
   }
 
   _put(m, x, y, z, yaw, scale, phase, r, g, b, flash, walk, atk, tilt, pose = 0) {
@@ -599,6 +669,7 @@ export class Renderer {
     if (sim && (sim !== this.propSim || sim.propVersion !== this.propVersion)) { this.propSim = sim; this.propVersion = sim.propVersion; this._updateProps(sim); }
     if (fx) this._flushDecals(fx);
     const cs = camState(cam, vw, vh);
+    this._dpr = cam.dpr || 1;
     viewProj(cam, vw, vh, this.vp);
     this.eye[0] = cs.ex; this.eye[1] = cs.ey; this.eye[2] = cs.ez; this.camF = cs.f;
     // the air: clear out to a little beyond the point of interest, then thickening toward the horizon
@@ -648,11 +719,13 @@ export class Renderer {
       const tier = zc < L.dot ? 3 : zc < L.box ? 2 : zc < L.hero ? 1 : 0;
       st.tier = tier;
       for (const name in this.meshes) { const ls = this.meshes[name].lists; ls[0].n = ls[1].n = ls[2].n = 0; }
+      for (const name in this.assets) { const a = this.assets[name], ls = a.lists; a.n = ls[0].n = ls[1].n = ls[2].n = ls[3].n = 0; }
+      // how much battle time has passed since the last frame (none while paused, eightfold at 8x): strides advance by it
+      { const t = sim.time + (al - 1) * 0.1, dt = t - this._simT; this._simT = t; this.animDt = dt > 0 && dt < 1 ? dt : 0; this._cs = cs; this._L = L; }
       dots = this._fillUnits(cam, cs, sim, al, vw, vh, L, clock, env.lift > 0.12);
       this._tier = 0;
       this._fillDynamic(sim, fx, al, clock);
-      for (const name in this.meshes) {
-        const m = this.meshes[name];
+      for (const m of [...Object.values(this.meshes), ...Object.values(this.assets)]) {
         if (!m.n) continue;
         gl.bindBuffer(gl.ARRAY_BUFFER, m.ibuf);
         if (m.n > m.gcap) m.gcap = Math.max(64, m.n * 2);
@@ -664,12 +737,14 @@ export class Renderer {
       gl.disable(gl.BLEND);
       this._drawMeshes(env, clock, tier, false, true);
       this._drawMeshes(env, clock, tier, false, false);
+      this._drawSkinned(env, false);
       this._time('scene');
       this._scene(env, true);
       this._time('shadows');
       if (env.shadows) {
         gl.enable(gl.BLEND); gl.depthMask(false);
         this._drawMeshes(env, clock, tier, true, false);
+        this._drawSkinned(env, true);
         gl.depthMask(true); gl.disable(gl.BLEND);
       }
       // hold the triangle budget: if this view spent too much on units, bring every level of detail in closer next frame
@@ -713,7 +788,7 @@ export class Renderer {
     const { ex, ey, ez, rx, ry, ux, uy, uz, fx: fwx, fy: fwy, fz: fwz, f: focal, near } = cs;
     const hw = vw / 2, hh = vh / 2, dprI = 1 / (cam.dpr || 1);
     // each unit's level of detail comes from its scale on screen (CSS px per metre where it stands)
-    const bias = this.lodBias, zDot = L.dot * bias, zBox = L.box * bias, zHero = L.hero * bias;
+    const bias = this.lodBias, zDot = L.dot * bias, zBox = L.box * bias, zHero = L.hero * bias, zClose = Math.max(L.hero * 3.2, 30) * bias; // zClose: from here in, a soldier stands some sixty pixels tall and earns the finest model
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
     const PFv = this.partF, PU = this.partU;
     let dots = 0, drawn = 0;
@@ -786,6 +861,32 @@ export class Renderer {
       let atk = 0;
       if (d.role === R.TOWER) atk = st === S_DONE ? 255 : 0;
       else { const ft = time - fireT[i], dur = d.team === DEF ? 0.16 : d.role === R.CATAPULT ? 1.2 : d.role === R.RAM ? 0.7 : 0.38; if (ft < dur) atk = ((1 - ft / dur) * 255) | 0; }
+      const A = this.unitAsset[type[i]];
+      if (A) {
+        // a model from files: pick the clip that fits what he is doing, and the frame of it he has reached
+        const C = A.clip, ft = time - fireT[i];
+        let cl, fr;
+        if (st === S_CLIMB) { cl = C.climb || C.walk; fr = (time * cl.fps * 1.4 + i * 7) % cl.frames; }
+        else if (C.attack && ft < 0.9 && sp < 1.5) { cl = C.attack; fr = Math.min(cl.frames - 1, (ft / 0.9) * cl.frames); }
+        else if (sp > 0.3) {
+          const eng = crewOf[i] >= 0 ? UNITS[type[crewOf[i]]] : null;
+          cl = (eng ? (eng.role === R.LADDER ? C.carry : C.push) : sh ? C.shield : sp > 2.6 ? C.run : C.walk) || C.walk;
+          // his stride keeps time with the ground he covers, within what the clip can bear without looking wound up or drugged
+          const nat = cl.fps / cl.frames, rate = Math.max(nat * 0.6, Math.min(nat * 1.9, cl.stride > 0.2 ? sp / cl.stride : nat));
+          let ph = this.animPhase[i] + this.animDt * rate; ph -= Math.floor(ph); this.animPhase[i] = ph;
+          fr = ph * cl.frames;
+        } else { cl = C.idle || C.walk; fr = (time * cl.fps + i * 13) % cl.frames; }
+        // (for looking a clip over: renderer.debugClip = { name, at: 0..1 } poses every such unit in it)
+        if (this.debugClip && C[this.debugClip.name]) { cl = C[this.debugClip.name]; fr = Math.min(cl.frames - 1, this.debugClip.at * cl.frames); }
+        const js = um_i.jitter ? 0.95 + ((h2 >> 4) & 31) * 0.0034 : 1;
+        // four levels of detail: the finest only where a soldier stands tall on screen, the coarsest where the built-in models are boxes
+        this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
+        // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
+        if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, sh ? 240 : tier === 2 ? 150 : 205, sh ? 235 : tier === 2 ? 130 : 190, flash, 0, 0, 0);
+        else if (sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 244, 226, flash, 0, 0, 0);
+        else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, 0, 0, 0);
+        continue;
+      }
       // mid-distance stand-ins are tinted by side so the two armies still read at a glance
       if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0, walk ? 0 : poseOf[i]); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 226, 228, 238, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
       else if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, 255, 236, 205, flash, walk, 0, 5);
@@ -818,6 +919,23 @@ export class Renderer {
       else this._put(M.transport, x, y, z, a.rot, 1.2, 0, 235, 235, 235, 0, 0, 0, 0);
     }
     if (!fx) return;
+    // the fallen: each plays his death once and lies where he ends it (drawn only where near enough to be more than a mark)
+    if (fx.fallen.length) {
+      const cs = this._cs, L = this._L, bias = this.lodBias, hw = this.canvas.width / 2, hh = this.canvas.height / 2, t = this._simT + 0.1;
+      for (const c of fx.fallen) {
+        const A = this.unitAsset[c.type], die = A && A.clip.die;
+        if (!die) continue;
+        const dx = c.x - cs.ex, dy = c.y - cs.ey, dz = c.z - cs.ez, w = dx * cs.fx + dy * cs.fy + dz * cs.fz;
+        if (w < cs.near) continue;
+        const z0 = cs.f / w, sx = (dx * cs.rx + dy * cs.ry) * z0, sy = (dx * cs.ux + dy * cs.uy + dz * cs.uz) * z0, pad = 4 * z0 + 8;
+        if (sx < -hw - pad || sx > hw + pad || sy < -hh - pad || sy > hh + pad) continue;
+        const zc = z0 / (this._dpr || 1);
+        if (zc < L.box * bias) continue;
+        this._tier = zc < L.hero * bias ? 2 : zc < Math.max(L.hero * 3.2, 30) * bias ? 1 : 0;
+        this._put(A, c.x, c.y, c.z, c.rot, c.s, die.start + Math.min(die.frames - 1, Math.max(0, (t - c.t) * die.fps * 1.5)), c.v, c.v, c.v, 0, 0, 0, 0);
+      }
+      this._tier = 0;
+    }
     for (const ch of fx.chunks) {
       const m = M[ch.mesh];
       if (m) this._put(m, ch.x, ch.y, ch.z, ch.yaw, ch.scale, 0, ch.r, ch.g, ch.b, 0, 0, 0, tiltOf(ch.tilt));

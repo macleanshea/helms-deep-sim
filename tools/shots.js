@@ -24,6 +24,7 @@ const flag = (k) => args.includes('--' + k);
 const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const out = path.resolve(get('out', path.join(root, 'shots')));
 const [W, H] = get('size', '1280x720').split('x').map(Number);
+const noAssets = flag('no-assets'); // the built-in models only
 const quality = get('quality', 'medium'); // 'high' is four times the work for the software rasteriser: minutes a view
 const jpeg = get('jpeg', null), ext = jpeg ? 'jpg' : 'png';
 const only = get('only', '').split(',').filter(Boolean);
@@ -56,6 +57,7 @@ const BATTLE = { preset: 'garrison', t: 420, views: [
   ['battle-wall-foot-z20', [945, 470, 20]],
   ['battle-horde-z5', 'horde', 5],
   ['battle-horde-z16', 'horde', 16],
+  ['battle-horde-z60', 'horde', 60],
 ] };
 
 const HIDE_UI = '#topbar,#left,#right,#minimap,#feed,#banner,#hint,#cmdbar,#leftHud,#selinfo,#grpbar,#tooltip,#vignette,#coach,#modal,#perf,#perfCopy,#settingsMenu{display:none!important}';
@@ -84,8 +86,9 @@ async function main() {
     const errors = [];
     page.on('pageerror', (e) => errors.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(`http://127.0.0.1:${port}/?q=${quality}`, { waitUntil: 'load' });
+    await page.goto(`http://127.0.0.1:${port}/?q=${quality}${noAssets ? '&assets=0' : ''}`, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__app && window.__ui && window.__renderer, null, { timeout: 120000 });
+    await page.evaluate(() => window.__app.assetsReady); // unit models from files, if any, are in before the first picture
     // hold the animation clock still (banners, water) and silence the things that move on their own
     await page.evaluate(() => {
       const app = window.__app;
@@ -111,7 +114,9 @@ async function main() {
       }, { at, ui: opts.ui });
       const file = path.join(out, `${name}.${ext}`);
       await page.screenshot(jpeg ? { path: file, type: 'jpeg', quality: +jpeg } : { path: file });
-      process.stdout.write(`  ${name}\n`);
+      // what the view cost to draw: units in view, triangles spent on them, draw calls
+      const st = await page.evaluate(() => { const r = window.__renderer, s = r.stats; return [s.units, Math.round((s.tris.units + s.tris.shadows) / 1000), s.draws, +r.lodBias.toFixed(2)]; });
+      process.stdout.write(`  ${name.padEnd(26)} ${String(st[0]).padStart(6)} units  ${String(st[1]).padStart(5)}k unit triangles  ${String(st[2]).padStart(3)} draws${st[3] > 1 ? `  (detail pulled in x${st[3]})` : ''}\n`);
     };
 
     await page.evaluate(async () => { window.__app.loadPreset('garrison', false, true); await window.__settle(6); });

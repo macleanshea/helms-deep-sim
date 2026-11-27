@@ -16,6 +16,7 @@ import { FxQueue } from './sim/fxqueue.js';
 import { Audio } from './audio.js';
 import { buildUI, fmt } from './ui/ui.js';
 import { loadPortraits } from './ui/portraits.js';
+import { loadUnitPacks } from './render/assets.js';
 import { LAYOUT } from './layout.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1186,6 +1187,7 @@ function frame(now) {
         sim.step(); app.acc -= DT; ticks++; simDt += DT;
         if (performance.now() - t0 > 15) break;
       }
+      fx.now = sim.time;
       app.fxq.replay(fx);
       simMs = performance.now() - t0;
       if (app.acc > DT * 2) app.acc = DT; // can't keep up: drop the backlog rather than spiral
@@ -1273,6 +1275,9 @@ app.lodAt = (scale) => { const keep = renderer.heroScale; renderer.heroScale = s
 
 // -------------------------------------------------------------------- boot
 if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
+// unit models built from files arrive after the game is up: until then (or with ?assets=0) the built-in ones stand in
+renderer.fx = fx;
+if (params.get('assets') !== '0') app.assetsReady = loadUnitPacks((name, pack, image) => renderer.addUnitAsset(name, pack, image));
 const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };

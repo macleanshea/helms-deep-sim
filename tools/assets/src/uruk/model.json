@@ -1,0 +1,143 @@
+{
+  "unit": "uruk",
+  "note": {
+    "generator": "meshy",
+    "concept": "assets-src/concepts/uruk-a-pose.png",
+    "tasks": {
+      "image-to-3d": "01a21b14-0eb7-7406-8325-9812c922013c",
+      "remesh": "01a21b18-9cf5-77df-b4b3-8f27df80a01f",
+      "rigging": "01a21b1b-397d-7483-a855-0066d6d5331b",
+      "animations": {
+        "idle": "01a21b1f-c37c-76c3-92a4-db8419e3a3c8",
+        "attack": "01a21b1f-c729-73c0-a829-a08b65537de6",
+        "die": "01a21b1f-cb0d-72a7-8329-18b7550ebae2",
+        "climb": "01a21b1f-ce9e-707c-bc65-4f966acc6e10",
+        "carry": "01a21b1f-d25d-7598-81a5-8118dade3c6d",
+        "push": "01a21b1f-d5f5-7116-b915-f010a1b6fa85",
+        "shield": "01a21b1f-d95b-74bd-93e0-82b368c9bfe7"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 58221
+    },
+    "nrm": {
+      "offset": 232884,
+      "length": 58221
+    },
+    "uv": {
+      "offset": 465768,
+      "length": 38814
+    },
+    "joints": {
+      "offset": 621024,
+      "length": 77628
+    },
+    "weights": {
+      "offset": 698652,
+      "length": 77628
+    },
+    "index": {
+      "offset": 1009164,
+      "length": 30438
+    },
+    "ibm": {
+      "offset": 1130916,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 50,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.64255,
+      "offset": 76800
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.76054,
+      "offset": 124416
+    },
+    {
+      "name": "shield",
+      "loop": true,
+      "frames": 34,
+      "stride": 1.79927,
+      "offset": 153600
+    },
+    {
+      "name": "carry",
+      "loop": true,
+      "frames": 195,
+      "stride": 2.07913,
+      "offset": 205824
+    },
+    {
+      "name": "push",
+      "loop": true,
+      "frames": 240,
+      "stride": 2.93042,
+      "offset": 505344
+    },
+    {
+      "name": "climb",
+      "loop": true,
+      "frames": 48,
+      "stride": 0.19927,
+      "offset": 873984
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 96,
+      "stride": 0,
+      "offset": 947712
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 90,
+      "stride": 0,
+      "offset": 1095168
+    }
+  ]
+}

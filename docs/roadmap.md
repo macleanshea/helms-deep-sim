@@ -17,7 +17,7 @@ Decisions already made:
   when zoomed in. Zoom stays the camera's state variable so benchmark views stay comparable.
 - The target is desktops and laptops with decent graphics at 60 fps, with detail stepping down
   (and back up) automatically. Phones and tablets are not a target.
-- Meshy and Tripo are compared on two units (an Uruk soldier and a warg) before committing to one.
+- Models come from Meshy. (A comparison with Tripo was planned and then dropped by the owner: go forward with Meshy alone.)
 - Generator keys live in the cloud environment's network secrets, never in the repository.
 - The map is not assumed right as it is. Every component is rescaled to the references, defects are
   fixed, and a full redesign is acceptable.
@@ -60,8 +60,8 @@ Defects the map lint found in today's map, to be put right in milestone 5:
 
 | Job | Tool |
 | --- | --- |
-| Unit and vehicle models | An AI generator (Meshy or Tripo, after the bake-off), fed concept sheets made with an image model in the style of the paintings in `assets/units/` |
-| Clean-up, detail levels, animation baking | Blender, run headless from `tools/assets/` |
+| Unit and vehicle models | Meshy (image to 3D, remesh, rigging, its animation library), fed concept sheets made with an image model in the style of the paintings in `assets/units/` |
+| Detail levels, gear, animation baking | `tools/assets/` in plain Node (its own triangle reducer), with Pillow for textures: nothing to install |
 | Crowd animation | A baked bone-animation texture played on the GPU: one path for every unit |
 | Fortress and layout | Code, from one parametric layout (`src/layout.js`) |
 | Rock, stone and ground surfaces | CC0 scans (Poly Haven, ambientCG), shipped as WebP |
@@ -81,10 +81,10 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 3 | Perspective camera and engine foundation | camera, per-unit detail, haze and sky done; HDR, depth pre-pass and the frame governor to come |
 | 4 | Simulation decoupled from rendering (still on the main thread) | effects queue done; render records and the order host to come |
 | 5 | Map redesign in greybox, owner signs off | |
-| 6 | One animated path for every unit | |
+| 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
-| 9 | Asset pipeline, generator bake-off, unit production | needs the owner's keys |
+| 9 | Asset pipeline and unit production | pipeline done; Uruk-hai in game; the rest of the roster to come |
 | 10 | Fortress art pass | |
 | 11 | Cliffs, ground, backdrop | |
 | 12 | Caching and polish | |
@@ -211,19 +211,39 @@ occlusion on the fortress; a night sky with moon and lightning; GPU rain. The mo
 loading art: cold rain, mist, fire glow. Budgets: shadows ≤ 1.5 ms, post ≤ 1.5 ms, total GPU
 ≤ 11 ms at high quality with 300 torches on screen.
 
-### 9. Asset pipeline, bake-off, unit production
+### 9. Asset pipeline and unit production
 
-`tools/assets/` with a manifest (prompts, vendor task ids, hashes) → Blender headless (detail
-levels of about 4k / 900 / 250 triangles, at most 32 bones, clips at 30 fps) → `assets/game/` with
-content-hashed names. `src/render/assets.js` streams them in with a 2 ms per-frame upload budget
-and reports through `window.__loading`; textures are WebP. `vercel.json` gets an immutable cache
-rule for `/assets/game/` only (the art already in `assets/` is not hashed). The bake-off is scored
-on silhouette at 250 triangles, rig quality under the walk clip, seams, the warg's rig, and cost.
-Order of production: Uruks (three bodies), crossbow, berserker, warg; defender infantry; trolls and
-captains; vehicles; siege engines, bare and crewed; aircraft. Every unit has a manifest switch back
-to its procedural model. Raw generator output (large source models) stays out of the game's tree:
-where it is kept is settled when the pipeline is built (a cloud session cannot create GitHub
-releases, so the choices are a separate source-assets branch or storage the owner provides).
+**The pipeline, done.** How a unit gets from an idea into the game:
+
+1. A concept sheet: `tools/assets/concepts/<unit>.prompt.txt` given to an image model together with the
+   unit's portrait from `assets/units/`, asking for the whole figure in a neutral pose on a plain
+   ground, with empty hands (gear is added in step 5). The sheets are kept beside their prompts.
+2. Meshy, through its CLI: image to 3D (30 credits), remesh to 10,000 triangles (5), rigging (5,
+   humanoids only; it comes with walk and run), and clips from its library (3 each).
+3. `node tools/assets/import.js <unit>` takes the downloads (about 16 MB a clip, kept out of the
+   repository in `assets-src/`) into `tools/assets/src/<unit>/`: mesh, colours and bone motion, a few MB.
+4. `tools/assets/units/<unit>.json` is the recipe: height, levels of detail, gear, and where it came from
+   (Meshy task ids).
+5. `node tools/assets/build.js <unit>` writes `assets/game/<unit>.<hash>.bin` (four levels of detail,
+   every clip baked to bone matrices at 30 fps) and a 512 px WebP, and lists them in
+   `assets/game/manifest.json`. Gear (a blade, a shield) is plain boxes bound to one bone each.
+6. The game loads the manifest after start-up (`src/render/assets.js`); a unit with a pack is drawn by
+   the skinned path, one without keeps its built-in model. `?assets=0` turns the packs off.
+
+In the renderer each soldier picks a clip from what he is doing (idle, walk, run, behind shields,
+carrying a ladder, pushing an engine, climbing, striking) and keeps his own place in his stride; the
+dead play a fall and lie where they end it, the oldest 2,500 as models and the rest as the ground
+marks there always were. Cost on the garrison battle's views, unit triangles with the built-in models
+against with the Uruk pack: 575k against 1,080k at zoom 5, 620k against 869k at zoom 16, 375k
+against 1,013k at zoom 60, all inside the 2.5 M budget.
+
+**Still to do for the Uruk:** a second and third body, the texture's normal map, blending between
+clips, frames interpolated at the closest level.
+
+**The rest of the roster,** in this order: crossbow Uruk, berserker, captain, sapper, troll (all
+humanoid: the same six steps); the warg (modelled already, `tools/assets/concepts/warg-side.jpg`, but
+Meshy rigs only humanoids: it needs bones assigned by region in the build); defender infantry;
+vehicles and siege engines (rigid parts, a bone each); aircraft.
 
 ### 10. Fortress art pass
 
