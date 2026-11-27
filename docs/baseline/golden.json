@@ -8,8 +8,8 @@
   "battle first-night, no orders, seed 1": "b9d028f8 loss at 528.5 s, 0/91 v 1602/3175",
   "battle first-night, stand-in commander, seed 1": "dbbcb254 win at 600 s, 16/91 v 448/3175",
   "battle garrison, no orders, seed 1": "3b97322a loss at 862.5 s, 0/497 v 7622/18106",
-  "battle garrison, stand-in commander, seed 1": "9dd3e3bf loss at 1112.5 s, 0/497 v 2966/18106",
-  "battle three-hundred, no orders, seed 1": "04ade49c loss at 597 s, 0/309 v 6159/10098",
-  "battle three-hundred, stand-in commander, seed 2": "193df043 loss at 827 s, 0/309 v 3725/10098",
+  "battle garrison, stand-in commander, seed 1": "eab3ff18 loss at 1112.5 s, 0/497 v 2953/18106",
+  "battle three-hundred, no orders, seed 1": "8c69efb4 loss at 608.5 s, 0/309 v 6149/10098",
+  "battle three-hundred, stand-in commander, seed 2": "6b00dc75 loss at 762 s, 0/309 v 4262/10098",
   "battle benchmark, no orders, seed 1, first 400 s": "ce4f2b26 unfinished at 400 s, 965/965 v 22413/30242"
 }

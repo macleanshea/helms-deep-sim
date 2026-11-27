@@ -62,8 +62,8 @@ guessed: see *Headless runs and balance* below.
   requisition points left unspent — and the best score and medal per scenario are kept in the
   browser.
 
-The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
-autofill both armies, then change anything. Every option can be edited, and support has a
+The **sandbox** lifts every limit. It opens on the Hornburg Garrison with both armies laid out; change anything,
+pick another scenario in the top bar to autofill the map, or choose Blank Map to build from nothing. Every option can be edited, and support has a
 fixed number of calls per kind (four of each to start) instead of Command Points; the random
 seed for sandbox battles is in **Settings**. There are no waves and no relief at
 dawn by default: the whole horde is on the field from the start, and the defenders win when the

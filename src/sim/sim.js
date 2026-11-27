@@ -354,11 +354,10 @@ export class Sim {
       if (dz > STEP || dz < -STEP) return false;
       if (this.way[ct] !== this.way[cf] && (dz > WAY_STEP || dz < -WAY_STEP)) return false; // a roadway's walled side
       if (sz === 0) return true;
-      if (mt === T.STAIR) return false;
-      if (sz === 2 && (dz > 1.6 || dz < -1.6 || (this.ob[ct] & OB.AV))) return false;
+      if (sz === 2 && (mt === T.STAIR || dz > 1.6 || dz < -1.6 || (this.ob[ct] & OB.AV))) return false;
       return true;
     }
-    if (sz) return false;
+    if (sz === 2) return false; // (a troll takes the stairs like anyone; an engine or a vehicle cannot)
     const k = KDIR[(((ct / GW) | 0) - ((cf / GW) | 0) + 1) * 3 + (ct % GW) - (cf % GW) + 1];
     return k >= 0 && ((this.portal[cf] >> k) & 1) === 1;
   }

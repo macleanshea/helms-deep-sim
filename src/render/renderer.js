@@ -34,6 +34,8 @@ const SB = { x0: LAYOUT.shadowBox[0], x1: LAYOUT.shadowBox[2], y0: LAYOUT.shadow
 // boxes and stand-ins each cover the same span of zoom at every setting.
 const DOT_ZOOM = 2.0;
 const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
+// The zooms (CSS px per metre at the middle of the view) between which soldiers are washed toward their side's colour.
+const WASH_FROM = 5.5, WASH_FULL = 2.6;
 export const HERO_SCALE_DEFAULT = 0.3;
 // how linear light is scaled from the display-space mood colours in main.js
 const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
@@ -139,6 +141,7 @@ export class Renderer {
     this._bakeTerrain();
     this._buildTerrainMesh();
     this._bakeTorches();
+    this._HT = new Float32Array(6000); this._nHT = 0; this._bakeHordeTorches();
 
     // decal layer over the playable world
     this.decalW = WORLD_W * this.texScale; this.decalH = WORLD_H * this.texScale;
@@ -426,6 +429,37 @@ export class Renderer {
     this.torchRect = new Float32Array([x0, y0, w, h]);
   }
 
+  /**
+   * The horde's torches as a second map of firelight, over the whole field and made afresh each frame from the
+   * torch-bearers in view (a coarse one: a torch's light is a pool a dozen metres across). The ground, the wall's
+   * foot and the companies themselves are lit by it as the host comes on.
+   */
+  _bakeHordeTorches() {
+    const gl = this.gl, W = 256, H = 184, n = this._nHT;
+    if (!this.torch2Tex) {
+      this.torch2Tex = this._tex(gl.LINEAR);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(W * H * 4));
+      this._htI = new Float32Array(W * H); this._htZ = new Float32Array(W * H); this._htPx = new Uint8Array(W * H * 4); this._htDirty = false;
+    }
+    if (!n && !this._htDirty) return;
+    const I = this._htI, Z = this._htZ, px = this._htPx, sx = W / WORLD_W, sy = H / WORLD_H, R = 13, T = this._HT;
+    I.fill(0); Z.fill(0);
+    for (let k = 0; k < n; k++) {
+      const x = T[k * 3], y = T[k * 3 + 1], z = T[k * 3 + 2], ci = x * sx, cj = y * sy, ri = Math.ceil(R * sx), rj = Math.ceil(R * sy);
+      for (let j = Math.max(1, Math.floor(cj - rj)); j <= Math.min(H - 2, cj + rj); j++) for (let i = Math.max(1, Math.floor(ci - ri)); i <= Math.min(W - 2, ci + ri); i++) {
+        const dx = (i + 0.5) / sx - x, dy = (j + 0.5) / sy - y, d2 = (dx * dx + dy * dy) / (R * R);
+        if (d2 >= 1) continue;
+        const w = (1 - d2) * (1 - d2);
+        I[j * W + i] += w; Z[j * W + i] += w * z;
+      }
+    }
+    for (let c = 0; c < W * H; c++) { const v = I[c]; px[c * 4] = 190 * (1 - Math.exp(-0.55 * v)); /* many torches together do not add without end: the light saturates */ px[c * 4 + 3] = v > 1e-4 ? Math.max(0, Math.min(255, (Z[c] / v / 64) * 255)) : 0; }
+    gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.torch2Tex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.activeTexture(gl.TEXTURE0);
+    this._htDirty = n > 0;
+  }
+
   _buildTerrainMesh() {
     const gl = this.gl, hm = this.map.hm;
     const nx = (HM_W * HM_RES) / GRID + 1, ny = (HM_H * HM_RES) / GRID + 1;
@@ -616,6 +650,7 @@ export class Renderer {
       gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.torchTex); gl.uniform1i(u.uTorch, 7);
       gl.uniform4fv(u.uTorchRect, this.torchRect); gl.uniform1f(u.uTorchK, (0.1 + 0.9 * night) * fl);
     }
+    if (u.uTorch2 && this.torch2Tex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.torch2Tex); gl.uniform1i(u.uTorch2, 8); gl.uniform2f(u.uTorch2Size, WORLD_W, WORLD_H); }
     if (u.uFog) gl.uniform3fv(u.uFog, env.fog);
     if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 40, MARGIN - 8); // the ground is gone into the haze before the modelled terrain ends
     if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.uniform1f(u.uShadowTexel, this.shadowTexel); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
@@ -823,6 +858,7 @@ export class Renderer {
       this._drawMeshes(env, clock, tier, false, false);
       this._drawSkinned(env, false);
       this._time('scene');
+      this._bakeHordeTorches();
       this._scene(env, true);
       this._time('shadows');
       if (env.shadows) {
@@ -876,6 +912,9 @@ export class Renderer {
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
     const PFv = this.partF, PU = this.partU;
     let dots = 0, drawn = 0;
+    this._nHT = 0;
+    // the side tint: none from WASH_FROM px per metre in, full by WASH_FULL, the same for every unit in view
+    let W = (WASH_FROM - cam.zoom * dprI) / (WASH_FROM - WASH_FULL); W = W < 0 ? 0 : W > 1 ? 1 : W; W = W * W * (3 - 2 * W);
     for (let i = 0, n = sim.n; i < n; i++) {
       if (!alive[i]) continue;
       const xi = px[i] + (x[i] - px[i]) * al, yi = py[i] + (y[i] - py[i]) * al;
@@ -903,6 +942,7 @@ export class Renderer {
       if (torches && team[i] !== DEF && d.sz === 0 && (h & 15) === 3 && dots < 9000) {
         // one in sixteen carries a torch: a flickering flame and a pool of light on the ground
         const fk = 0.8 + 0.2 * Math.sin(clock * 15 + i * 1.7) * Math.sin(clock * 6.3 + i);
+        if (this._nHT < 2000) { const q = this._nHT++ * 3; this._HT[q] = xi; this._HT[q + 1] = yi; this._HT[q + 2] = zi + 2.2; } // (and lights whatever is round him: see _bakeHordeTorches)
         let o = dots++ * PF;
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + (st === S_CLIMB ? 1.5 : 2.5); PFv[o + 3] = PFv[o + 4] = Math.max(1.7, 7.5 / z0) * fk; PFv[o + 5] = 0; PFv[o + 6] = SPR.glow;
         PU[o + 7] = ((235 << 24) | (70 << 16) | (165 << 8) | 255) >>> 0;
@@ -975,20 +1015,31 @@ export class Renderer {
         // (a machine several times a man's size earns each level from that much further off)
         if (A.big > 1) { const zb = zc * A.big; this._tier = zb >= zClose ? 0 : zb >= zHero ? 1 : zb >= zBox ? 2 : 3; }
         else this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
-        // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
+        // seen from far off, the two armies are tinted by side so they still read at a glance. How far is one figure for the whole
+        // map, set by the zoom alone (W): never by how near the camera a soldier happens to stand, which painted a block half and half
         // (the last argument is the wash: how far the figure is taken from its own colours toward its side's)
-        if (A.big > 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v, v, flash, 0, 0, 0); // (a machine is told by its size)
-        else if (tier >= 1 && team[i] === DEF) { if (d.ammo && ammo[i] < 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 178, 70, flash, 0, 0, 0, tier === 2 ? 190 : 70); else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 120, 205, 245, flash, 0, 0, 0, tier === 2 ? 190 : 70); }
-        else if (tier >= 1 && sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 236, 236, 244, flash, 0, 0, 0, tier === 2 ? 170 : 90);
-        else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 215, 84, 62, flash, 0, 0, 0, tier === 2 ? 170 : 80);
-        else if (sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 244, 226, flash, 0, 0, 0);
-        else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, 0, 0, 0);
+        if (A.big > 1) { this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v, v, flash, 0, 0, 0); continue; } // (a machine is told by its size)
+        let r = v, g = v - (h2 & 7), b = v - ((h2 >> 9) & 15), wm = 0;
+        if (sh) { r = 255; g = 244; b = 226; } // (behind locked shields a rank catches the light)
+        if (W > 0) {
+          let sr, sg, sb;
+          if (team[i] === DEF) { if (d.ammo && ammo[i] < 1) { sr = 255; sg = 178; sb = 70; } else { sr = 120; sg = 205; sb = 245; } wm = 190 * W; }
+          else if (sh) { sr = 236; sg = 236; sb = 244; wm = 170 * W; }
+          else { sr = 215; sg = 84; sb = 62; wm = 170 * W; }
+          r += (sr - r) * W; g += (sg - g) * W; b += (sb - b) * W;
+        }
+        this._put(A, xi, yi, zi, yaw, js, cl.start + fr, r, g, b, flash, 0, 0, 0, wm);
         continue;
       }
-      // mid-distance stand-ins are tinted by side so the two armies still read at a glance
-      if (tier === 2 && d.size < 7) { if (team[i] === DEF) this._put(m, xi, yi, zi, yaw, sc, phase, 120, 200, 235, flash, walk, atk, 0, walk ? 0 : poseOf[i]); else if (sh) this._put(m, xi, yi, zi, yaw, sc, phase, 226, 228, 238, flash, walk, atk, 5); else this._put(m, xi, yi, zi, yaw, sc, phase, v, 92, 74, flash, walk, atk, 0); }
-      else if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, 255, 236, 205, flash, walk, 0, 5);
-      else this._put(m, xi, yi, zi, yaw, sc, phase, v, v - (h2 & 7), v - ((h2 >> 9) & 15), flash, walk, atk, 0, team[i] === DEF && !walk ? poseOf[i] : 0);
+      // the built-in stand-ins take the same tint, by the same zoom
+      let r = v, g = v - (h2 & 7), b = v - ((h2 >> 9) & 15);
+      if (sh) { r = 255; g = 236; b = 205; }
+      if (W > 0 && d.size < 7) {
+        const df = team[i] === DEF, sr = df ? 120 : sh ? 226 : v, sg = df ? 200 : sh ? 228 : 92, sb = df ? 235 : sh ? 238 : 74;
+        r += (sr - r) * W; g += (sg - g) * W; b += (sb - b) * W;
+      }
+      if (sh) this._put(m, xi, yi, zi, yaw, sc * 0.94, phase, r, g, b, flash, walk, 0, 5);
+      else this._put(m, xi, yi, zi, yaw, sc, phase, r, g, b, flash, walk, atk, 0, team[i] === DEF && !walk ? poseOf[i] : 0);
       if (um_i.turret) this._put(um_i.turret, xi, yi, zi, trot[i], um_i.scale, 0, v, v, v, flash, 0, atk, 0);
     }
     this.stats.units = drawn; this.stats.dots = dots;

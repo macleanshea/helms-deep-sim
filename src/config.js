@@ -159,7 +159,7 @@ UNITS.forEach((u, i) => {
   u.wdef = u.w ? WEAPONS[u.w] : null;
   u.w2def = u.w2 ? WEAPONS[u.w2] : null;
   if (u.team === DEF) u.armor = u.cls === C.INF ? A.INF : u.cls === C.VEH ? A.VEH : A.GUN;
-  u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (no stairs or ladders), 2 heavy (also stopped by obstacles)
+  u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (stairs but no ladders), 2 heavy (also stopped by obstacles)
 });
 
 // Player-called support. In a challenge battle every call is paid for from one shared pool of

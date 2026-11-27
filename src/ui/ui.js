@@ -73,7 +73,7 @@ export function buildUI(app, portraits) {
   let bestScores = {};
   /**
    * The scenario list for the current mode. A challenge offers the scenarios, each with the best medal
-   * and score won on it; the sandbox starts from a blank map and offers the scenarios to autofill it.
+   * and score won on it; the sandbox opens on the same scenario with both armies laid out, and offers the others (and a blank map) to autofill it.
    */
   ui.refreshPresetList = () => {
     const sb = app.isSandbox(), cur = preset.value;
@@ -82,7 +82,7 @@ export function buildUI(app, portraits) {
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
       // (the best score won on it is shown beside the list, labelled: tacked onto the name it read as part of the name)
-      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b && b.medal ? '  ★' : ''));
+      const o = el('option', null, p.name + (p.level ? ` (${p.level})` : '') + (b && b.medal ? '  ★' : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
@@ -614,7 +614,7 @@ export function buildUI(app, portraits) {
     if (coached.has(kind)) return;
     coached.add(kind);
     coachBody.innerHTML = kind === 'sandbox'
-      ? '<b>Start from a blank map — or autofill it</b><p>Pick a scenario here to fill the map with both its armies, then change anything. Or build each side yourself from the panel on the left.</p>'
+      ? '<b>Both armies are yours to change</b><p>The Hornburg Garrison and its horde are on the map: change anything from the panel on the left. Pick another scenario here to autofill the map, or <b>Blank Map</b> to build both sides from nothing.</p>'
       : '<b>The Hornburg Garrison is ready</b><p>The garrison is in place: press <b>Begin Battle</b> to take command. Pick another challenge here, or open <b>Advanced</b> on the right to rework the garrison.</p>';
     coach.hidden = false;
     placeCoach();

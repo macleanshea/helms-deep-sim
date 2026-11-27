@@ -156,13 +156,13 @@ app.loadPreset = (key, sandbox = app.isSandbox(), quiet = false) => {
   const p = PRESETS.find((q) => q.key === key);
   if (p && !quiet) ui.toast(sandbox ? (key === 'empty' ? 'A blank map: build both armies, or pick a scenario to autofill it.' : `Autofilled from ${p.name}: both armies are yours to change.`) : p.blurb);
 };
-/** Switch between the two ways to play. Each starts from its own default: a blank map, or the Hornburg Garrison. */
+/** Switch between the two ways to play. Both open on the Hornburg Garrison (in the sandbox, with the whole horde laid out to change). */
 app.enterMode = (mode) => {
   const sb = mode === 'sandbox';
   if (app.mode === 'battle') app.backToSetup();
   const first = !app.modeChosen;
   app.modeChosen = true;
-  if (first || sb !== app.isSandbox()) app.loadPreset(sb ? 'empty' : 'garrison', sb, true); else ui.refreshPresetList();
+  if (first || sb !== app.isSandbox()) app.loadPreset('garrison', sb, true); else ui.refreshPresetList();
   ui.toast(sb ? 'Sandbox: build both armies and set your own win conditions. Not scored.' : 'Challenge: hold the Deep until dawn within your requisition. Scored.');
   ui.coach(sb ? 'sandbox' : 'challenge');
 };
@@ -207,15 +207,30 @@ app.clearTeam = (team) => { app.setup.groups = app.setup.groups.filter((g) => g.
 app.editGroup = (g, patch) => { Object.assign(g, patch); if (patch.ang != null && !g.w) g.w = groupBounds(g).hw * 2 - UNITS[U[g.type]].spacing * 2; groupsChanged(); };
 app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !== g); if (app.selGroup === g) app.selGroup = null; groupsChanged(); };
 
+/** The band of wall walk a group posted along a wall takes up: its length, and how far out and in from the wall's centre line it reaches. */
+function runBand(g) {
+  const r = g.run, d = UNITS[U[g.type]], half = r.wall ? KEEP.half : WALL_HALF, len = wallRunLength(map, r.wall, r.a, r.b);
+  const st = Math.min(d.spacing * (g.spread || 1), 1.5), ranks = Math.ceil(g.count / Math.max(1, Math.floor(len / st) + 1));
+  return { len, out: half, inn: Math.max(-half, half - 2 - (ranks - 1) * 1.6), top: r.wall ? RING_TOP : WALL_H };
+}
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
   const lockOrc = !app.isSandbox();
   for (const g of app.setup.groups) {
     if (g.phase > 0 || (lockOrc && g.team === ORC)) continue; // later waves are beyond the valley mouth; a challenge's enemy is fixed
+    const pad = 3 / app.cam.zoom + 1;
+    if (g.run) {
+      // men along a wall walk: the pointer is over them where it is over their stretch of the walk
+      const r = runBand(g);
+      for (let k = 0; k <= 24; k++) {
+        const w = wallPoint(map, g.run.wall, g.run.a + ((g.run.b - g.run.a) * k) / 24), o = (wx - w.x) * w.nx + (wy - w.y) * w.ny, t = Math.abs(-(wx - w.x) * w.ny + (wy - w.y) * w.nx);
+        if (o < r.out + pad && o > r.inn - pad && t < r.len / 48 + 1 + pad) { const area = r.len * (r.out - r.inn) / 4; if (area < ba) { ba = area; best = g; } break; }
+      }
+      continue;
+    }
     const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
     const dx = wx - g.x, dy = wy - g.y;
     const a = dx * ux + dy * uy, p = -dx * uy + dy * ux;
-    const pad = 3 / app.cam.zoom + 1;
     if (Math.abs(a) < b.hw + pad && Math.abs(p) < b.hd + pad) { const area = b.hw * b.hd; if (area < ba) { ba = area; best = g; } }
   }
   return best;
@@ -853,7 +868,17 @@ function drawOverlay(dtReal) {
       const ux = Math.cos(g.ang), uy = Math.sin(g.ang), gz = heightAt(g.x, g.y) + 0.3;
       c.beginPath();
       let top = 1e9, cxs = 0;
-      for (const [a, p] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      if (g.run) {
+        // posted along a wall: the outline is their stretch of the walk, bent with the wall
+        const r = runBand(g), N = Math.max(4, Math.min(48, Math.ceil(r.len / 4)));
+        for (let k = 0; k <= 2 * N + 1; k++) {
+          const f = k <= N ? k / N : (2 * N + 1 - k) / N, o = k <= N ? r.out : r.inn, w = wallPoint(map, g.run.wall, g.run.a + (g.run.b - g.run.a) * f);
+          const q = S(w.x + w.nx * o, w.y + w.ny * o, r.top + 0.3);
+          if (k) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]);
+          top = Math.min(top, q[1]);
+          if (k === (N >> 1)) cxs = q[0];
+        }
+      } else for (const [a, p] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
         const q = S(g.x + ux * a * b.hw - uy * p * b.hd, g.y + uy * a * b.hw + ux * p * b.hd, gz);
         if (a === -1 && p === -1) c.moveTo(q[0], q[1]); else c.lineTo(q[0], q[1]);
         top = Math.min(top, q[1]); cxs += q[0] / 4;

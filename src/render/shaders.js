@@ -37,7 +37,7 @@ const LIGHT = `
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uEye; uniform float uWet; uniform float uExposure;
 uniform mat4 uShadowVP; uniform highp sampler2DShadow uShadow; uniform float uShadowOn; uniform float uShadowTexel;
 uniform vec4 uLPos[6]; uniform vec3 uLCol[6];
-uniform sampler2D uTorch; uniform vec4 uTorchRect; uniform float uTorchK;   // the watch fires: how bright at each place, and how high they burn
+uniform sampler2D uTorch; uniform vec4 uTorchRect; uniform float uTorchK; uniform sampler2D uTorch2; uniform vec2 uTorch2Size;   // the watch fires: how bright at each place, and how high they burn
 float shadowAt(vec3 wp, float ndl){
   if (uShadowOn < .5) return 1.;
   vec4 sc = uShadowVP*vec4(wp,1.); vec3 p = sc.xyz*0.5+0.5;
@@ -66,6 +66,11 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wp, float rough, float spec, float ao){
     // firelight: read off a map of the fortress's braziers, brightest at the height the fire burns and fading above and below
     vec4 tq = texture(uTorch, (wp.xy - uTorchRect.xy)/uTorchRect.zw);
     l += vec3(1.0, 0.5, 0.18)*(tq.r*2.4*exp(-abs(wp.z + 1.0 - tq.a*64.)*0.17)*uTorchK*(0.55 + 0.45*max(n.z, 0.) + 0.3*(1. - abs(n.z))));
+  }
+  {
+    // and the torches the horde carries, from a map made each frame
+    vec4 th = texture(uTorch2, wp.xy/uTorch2Size);
+    l += vec3(1.0, 0.5, 0.18)*(th.r*0.7*exp(-abs(wp.z + 0.8 - th.a*64.)*0.22)*(0.6 + 0.4*max(n.z, 0.) + 0.25*(1. - abs(n.z))));
   }
   vec3 c = (a*l + s)*uExposure;
   return sqrt(c/(1.+0.22*c));
