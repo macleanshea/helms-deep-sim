@@ -1,0 +1,22 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/archer.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-crossbow/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-crossbow.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b748-7270-b221-232510829608",
+      "remesh": "01a21f5b-1f91-733b-9b1a-90c064981402"
+    }
+  }
+}

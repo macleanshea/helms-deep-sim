@@ -1,0 +1,22 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/mortar.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-mortar/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-mortar.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-f163-7393-aec2-6246ff7b8cca",
+      "remesh": "01a21f5b-95ca-733a-bfe8-130e7c11cbb3"
+    }
+  }
+}

@@ -61,8 +61,10 @@ const download = (id, selector, file) => {
 };
 
 // ---- 1. concept sheet
+// (a unit with tools/assets/concepts/<unit>.text.txt has no sheet: its model is made from that description alone, see below)
+const textFile = path.join(here, 'concepts', `${unit}.text.txt`), fromText = fs.existsSync(textFile);
 const concept = path.join(work, 'concept.png'), keep = path.join(here, 'concepts', `${unit}.jpg`);
-if (!fs.existsSync(concept)) {
+if (!fromText && !fs.existsSync(concept)) {
   const prompt = fs.readFileSync(path.join(here, 'concepts', `${unit}.prompt.txt`), 'utf8').trim();
   const portrait = path.join(root, recipe.portrait || `assets/units/${unit}.webp`), ref = path.join(work, 'portrait.png');
   execFileSync('python3', ['-I', '-c', 'import sys\nfrom PIL import Image\nImage.open(sys.argv[1]).convert("RGB").save(sys.argv[2])', portrait, ref]);
@@ -80,22 +82,30 @@ if (process.argv.includes('--concept-only')) process.exit(0);
 // ---- 2. Meshy
 // (a beast or a machine gets no rig from Meshy, which rigs only two-legged figures: its bones are made in the import)
 const fixed = recipe.quadruped ? 'quadruped' : recipe.rigid ? 'rigid' : null;
-if (!state.tasks.model) {
+if (fromText && !state.tasks.preview) {
+  // text to 3D is two tasks: a shape (preview), then its colours (refine, the task kept as "model")
+  const r = meshy(['text-to-3d', 'create', '--mode', 'preview', '--prompt', fs.readFileSync(textFile, 'utf8').trim().slice(0, 600), '--async']);
+  state.tasks.preview = r.submission.task_id; save();
+  log(`text-to-3d preview: issued ${state.tasks.preview}`);
+}
+if (!fromText && !state.tasks.model) {
   const r = meshy(['image-to-3d', 'create', '--image-url', concept, '--model-type', 'standard', '--should-texture', 'true', '--enable-pbr', 'true', '--texture-resolution', '2k', ...(fixed ? [] : ['--pose-mode', 'a-pose']), '--target-formats', 'glb', '--async']);
   state.tasks.model = r.submission.task_id; save();
   log(`image-to-3d: issued ${state.tasks.model}`);
 }
 if (!state.project) {
-  state.project = meshy(['project', 'init', '--root', path.join(work, 'meshy_output'), '--name', unit, '--task-id', state.tasks.model, '--task-type', 'image-to-3d', '--workspace', work]).project_dir; save();
+  state.project = meshy(['project', 'init', '--root', path.join(work, 'meshy_output'), '--name', unit, '--task-id', fromText ? state.tasks.preview : state.tasks.model, '--task-type', fromText ? 'text-to-3d' : 'image-to-3d', '--workspace', work]).project_dir; save();
 }
-const model = task('model', 'image-to-3d', []);
+const model = fromText
+  ? task('model', 'text-to-3d', ['--mode', 'refine', '--preview-task-id', task('preview', 'text-to-3d', []), '--texture-resolution', '2k', '--target-formats', 'glb', '--project', state.project, '--stage', 'refine', '--workspace', work])
+  : task('model', 'image-to-3d', []);
 const remesh = task('remesh', 'remesh', ['--input-task-id', model, '--topology', 'triangle', '--target-polycount', '10000', '--target-formats', 'glb', '--project', state.project, '--stage', 'remesh', '--workspace', work]);
 if (fixed) {
   const file = path.join(work, 'model.glb');
   download(remesh, ['--asset', 'model.glb'], file);
   download(model, ['--asset', 'thumbnail.primary'], path.join(work, 'preview.png'));
   recipe[fixed].file = path.relative(root, file);
-  recipe.source = { generator: 'meshy', concept: path.relative(root, keep), prompt: `tools/assets/concepts/${unit}.prompt.txt`, tasks: { 'image-to-3d': model, remesh } };
+  recipe.source = fromText ? { generator: 'meshy', prompt: `tools/assets/concepts/${unit}.text.txt`, tasks: { 'text-to-3d': model, remesh } } : { generator: 'meshy', concept: path.relative(root, keep), prompt: `tools/assets/concepts/${unit}.prompt.txt`, tasks: { 'image-to-3d': model, remesh } };
   fs.writeFileSync(recipeFile, JSON.stringify(recipe, null, 2) + '\n');
   execFileSync(process.execPath, [path.join(here, 'import.js'), unit], { stdio: 'inherit' });
   if (!process.argv.includes('--no-build')) execFileSync(process.execPath, [path.join(here, 'build.js'), unit], { stdio: 'inherit' });

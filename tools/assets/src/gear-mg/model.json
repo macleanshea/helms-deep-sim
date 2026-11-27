@@ -1,0 +1,55 @@
+{
+  "unit": "gear-mg",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-mg.jpg",
+    "prompt": "tools/assets/concepts/gear-mg.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f58-b0a4-775c-b05e-33ca55f24f87",
+      "remesh": "01a21f59-ad9a-779e-958a-d09ad923f614"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 56121
+    },
+    "nrm": {
+      "offset": 224484,
+      "length": 56121
+    },
+    "uv": {
+      "offset": 448968,
+      "length": 37414
+    },
+    "joints": {
+      "offset": 598624,
+      "length": 74828
+    },
+    "weights": {
+      "offset": 673452,
+      "length": 74828
+    },
+    "index": {
+      "offset": 972764,
+      "length": 29394
+    },
+    "ibm": {
+      "offset": 1090340,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

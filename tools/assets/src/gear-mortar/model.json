@@ -1,0 +1,54 @@
+{
+  "unit": "gear-mortar",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-mortar.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-f163-7393-aec2-6246ff7b8cca",
+      "remesh": "01a21f5b-95ca-733a-bfe8-130e7c11cbb3"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 45138
+    },
+    "nrm": {
+      "offset": 180552,
+      "length": 45138
+    },
+    "uv": {
+      "offset": 361104,
+      "length": 30092
+    },
+    "joints": {
+      "offset": 481472,
+      "length": 60184
+    },
+    "weights": {
+      "offset": 541656,
+      "length": 60184
+    },
+    "index": {
+      "offset": 782392,
+      "length": 30024
+    },
+    "ibm": {
+      "offset": 902488,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

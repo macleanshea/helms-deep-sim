@@ -1,0 +1,54 @@
+{
+  "unit": "gear-sniper",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-sniper.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b7f0-70d7-a2e0-9c9fe606ec51",
+      "remesh": "01a21f5b-2130-73a1-b705-7daa0d58a51b"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 45879
+    },
+    "nrm": {
+      "offset": 183516,
+      "length": 45879
+    },
+    "uv": {
+      "offset": 367032,
+      "length": 30586
+    },
+    "joints": {
+      "offset": 489376,
+      "length": 61172
+    },
+    "weights": {
+      "offset": 550548,
+      "length": 61172
+    },
+    "index": {
+      "offset": 795236,
+      "length": 29220
+    },
+    "ibm": {
+      "offset": 912116,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/at.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-tube/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-tube.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b740-711f-8c58-9204c4cf9615",
+      "remesh": "01a21f5b-1f6b-722a-8c4a-6021d060a410"
+    }
+  }
+}

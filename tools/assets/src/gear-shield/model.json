@@ -1,0 +1,55 @@
+{
+  "unit": "gear-shield",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-shield.jpg",
+    "prompt": "tools/assets/concepts/gear-shield.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-3bc4-753c-b551-b76d7111d5d8",
+      "remesh": "01a21f58-3bd2-7123-98ff-3d9834409835"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 41709
+    },
+    "nrm": {
+      "offset": 166836,
+      "length": 41709
+    },
+    "uv": {
+      "offset": 333672,
+      "length": 27806
+    },
+    "joints": {
+      "offset": 444896,
+      "length": 55612
+    },
+    "weights": {
+      "offset": 500508,
+      "length": 55612
+    },
+    "index": {
+      "offset": 722956,
+      "length": 27234
+    },
+    "ibm": {
+      "offset": 831892,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

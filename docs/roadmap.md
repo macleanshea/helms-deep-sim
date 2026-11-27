@@ -444,6 +444,17 @@ its garrison's cost. Also: the Advanced button is outlined in the accent colour 
 opens itself when a defender is added in a challenge; an air strike is always twelve bombs, laid further
 apart on a longer run.
 
+**Weapons and shields as models.** Gear was plain boxes in four flat colours. Each kind is now a generated
+model of its own (`tools/assets/src/gear-*/`: sword, shield, club, crossbow, rifle, machine gun, marksman's
+rifle, launcher, launch tube, mortar; 350 credits). `build.js fit()` sets each in the hand by the frame the
+boxes used (length from grip to tip, breadth, the point that sits in the hand), tells the tip from the shape,
+and joins it to the figure before the levels of detail are made, so it is reduced and painted with the body
+(each piece painted only from its own surface). Boxes remain only at the coarsest level. The image service
+refused concept pictures for the crossbow and every firearm but one, twice; those six were made from a
+written description instead (`concepts/<name>.text.txt`, the generator's text-to-3D: `generate.js` takes that
+path when the file is there). The mortar the generator made is a stout emplaced piece, not a tube and bipod.
+Pictures: `docs/progress/gear/`.
+
 **The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
 one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 

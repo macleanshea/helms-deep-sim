@@ -1,0 +1,55 @@
+{
+  "unit": "gear-sword",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-sword.jpg",
+    "prompt": "tools/assets/concepts/gear-sword.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-09b7-7098-8d05-8f632ada2e73",
+      "remesh": "01a21f57-b8a5-71ff-9c8b-142b67f7e511"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 33279
+    },
+    "nrm": {
+      "offset": 133116,
+      "length": 33279
+    },
+    "uv": {
+      "offset": 266232,
+      "length": 22186
+    },
+    "joints": {
+      "offset": 354976,
+      "length": 44372
+    },
+    "weights": {
+      "offset": 399348,
+      "length": 44372
+    },
+    "index": {
+      "offset": 576836,
+      "length": 30642
+    },
+    "ibm": {
+      "offset": 699404,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

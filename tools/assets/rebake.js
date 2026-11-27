@@ -17,9 +17,11 @@
  * @param W, H    size of the picture to paint
  * @param regions [x, y, w, h] in it for each level
  * @param byBone  keep vertices of different bones apart even where they share a place (machines)
+ * @param group   a number for each vertex (the figure 0, each piece of gear its own): a texel is painted only from its own
+ *                group's surface, so a sword's grip does not take the colour of the hand closed round it
  * @returns { px: Uint8Array(W * H * 3), levels: [{ from: Int32Array, uv: Float32Array, index: Uint32Array, charts }] }
  */
-export function rebake(m, levels, src, W, H, regions, byBone = false) {
+export function rebake(m, levels, src, W, H, regions, byBone = false, group = null) {
   const nv = m.pos.length / 3, pos = m.pos;
   // places: vertices that share a position
   const place = new Int32Array(nv), seen = new Map(), rep = [];
@@ -31,7 +33,7 @@ export function rebake(m, levels, src, W, H, regions, byBone = false) {
   }
   const np = rep.length, P = new Float64Array(np * 3);
   for (let p = 0; p < np; p++) for (let e = 0; e < 3; e++) P[p * 3 + e] = pos[rep[p] * 3 + e];
-  const near = nearest(m);
+  const near = nearest(m, group);
   const out = new Uint8Array(W * H * 3), done = new Uint8Array(W * H), res = [];
   const fr = (x) => x - Math.floor(x);
   const sample = (u, v, o) => {
@@ -162,7 +164,7 @@ export function rebake(m, levels, src, W, H, regions, byBone = false) {
           const o = y * W + x, rank = mn >= 0 ? 2 : 1; // (a texel inside one triangle is not overwritten from the margin of its neighbour)
           if (done[o] >= rank) continue;
           b0 = Math.max(0, b0); b1 = Math.max(0, b1); b2 = Math.max(0, b2); const s = b0 + b1 + b2; b0 /= s; b1 /= s; b2 /= s;
-          const h = near(P[A] * b0 + P[B] * b1 + P[C] * b2, P[A + 1] * b0 + P[B + 1] * b1 + P[C + 1] * b2, P[A + 2] * b0 + P[B + 2] * b1 + P[C + 2] * b2, fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2]);
+          const h = near(P[A] * b0 + P[B] * b1 + P[C] * b2, P[A + 1] * b0 + P[B + 1] * b1 + P[C + 1] * b2, P[A + 2] * b0 + P[B + 2] * b1 + P[C + 2] * b2, fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2], group ? group[T[t * 6 + 3]] : -1);
           sample(h[0], h[1], o * 3);
           if (!done[o]) { filled++; sr += out[o * 3]; sg += out[o * 3 + 1]; sb += out[o * 3 + 2]; }
           done[o] = rank;
@@ -188,7 +190,7 @@ export function rebake(m, levels, src, W, H, regions, byBone = false) {
 }
 
 /** The full model's surface, for asking which point of it lies nearest a place: returns (x, y, z, nx, ny, nz) => [u, v]. */
-function nearest(m) {
+function nearest(m, group) {
   const pos = m.pos, idx = m.index, nt = idx.length / 3, uv = m.uv;
   let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
   for (let v = 0; v < pos.length; v += 3) for (let e = 0; e < 3; e++) { if (pos[v + e] < lo[e]) lo[e] = pos[v + e]; if (pos[v + e] > hi[e]) hi[e] = pos[v + e]; }
@@ -232,7 +234,7 @@ function nearest(m) {
     return qx * qx + qy * qy + qz * qz;
   };
   const fr = (x) => x - Math.floor(x);
-  return (px, py, pz, fx, fy, fz) => {
+  return (px, py, pz, fx, fy, fz, grp = -1) => {
     const cx = Math.floor((px - lo[0]) / cs), cy = Math.floor((py - lo[1]) / cs), cz = Math.floor((pz - lo[2]) / cs);
     let best = Infinity, bt = -1, b0 = 0, b1 = 0, b2 = 0;
     tick++;
@@ -243,6 +245,7 @@ function nearest(m) {
           const l = cells[(z * ny + y) * nx + x]; if (!l) continue;
           for (const t of l) {
             if (stamp[t] === tick) continue; stamp[t] = tick;
+            if (grp >= 0 && group[idx[t * 3]] !== grp) continue;
             let d = dist2(px, py, pz, t);
             // (a surface facing the other way is another layer: the inside of a cloak, the far side of a thin plate)
             if (tn[t * 3] * fx + tn[t * 3 + 1] * fy + tn[t * 3 + 2] * fz < -0.2) d = d * 4 + cs * cs * 0.05;
@@ -251,6 +254,7 @@ function nearest(m) {
         } } }
       if (bt >= 0 && best <= ring * cs * ring * cs) break;
     }
+    if (bt < 0) { res[0] = 0; res[1] = 0; return res; }
     const A = idx[bt * 3] * 2, B = idx[bt * 3 + 1] * 2, C = idx[bt * 3 + 2] * 2;
     // (a triangle's corners may sit either side of the picture's edge: they are taken within one turn of the first)
     const ua = fr(uv[A]), va = fr(uv[A + 1]);

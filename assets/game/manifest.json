@@ -1,24 +1,24 @@
 {
   "units": {
     "uruk": {
-      "pack": "uruk.e21a9c7e95.bin",
-      "texture": "uruk.b03a1a3686.webp",
-      "bytes": 1131524
+      "pack": "uruk.b92d622a1a.bin",
+      "texture": "uruk.e80b78afb3.webp",
+      "bytes": 1127112
     },
     "archer": {
-      "pack": "archer.ee6a6cd573.bin",
-      "texture": "archer.c5ea91b4ce.webp",
-      "bytes": 680372
+      "pack": "archer.124aae48d9.bin",
+      "texture": "archer.aadee76364.webp",
+      "bytes": 681660
     },
     "berserker": {
-      "pack": "berserker.5e83616b45.bin",
-      "texture": "berserker.9811275be2.webp",
-      "bytes": 554984
+      "pack": "berserker.b86a37c9c3.bin",
+      "texture": "berserker.f1e1fb6506.webp",
+      "bytes": 550940
     },
     "chief": {
-      "pack": "chief.c8868282ae.bin",
-      "texture": "chief.8e6b62b22c.webp",
-      "bytes": 608348
+      "pack": "chief.fe0ccf81dd.bin",
+      "texture": "chief.6117ccc1a3.webp",
+      "bytes": 602916
     },
     "sapper": {
       "pack": "sapper.8ab583ffba.bin",
@@ -26,44 +26,44 @@
       "bytes": 658604
     },
     "troll": {
-      "pack": "troll.f3526f0b71.bin",
-      "texture": "troll.920cc6d75f.webp",
-      "bytes": 494040
+      "pack": "troll.643a631e28.bin",
+      "texture": "troll.0e622a862a.webp",
+      "bytes": 491424
     },
     "rifle": {
-      "pack": "rifle.e2d777e000.bin",
-      "texture": "rifle.332283a905.webp",
-      "bytes": 444932
+      "pack": "rifle.1844bcb9be.bin",
+      "texture": "rifle.f2e24b2986.webp",
+      "bytes": 450852
     },
     "mg": {
-      "pack": "mg.cf263f8037.bin",
-      "texture": "mg.ccba01ab5e.webp",
-      "bytes": 443636
+      "pack": "mg.96aa01e7e1.bin",
+      "texture": "mg.0f42075734.webp",
+      "bytes": 453188
     },
     "marksman": {
-      "pack": "marksman.2cf59c3fff.bin",
-      "texture": "marksman.1eddd67174.webp",
-      "bytes": 490524
+      "pack": "marksman.2a6071e829.bin",
+      "texture": "marksman.955dae15b4.webp",
+      "bytes": 492220
     },
     "grenadier": {
-      "pack": "grenadier.14069cd5b8.bin",
-      "texture": "grenadier.c222ef883f.webp",
-      "bytes": 453356
+      "pack": "grenadier.0dfb237983.bin",
+      "texture": "grenadier.875f57c237.webp",
+      "bytes": 453916
     },
     "at": {
-      "pack": "at.46b0d4b92b.bin",
-      "texture": "at.5612feaf74.webp",
-      "bytes": 452640
+      "pack": "at.7368b4ec89.bin",
+      "texture": "at.4c6881480b.webp",
+      "bytes": 450944
     },
     "cmd": {
-      "pack": "cmd.c1157bbc97.bin",
-      "texture": "cmd.102b1e4a46.webp",
-      "bytes": 437804
+      "pack": "cmd.f82de1bd24.bin",
+      "texture": "cmd.04c17e689f.webp",
+      "bytes": 443292
     },
     "mortar": {
-      "pack": "mortar.5cabef80a3.bin",
-      "texture": "mortar.0493bf339d.webp",
-      "bytes": 451244
+      "pack": "mortar.11b0e4f537.bin",
+      "texture": "mortar.d9b3b006d1.webp",
+      "bytes": 452912
     },
     "warg": {
       "pack": "warg.511163ed44.bin",

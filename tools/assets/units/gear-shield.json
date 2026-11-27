@@ -1,0 +1,23 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1024x1536",
+  "portrait": "assets/units/uruk.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-shield/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-shield.jpg",
+    "prompt": "tools/assets/concepts/gear-shield.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-3bc4-753c-b551-b76d7111d5d8",
+      "remesh": "01a21f58-3bd2-7123-98ff-3d9834409835"
+    }
+  }
+}

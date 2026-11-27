@@ -1,0 +1,22 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/marksman.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-sniper/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-sniper.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b7f0-70d7-a2e0-9c9fe606ec51",
+      "remesh": "01a21f5b-2130-73a1-b705-7daa0d58a51b"
+    }
+  }
+}
