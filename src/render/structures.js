@@ -362,6 +362,9 @@ function stairs(m, map) {
         // the parapet on the open side, stepping up with the flight
         m.prism([P(a0, ro - 0.5, zt), P(a1, ro - 0.5, zt), P(a1, ro, zt), P(a0, ro, zt)], [P(a0, ro - 0.5, zt + 1.15), P(a1, ro - 0.5, zt + 1.15), P(a1, ro, zt + 1.15), P(a0, ro, zt + 1.15)], STONE_LT);
       }
+      // the landing's far end is closed from the parapet across to the drum: the head opens only onto the court
+      const ae = ang(st.len), ab = ang(st.len - 0.5);
+      m.prism([P(ab, ri, st.z1), P(ae, ri, st.z1), P(ae, ro, st.z1), P(ab, ro, st.z1)], [P(ab, ri, st.z1 + 1.15), P(ae, ri, st.z1 + 1.15), P(ae, ro, st.z1 + 1.15), P(ab, ro, st.z1 + 1.15)], STONE_LT);
       continue;
     }
     const steps = 16, px = -st.dy, py = st.dx, run = (st.len - 2) / steps, rise = st.z1 - st.z0;
@@ -380,6 +383,10 @@ function stairs(m, map) {
     m.frameBox([mx, my, st.z0 + rise / 2 + 0.75], [st.dx * L / 2, st.dy * L / 2, rise / 2], [px * 0.26, py * 0.26, 0], [0, 0, 0.6], STONE_LT);
     m.frameBox([mx, my, st.z0 + rise / 2 + 1.42], [st.dx * L / 2, st.dy * L / 2, rise / 2], [px * 0.36, py * 0.36, 0], [0, 0, 0.09], STONE);
     m.frameBox([hx + ox, hy + oy, st.z1 + 0.7], [st.dx, st.dy, 0], [px * 0.26, py * 0.26, 0], [0, 0, 0.7], STONE_LT);
+    // and across the far end of the landing, from that parapet to the wall, so the head is open only onto the walk
+    const ex = st.x + st.dx * (st.len - 0.26), ey = st.y + st.dy * (st.len - 0.26);
+    m.frameBox([ex, ey, st.z1 + 0.6], [st.dx * 0.26, st.dy * 0.26, 0], [px * st.half, py * st.half, 0], [0, 0, 0.6], STONE_LT);
+    m.frameBox([ex, ey, st.z1 + 1.29], [st.dx * 0.36, st.dy * 0.36, 0], [px * (st.half + 0.1), py * (st.half + 0.1), 0], [0, 0, 0.09], STONE);
   }
 }
 
@@ -465,34 +472,53 @@ function hallArcade(m, map, t) {
   const L = 2 * (t.r - 2) * Math.sin(span / 2), d = (t.r - 2) * Math.cos(span / 2) - 1.5, H = 13, bays = Math.max(3, Math.round(L / 6.4)), bw = L / bays;
   // a frame standing on the ward at the middle of the front: +x out of the cliff (toward the ward), +y along the front
   m.frame([t.x + Math.cos(am) * d, t.y + Math.sin(am) * d, t.z], [-Math.cos(am), -Math.sin(am)], [Math.sin(am), -Math.cos(am)], () => {
-    m.box(-2.5, 0, H / 2, 5, L + 3, H, STONE);                              // the front wall, thick, running back into the rock
+    const H2 = 7.5, HR0 = H + H2, D = 1.6;
+    // the hall's body lies behind the front and runs back into the mountain: nothing of it stands free
+    m.box(-D - 17, 0, HR0 / 2, 34, L + 3, HR0, STONE_DK);
     m.box(0.25, 0, 0.5, 0.9, L + 3.4, 1.0, STONE_DK);                        // plinth
-    m.box(0.3, 0, H - 2.6, 0.9, L + 3.2, 0.5, STONE_LT);                     // string course over the arches
-    for (let k = 0; k < bays; k++) {
-      const y = (k + 0.5 - bays / 2) * bw, w = bw * 0.62, hs = H - 6.6, arch = [], ring = [];
-      // the opening: a tall doorway with a round head; behind it, the dark of the hall, here and there a fire
-      for (let q = 0; q <= 8; q++) { const a = (q / 8) * Math.PI; arch.push([y + Math.cos(a) * w / 2, 1.0 + hs + Math.sin(a) * w / 2]); ring.push([y + Math.cos(a) * (w / 2 + 0.38), 1.0 + hs + Math.sin(a) * (w / 2 + 0.38)]); }
-      m.extrudeX([[y + w / 2 + 0.38, 1.0], ...ring, [y - w / 2 - 0.38, 1.0]], 0, 0.32, STONE_LT);
-      m.withMat(k % 3 === 1 ? MAT.EMIT : MAT.PLAIN, () => m.extrudeX([[y + w / 2, 1.0], ...arch, [y - w / 2, 1.0]], 0, 0.4, k % 3 === 1 ? dim(LAMP, 0.55) : DARK));
-      // a small light over each arch, and a pier between bays
-      m.box(0.14, y, H - 1.5, 0.3, 0.9, 1.5, STONE_LT); slit(m, 0.3, y, H - 1.5, 0.5, 1.1, k % 2 === 0);
-      if (k > 0) m.box(0.45, y - bw / 2, (H - 2.6) / 2, 0.9, bw * 0.16, H - 2.6, STONE_LT);
-    }
-    // the upper storey: a gallery of smaller arches under the eaves, most of them lit from the hall within
-    const H2 = 7.5, nb2 = bays * 2;
-    m.box(-2.5, 0, H + H2 / 2, 5, L + 3, H2, STONE);
-    for (let k = 0; k < nb2; k++) {
-      const y = (k + 0.5 - nb2 / 2) * (L / nb2), w = (L / nb2) * 0.5, top2 = [];
-      for (let q = 0; q <= 6; q++) { const a = (q / 6) * Math.PI; top2.push([y + Math.cos(a) * w / 2, H + 1.6 + 2.4 + Math.sin(a) * w / 2]); }
-      m.withMat(k % 3 !== 2 ? MAT.EMIT : MAT.PLAIN, () => m.extrudeX([[y + w / 2, H + 1.6], ...top2, [y - w / 2, H + 1.6]], 0, 0.14, k % 3 !== 2 ? dim(LAMP, 0.5) : DARK));
-      m.box(0.2, y + (L / nb2) / 2, H + 1.6 + 1.7, 0.5, (L / nb2) * 0.22, 3.6, STONE_LT);
-    }
-    m.box(0.3, 0, H + 1.2, 0.9, L + 3.2, 0.45, STONE_LT);
-    m.box(0.35, 0, H + H2 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);
-    for (const sd of [-1, 1]) m.box(0.5, sd * (L / 2 + 0.6), (H + H2) / 2, 1.6, 1.8, H + H2 + 1.5, STONE_LT);     // end piers
-    // the roof: a slate pent running back and up into the mountain
+    /**
+     * One arched opening in a bay `bw` wide: the piers either side of it, the masonry over its round head, and behind
+     * them the room, glowing from a fire on its floor if it is lit and no more than a dim hollow if it is not.
+     */
+    const opening = (y, w, bw, z0, hs, zTop, lit) => {
+      const r = w / 2, zs = z0 + hs;
+      for (const sd of [-1, 1]) m.box(-D / 2, y + sd * (r + bw / 2) / 2, (z0 + zTop) / 2, D, bw / 2 - r + 0.02, zTop - z0, STONE);
+      for (let q = 0; q < 8; q++) {
+        const a0 = (q / 8) * Math.PI, a1 = ((q + 1) / 8) * Math.PI, ya = y + Math.cos(a0) * r, yb = y + Math.cos(a1) * r;
+        m.extrudeX([[ya, zs + Math.sin(a0) * r], [yb, zs + Math.sin(a1) * r], [yb, zTop], [ya, zTop]], -D, 0, STONE);
+        // the arch ring, standing a little proud
+        m.extrudeX([[y + Math.cos(a0) * r, zs + Math.sin(a0) * r], [y + Math.cos(a1) * r, zs + Math.sin(a1) * r], [y + Math.cos(a1) * (r + 0.36), zs + Math.sin(a1) * (r + 0.36)], [y + Math.cos(a0) * (r + 0.36), zs + Math.sin(a0) * (r + 0.36)]], -0.05, 0.2, q & 1 ? STONE_LT : STONE);
+      }
+      const warm = lit ? [0.98, 0.56, 0.2] : [0.07, 0.055, 0.045], dimTop = lit ? [0.2, 0.09, 0.03] : [0.012, 0.011, 0.012], zt = zs + r;
+      m.withMat(MAT.EMIT, () => {
+        // the back of the room: brightest low down in the middle, where the fire is, dying away to the vault
+        for (const sd of [-1, 1]) m.quadC([-D + 0.02, y, z0], [-D + 0.02, y + sd * r, z0], [-D + 0.02, y + sd * r, zt], [-D + 0.02, y, zt], [-D - 5, y, z0], warm, dim(warm, 0.55), dimTop, dim(dimTop, 1.6));
+        m.quadC([-D + 0.02, y - r, z0 + 0.02], [0, y - r, z0 + 0.02], [0, y + r, z0 + 0.02], [-D + 0.02, y + r, z0 + 0.02], [-D / 2, y, z0 - 5], dim(warm, 0.5), dim(warm, 0.18), dim(warm, 0.18), dim(warm, 0.5));   // light on the threshold
+      });
+    };
+    for (let k = 0; k < bays; k++) opening((k + 0.5 - bays / 2) * bw, bw * 0.62, bw, 1.0, H - 6.6 - 1.0 + 1.0, H, k % 3 !== 2);
+    m.box(0.12, 0, H - 0.3, 0.5, L + 3.2, 0.5, STONE_LT);                    // string course between the storeys
+    // the upper storey: a gallery of smaller arches under the eaves
+    const nb2 = bays * 2, bw2 = L / nb2;
+    for (let k = 0; k < nb2; k++) opening((k + 0.5 - nb2 / 2) * bw2, bw2 * 0.52, bw2, H + 0.6, 3.0, HR0, k % 4 !== 3);
+    m.box(0.3, 0, HR0 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                  // cornice
+    for (const sd of [-1, 1]) m.box(0.2, sd * (L / 2 + 0.75), HR0 / 2, 1.6, 1.5, HR0 + 1.5, STONE_LT);     // end piers
     const HR = H + H2;
-    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, HR + 0.5], [0.9, L / 2 + 1.7, HR + 0.5], [-7, L / 2 + 1.7, HR + 4.8], [-7, -L / 2 - 1.7, HR + 4.8]], [[0.9, -L / 2 - 1.7, HR + 0.8], [0.9, L / 2 + 1.7, HR + 0.8], [-7, L / 2 + 1.7, HR + 5.1], [-7, -L / 2 - 1.7, HR + 5.1]], SLATE));
+    // the mountain closes round it: shoulders of rock either side of the front and over its roof, so only the face shows
+    m.withMat(MAT.ROCK, () => {
+      const ROCKC = [0.4, 0.39, 0.36];
+      seed = 9091;
+      // (each a rough lump: a few-sided ball pulled out of shape and turned, no two the same)
+      const lump = (cx, cy, cz, sz) => {
+        m.push().translate(cx, cy, cz).rotZ(rnd() * 6.28).rotY((rnd() - 0.5) * 0.9).scale(sz * (0.8 + rnd() * 0.5), sz * (0.65 + rnd() * 0.4), sz * (0.9 + rnd() * 0.7));
+        m.sphere([0, 0, 0], 1, dim(ROCKC, 0.78 + rnd() * 0.36), 0, 6 + ((rnd() * 3) | 0), 4 + ((rnd() * 2) | 0));
+        m.pop();
+      };
+      for (const sd of [-1, 1]) for (let k = 0; k < 9; k++) lump(-1 - rnd() * 8 - k * 0.3, sd * (L / 2 + 3.5 + rnd() * 7 + (k % 3) * 2), (k * (HR0 + 8)) / 9 + rnd() * 3, 5 + rnd() * 4);
+      for (let k = 0; k < 8; k++) lump(-5 - rnd() * 9, (k / 7 - 0.5) * (L + 12), HR0 + 5 + rnd() * 6, 5.5 + rnd() * 4.5);
+    });
+    // the roof: a slate pent climbing back until the mountain takes it
+    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, HR + 0.5], [0.9, L / 2 + 1.7, HR + 0.5], [-34, L / 2 + 1.7, HR + 14], [-34, -L / 2 - 1.7, HR + 14]], [[0.9, -L / 2 - 1.7, HR + 0.8], [0.9, L / 2 + 1.7, HR + 0.8], [-34, L / 2 + 1.7, HR + 14.3], [-34, -L / 2 - 1.7, HR + 14.3]], SLATE));
   });
 }
 
@@ -543,24 +569,30 @@ function banner(m, x, y, z, h = 9, len = 4.6) {
 function dressing(m, map) {
   const g = map.segments[map.GATE], f = map.flanks[0], top = RING_TOP;
   const P = (u, v, z) => [g.x + g.nx * u + g.tx * v, g.y + g.ny * u + g.ty * v, z];
-  // the gallery: posts at the corners of the platform over the gate, a plank parapet toward the field, a slate roof
-  const u0 = -KEEP.half + 0.6, u1 = KEEP.half + 1.4, hw = f.v0 + 0.4, zr = top + 3.3;
-  m.withMat(MAT.TIMBER, () => {
-    for (const u of [u0, u1]) for (const v of [-hw, hw]) { const p = P(u, v, 0); m.box(p[0], p[1], top + zr / 2 - top / 2 + 0.0, 0.32, 0.32, zr - top, WOOD, 0, Math.atan2(g.ny, g.nx)); }
-    m.frame([g.x, g.y, 0], [g.nx, g.ny], [g.tx, g.ty], () => {
-      m.box(u1 + 0.1, 0, top + 1.0, 0.14, hw * 2, 0.9, dim(WOOD, 0.9));          // the breast of planks, with a gap to shoot through below the eaves
-      m.box((u0 + u1) / 2, 0, zr - 0.12, u1 - u0 + 0.5, hw * 2 + 0.5, 0.2, dim(WOOD, 0.8));
-      for (let k = -2; k <= 2; k++) m.box(u1 + 0.75, k * hw * 0.42, top - 0.5, 1.5, 0.24, 0.24, dim(WOOD, 0.75));   // the beams it oversails on
+  // a gallery over each way in (the gate, the postern, the door from the Deeping Wall): posts at the corners of the
+  // walk above the arch, a plank breast toward the field, beams it oversails on, a slate roof
+  const gallery = (sg, hw) => {
+    const u0 = -KEEP.half + 0.6, u1 = KEEP.half + 1.4, zr = top + 3.3, yaw = Math.atan2(sg.ny, sg.nx);
+    m.withMat(MAT.TIMBER, () => {
+      for (const u of [u0, u1]) for (const v of [-hw, hw]) m.box(sg.x + sg.nx * u + sg.tx * v, sg.y + sg.ny * u + sg.ty * v, (top + zr) / 2, 0.32, 0.32, zr - top, WOOD, 0, yaw);
+      m.frame([sg.x, sg.y, 0], [sg.nx, sg.ny], [sg.tx, sg.ty], () => {
+        m.box(u1 + 0.1, 0, top + 1.0, 0.14, hw * 2, 0.9, dim(WOOD, 0.9));
+        m.box((u0 + u1) / 2, 0, zr - 0.12, u1 - u0 + 0.5, hw * 2 + 0.5, 0.2, dim(WOOD, 0.8));
+        for (let k = -2; k <= 2; k++) m.box(u1 + 0.75, k * hw * 0.42, top - 0.5, 1.5, 0.24, 0.24, dim(WOOD, 0.75));
+      });
     });
-  });
-  m.withMat(MAT.SLATE, () => m.frame([g.x, g.y, 0], [g.nx, g.ny], [g.tx, g.ty], () => {
-    const um = (u0 + u1) / 2, e = 0.7;
-    m.prism([[u0 - e, -hw - e, zr], [u1 + e, -hw - e, zr], [u1 + e, hw + e, zr], [u0 - e, hw + e, zr]], [[um - 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, hw * 0.55, zr + 2.6], [um - 0.4, hw * 0.55, zr + 2.6]], SLATE);
-  }));
+    m.withMat(MAT.SLATE, () => m.frame([sg.x, sg.y, 0], [sg.nx, sg.ny], [sg.tx, sg.ty], () => {
+      const um = (u0 + u1) / 2, e = 0.7;
+      m.prism([[u0 - e, -hw - e, zr], [u1 + e, -hw - e, zr], [u1 + e, hw + e, zr], [u0 - e, hw + e, zr]], [[um - 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, hw * 0.55, zr + 2.6], [um - 0.4, hw * 0.55, zr + 2.6]], SLATE);
+    }));
+  };
+  gallery(g, f.v0 + 0.4);
+  const ps = map.segments[map.POSTERN], ds = map.segments[map.DOOR];
+  gallery(ps, ps.len * 0.2 + 1.5);
+  gallery(ds, ds.len * 0.3 + 1.2);
   for (const fl of map.flanks) { const p = P(fl.u1 - 1.0, (fl.v1 - 1.0) * fl.sd, top); banner(m, p[0], p[1], p[2], 10, 5.2); }
   for (const b of map.bastions) banner(m, b.x + Math.cos(b.a) * (b.r - 1.6), b.y + Math.sin(b.a) * (b.r - 1.6), top, 8, 4);
-  const tw = KEEP.tower, t2 = KEEP.t2;
-  banner(m, tw.x - tw.r - 2.2, tw.y - 3, KEEP.t1.z, 11, 6);
+  const t2 = KEEP.t2;
   for (const sd of [-1, 1]) { const a = Math.atan2(t2.y - KEEP.t1.y, t2.x - KEEP.t1.x) + Math.PI + sd * 0.5; const x = t2.x + Math.cos(a) * (t2.r - 2), y = t2.y + Math.sin(a) * (t2.r - 2); if (map.tierAt(x, y) === 2) banner(m, x, y, t2.z, 9, 4.6); }
 }
 

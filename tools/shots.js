@@ -56,6 +56,8 @@ const SETUP = [
   ['inner-courts', [976, 728, 6.5, 0.4, 0]],
   ['culvert-from-the-deep', [985, 452, 12, YAW + Math.PI, 0]],
   ['gatehouse', [872, 684, 12, YAW, 0]],
+  ['hall-front', [984, 752, 11, 2.6, 0]],
+  ['stair-head', [966, 556, 22, 1.9, 0.1]],
   ['low-toward-the-wall', [840, 470, 16, YAW, -0.14]],
   ['low-down-the-valley', [958, 430, 22, YAW + Math.PI, -0.12]],
 ];

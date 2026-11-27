@@ -754,6 +754,9 @@ export class Renderer {
     this.eye[0] = cs.ex; this.eye[1] = cs.ey; this.eye[2] = cs.ez; this.camF = cs.f;
     // the air: clear out to a little beyond the point of interest, then thickening toward the horizon
     this.haze[0] = Math.max(140, cs.dist * 1.25); this.haze[1] = 1 / (700 + cs.dist * 0.6); this.haze[2] = 0.94; this.haze[3] = 420;
+    // at night the mist lies in the valley floor: thicker, nearer, and thinning quickly with height, so the walls and the
+    // rock stand up out of it
+    { const night = Math.max(0, Math.min(1, ((env.lift || 0) - 0.03) / 0.2)); this.haze[0] *= 1 - 0.45 * night; this.haze[1] *= 1 + 1.3 * night; this.haze[3] = 420 - 330 * night; }
 
     // brightest few flashes become real lights
     this.lpos.fill(0); this.lcol.fill(0);
@@ -974,7 +977,7 @@ export class Renderer {
         // far off, the two armies are tinted by side so they still read at a glance; behind locked shields a rank catches the light
         // (the last argument is the wash: how far the figure is taken from its own colours toward its side's)
         if (A.big > 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v, v, flash, 0, 0, 0); // (a machine is told by its size)
-        else if (tier >= 1 && team[i] === DEF) { if (d.ammo && ammo[i] < 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 178, 70, flash, 0, 0, 0, tier === 2 ? 190 : 110); else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 120, 205, 245, flash, 0, 0, 0, tier === 2 ? 190 : 110); }
+        else if (tier >= 1 && team[i] === DEF) { if (d.ammo && ammo[i] < 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 178, 70, flash, 0, 0, 0, tier === 2 ? 190 : 70); else this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 120, 205, 245, flash, 0, 0, 0, tier === 2 ? 190 : 70); }
         else if (tier >= 1 && sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 236, 236, 244, flash, 0, 0, 0, tier === 2 ? 170 : 90);
         else if (tier >= 1) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 215, 84, 62, flash, 0, 0, 0, tier === 2 ? 170 : 80);
         else if (sh) this._put(A, xi, yi, zi, yaw, js, cl.start + fr, 255, 244, 226, flash, 0, 0, 0);
