@@ -128,11 +128,13 @@ async function main() {
         const sim = app.sim;
         while (sim.time < t && !sim.result) {
           for (let k = 0; k < 100 && sim.time < t && !sim.result; k++) { sim.step(); sim.events.length = 0; }
+          if (app.fxq) app.fxq.replay(window.__fx); // the ground keeps the dead and the craters of the battle so far
           await new Promise((r) => setTimeout(r, 0));
         }
         // stepping the battle with the picture frozen piles up hours of muzzle flashes: clear them, then let a moment's worth happen
         window.__fx.reset();
         for (let k = 0; k < 6 && !sim.result; k++) { sim.step(); sim.events.length = 0; }
+        if (app.fxq) app.fxq.replay(window.__fx);
         // the thickest of the horde, as the benchmark finds it
         const cells = new Map();
         for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === 1) { const k = ((sim.y[i] / 80) | 0) * 100 + ((sim.x[i] / 80) | 0); cells.set(k, (cells.get(k) || 0) + 1); }

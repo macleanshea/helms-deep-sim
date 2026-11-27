@@ -79,7 +79,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 1 | Sync with main, baseline and guard rails | done, bar the owner's benchmark table |
 | 2 | Layout extraction (no visible change) | 2a done; 2b lands with milestone 5 |
 | 3 | Perspective camera and engine foundation | camera, per-unit detail, haze and sky done; HDR, depth pre-pass and the frame governor to come |
-| 4 | Simulation decoupled from rendering (still on the main thread) | |
+| 4 | Simulation decoupled from rendering (still on the main thread) | effects queue done; render records and the order host to come |
 | 5 | Map redesign in greybox, owner signs off | |
 | 6 | One animated path for every unit | |
 | 7 | Simulation in a worker | |
@@ -161,6 +161,10 @@ Done when: the benchmark is at or below baseline frame time, draw calls ≤ 220,
 ≤ 2.5 M, no pick error over 0.5 m at any pitch.
 
 ### 4. Simulation decoupling
+
+**Done so far:** the battle reports its effects to `src/sim/fxqueue.js`, a recorder with the twelve
+calls the simulation makes; the frame loop plays the queue on the real effects after stepping. The
+pictures are identical to calling them directly.
 
 The sim's `fx.*` calls become a recorded event buffer (`src/sim/fxqueue.js`). After each tick
 `src/sim/extract.js` writes 48-byte render records per unit, sorted by 16 m cell (position, heading,

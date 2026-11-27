@@ -107,6 +107,7 @@ export class Perf {
     const sim = app.sim, until = BENCH_TIME;
     while (sim.time < until && !sim.result) {
       for (let k = 0; k < 150 && sim.time < until && !sim.result; k++) { sim.step(); sim.events.length = 0; }
+      app.fxq.replay(app.fx); // (so the ground carries the dead and the craters of the battle so far, as it would have)
       this.el.textContent = `benchmark: fast-forwarding the battle… ${Math.round((sim.time / until) * 100)}%`;
       await raf();
     }

@@ -12,6 +12,7 @@ import { Renderer, HERO_SCALE_DEFAULT } from './render/renderer.js';
 import { Perf } from './render/perf.js';
 import { toScreen, toGround, pick, camState, DEFAULT_YAW } from './render/camera.js';
 import { Fx } from './render/fx.js';
+import { FxQueue } from './sim/fxqueue.js';
 import { Audio } from './audio.js';
 import { buildUI, fmt } from './ui/ui.js';
 import { loadPortraits } from './ui/portraits.js';
@@ -51,6 +52,8 @@ const MOOD = {
 };
 
 const app = {
+  fxq: new FxQueue(), // what the battle asks of the effects, between its steps and the frame that shows them
+  fx,
   mode: 'setup', map, setup: null, sim: null, oobOpen: false, modeChosen: false,
   cam: { x: WORLD_W / 2, y: WORLD_H / 2, z: 0, zoom: 0.6, yaw: DEFAULT_YAW, tilt: 0 },
   speed: 1, paused: false, tool: null, brushCount: 50,
@@ -227,7 +230,9 @@ app.startBattle = () => {
   app.battleSpent = spent; app.lastScore = null;
   fx.reset(); renderer.clearDecals();
   // the sandbox rolls its dice from the seed in Settings; a challenge keeps its own
-  app.sim = new Sim(map, app.isSandbox() ? { ...app.setup, options: { ...app.setup.options, seed: Math.max(1, +app.settings.seed | 0 || 1) } } : app.setup, fx);
+  // the battle reports its effects to a queue, which the frame loop plays on `fx` after stepping it
+  app.fxq.clear();
+  app.sim = new Sim(map, app.isSandbox() ? { ...app.setup, options: { ...app.setup.options, seed: Math.max(1, +app.settings.seed | 0 || 1) } } : app.setup, app.fxq);
   fx.groundFn = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim.surfZ(x, y));
   app.mode = 'battle'; app.paused = false; app.speed = 1; app.acc = 0; app.slowT = 0; app.showLosses = false;
   app.overlay.zones = false; app.overlay.ranges = false; app.artyPanel = false; rangeCache.t = -1; rangeCache.keyStr = ''; ui.setOverlayKey(null);
@@ -1181,6 +1186,7 @@ function frame(now) {
         sim.step(); app.acc -= DT; ticks++; simDt += DT;
         if (performance.now() - t0 > 15) break;
       }
+      app.fxq.replay(fx);
       simMs = performance.now() - t0;
       if (app.acc > DT * 2) app.acc = DT; // can't keep up: drop the backlog rather than spiral
       alpha = Math.min(1, app.acc / DT);
