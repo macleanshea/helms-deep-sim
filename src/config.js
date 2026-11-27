@@ -172,7 +172,7 @@ export const SUPPORT = {
 // Command Points paid out for destroying what the horde can least afford to lose. The bounty is a
 // fixed pool shared over everything on this list in the attacker's order of battle.
 export const BOUNTY = { chief: 4, tower: 4, ram: 3, catapult: 2, troll: 1 };
-export const CAPTAIN_REACH = 1.3; // with the captains rule on, an Uruk captain's presence carries this much further than his `aura`
+export const CAPTAIN_REACH = 1.3; // an Uruk captain's presence carries this much further than his `aura`
 export const BOUNTY_SHARE = 0.35; // size of the pool, as a fraction of the trickle income up to dawn
 
 export const DEFAULT_OPTIONS = {
@@ -186,33 +186,5 @@ export const DEFAULT_OPTIONS = {
   rout: 0.08, // horde breaks when this fraction remains (0 = fights to the last)
   morale: true, // companies waver, break and rally
   seed: 1,
-  ff: null, // feature flags (see FEATURES): null or missing keys mean "on"
 };
 
-// Switchable rules, for testing. Every flag defaults to on; with all of them off the battle plays
-// exactly as it did before any of these rules existed. `setup: true` marks flags read when the
-// armies are laid out rather than during the battle.
-export const FEATURES = {
-  fixes:     { name: 'Plain fixes', desc: 'Sappers no longer set each other off, and warg riders cannot climb ladders.' },
-  captains:  { name: 'Captains', desc: 'Captains follow behind their companies, are not sniped on sight, are covered by the troops around them, hold their companies against routing and rally the broken.' },
-  warlord:   { name: 'Warlord', desc: 'Task forces with objectives, staggered step-off so a force arrives together, a reserve held for a breach, pull back and regroup, a final all-out effort before dawn.' },
-  clock:     { name: 'Night clock', desc: 'Waves are released earlier so the fight reaches the wall well before dawn.' },
-  fields:    { name: 'Objective paths', desc: 'Ladder crews, sappers and task forces find a path to their own objective instead of walking a straight line or at the nearest defender.' },
-  physics:   { name: 'Bodies take space', desc: 'A limit on how many can stand in one spot, big units push small ones aside, engines block the ground under them.' },
-  crews:     { name: 'Crewed engines', desc: 'Ladders, rams, towers and catapults are objects small arms cannot hurt, moved by real Uruk-hai and trolls who can be shot and replaced.' },
-  throwdown: { name: 'Ladder throw-down', desc: 'Defenders at an uncontested ladder head push the ladder off the wall.' },
-  suppress:  { name: 'Attacker fire support', desc: 'Volleys and rocks pin defenders; catapults get missions and learn to stand off from rockets.' },
-  shields:   { name: 'Shield wall', desc: 'Escort and assault companies lock shields in the killing ground: slow, frontal cover from bullets, none from blast. Crossbows set pavises.' },
-  tier2:     { name: 'Adaptive horde', desc: 'Surges at a sector that falls silent, changes the next wave to what worked, and confirms its target late.' },
-  intel:     { name: 'Honest intelligence', desc: 'The horde plans from what it has seen on the walls and what has fired, not from the true positions.' },
-  lanes:     { name: 'Lines of fire', desc: 'Defenders cannot shoot through their own men: two ranks fire from a battlement, three on the flat (prone, kneeling, standing), and the rest find a place or wait. No firing along a wall. Standing men take up room.' },
-  postern:   { name: 'The way in from the Deep', desc: 'The Hornburg gate is much stronger and the postern at its rear weaker. With the Deeping Wall given up, the horde comes round: over the empty wall or through the culvert into the Deep and up the rear ramp to the postern, while a force keeps the gate busy.' },
-  door:      { name: 'The door from the wall', desc: 'The arch from the Deeping Wall walk into the Hornburg court gets a door the horde can batter down. Attackers holding the keep end of the wall make for it; the garrison still passes through freely.' },
-  layout:    { name: 'Task-force layout', desc: 'The generated horde is drawn up by task force: captains spread out, sappers dispersed, engines in front, wargs at the rear.', setup: true },
-};
-/** Resolve a partial flag set (or 'none' / 'all') into a full table of booleans. */
-export function featureFlags(ff) {
-  const out = {};
-  for (const k in FEATURES) out[k] = ff === 'none' ? false : !ff || ff === 'all' || ff[k] !== false;
-  return out;
-}

@@ -22,9 +22,6 @@ const EARLY = 60;        // how far ahead of schedule a wave may be sent in when
 const SPENT = 0.25;      // a wave is spent when this fraction of it is still in the fight
 const APPROACH = 4.6;    // typical pace up the valley, for contact estimates (m/s)
 
-// how hard each kind of wave leans on its chosen sector (0 = spread evenly)
-const AIMED = { escalade: 1.0, siege: 1.5, assault: 1.2 };
-
 // wave states
 const PENDING = 0, FORMING = 1, ARRIVING = 2, COMMITTED = 3;
 
@@ -36,11 +33,10 @@ export const directorMethods = {
     const sum = waveSummary(groups);
     const W = sum.length;
     const dawnEff = this.opt.dawn > 0 ? this.opt.dawn : 1200;
-    // with the night clock on, the last wave steps off earlier and the middle ones are brought forward:
+    // the last wave steps off well before dawn and the middle ones are brought forward:
     // an assault needs time at the wall, not only time to walk to it
-    const clock = this.ff.clock;
-    const span = Math.max(0, dawnEff - (clock ? Math.max(TAIL, Math.min(520, dawnEff * 0.42)) : TAIL));
-    const waves = sum.map((s, k) => ({ ...s, sector: -1, rel: W > 1 ? (clock ? (k / (W - 1)) ** 1.3 : k / (W - 1)) * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0, depth: 0 }));
+    const span = Math.max(0, dawnEff - Math.max(TAIL, Math.min(520, dawnEff * 0.42)));
+    const waves = sum.map((s, k) => ({ ...s, sector: -1, rel: W > 1 ? (k / (W - 1)) ** 1.3 * span : 0, relT: 0, state: k === 0 ? COMMITTED : PENDING, groups: [], pend: [], contactT: 0, left: 0, depth: 0 }));
     let reserveN = 0, cmdReserve = 0;
     for (const g of reserve) {
       const d = UNITS[U[g.type]], n = g.count * this._per(d);
@@ -81,18 +77,16 @@ export const directorMethods = {
     d.lull = spent && !!next;
     if (d.lull) d.lullS += 0.5;
     if (!next) return;
-    const wlOn = this.ff.warlord, allIn = wlOn && this.wl.allIn; // the final effort: everything still waiting comes on at once
+    const allIn = this.wl.allIn; // the final effort: everything still waiting comes on at once
     if (next.state === PENDING) {
       const early = spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY);
       if (early || allIn || this.time >= next.rel - WARN) {
         next.state = FORMING;
         next.relT = allIn ? this.time + 3 : early ? this.time + WARN * 0.6 : next.rel;
         // the assaults in the middle of the night are thrown at the stretch of wall that looks weakest
-        if (wlOn) {
-          const plan = this._wlPlan(next.k, next.kind, next.groups.some((g) => g.type === 'ram' && g.count > 0));
-          next.sector = plan.main;
-        } else next.sector = AIMED[next.kind] ? this._weakSector() : -1;
-        const note = wlOn ? this._wlAdapt(next) : '';
+        const plan = this._wlPlan(next.k, next.kind, next.groups.some((g) => g.type === 'ram' && g.count > 0));
+        next.sector = plan.main;
+        const note = this._wlAdapt(next);
         const where = next.sector >= 0 ? ` — massing against ${this.sectors[next.sector].name}` : '';
         this._alert(null, 0, `Horns down the valley — the ${next.name.toLowerCase()} is forming up${where}${note}`, 'warn', 40, next.sector >= 0 ? this.sectors[next.sector].y : 480, true);
       }
@@ -100,11 +94,11 @@ export const directorMethods = {
       next.state = ARRIVING; next.relT = this.time; d.cur++;
       d.aimY = next.sector >= 0 ? this.sectors[next.sector].y : -1;
       d.lossMark = this.loss[ORC].slice();
-      const groups = wlOn ? this._wlEscorts(this._aimWave(next)) : this._aimWave(next);
+      const groups = this._wlEscorts(next.groups);
       // each rank comes over the edge when it would have marched that far; the warlord also holds the
       // quicker formations back so that the wave reaches the wall together
       let hold = null;
-      if (wlOn && !allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < 344 ? 0 : g.y < 616 ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
+      if (!allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < 344 ? 0 : g.y < 616 ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
       next.pend = groups.map((g, k) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH + (hold ? hold[k] : 0) })).sort((a, b) => b.t - a.t);
       next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (hold ? hold.slice().sort((a, b) => a - b)[hold.length >> 1] : 0);
       this._alert(null, 0, `${next.name} sighted at the valley mouth — wave ${next.k + 1} of ${d.W}`, 'bad', 40, 480, true);
@@ -129,21 +123,14 @@ export const directorMethods = {
    */
   _weakSector() {
     const d = this.dir, held = [0, 0, 0], dmg = [0, 0, 0], nseg = [0, 0, 0], fell = [0, 0, 0], bled = [0, 0, 0];
-    const intel = this.ff.intel, open = [0, 0, 0];
-    for (let i = 0; i < this.n; i++) {
-      if (!this.alive[i] || this.team[i] !== DEF) continue;
-      const u = UNITS[this.type[i]];
-      if (u.cls === C.CACHE || (u.ammo && this.ammo[i] < 1)) continue;
-      const k = this.sectorAt(this.x[i], this.y[i]);
-      if (k < 3 && this.x[i] < this.map.wallTop.x + 60 && !intel) held[k] += u.supply || 1;
-    }
+    const open = [0, 0, 0];
     for (let k = 0; k < this.segs.length; k++) {
       const sg = this.segs[k];
       if (sg.kind !== 'wall') continue;
       const q = this.segSector(k);
       nseg[q]++; dmg[q] += sg.breached ? 3 : 1 - sg.hp / sg.maxHp;
     }
-    if (intel) {
+    {
       // the horde goes by what it has seen: the last head-count it had of each sector's wall, plus how
       // hard that sector has been firing. A stretch it has not yet looked at is taken for average.
       const wl = this.wl;
@@ -173,23 +160,6 @@ export const directorMethods = {
       if (sc > bs) { bs = sc; best = k; }
     }
     return best;
-  },
-
-  /** Copies of a wave's formations with their strength shifted toward the lanes that lead to its target. */
-  _aimWave(w) {
-    if (w.sector < 0 || this.ff.warlord) return w.groups; // the warlord masses by objective instead
-    const aimY = this.sectors[w.sector].y, B = AIMED[w.kind];
-    const wt = (g) => 1 + B * Math.exp(-(((g.y - aimY) / 150) ** 2));
-    const byType = new Map();
-    for (const g of w.groups) { if (!byType.has(g.type)) byType.set(g.type, []); byType.get(g.type).push(g); }
-    const out = [];
-    for (const list of byType.values()) {
-      let total = 0, wsum = 0;
-      for (const g of list) { total += g.count; wsum += g.count * wt(g); }
-      let acc = 0, done = 0;
-      for (const g of list) { acc += wsum > 0 ? (total * g.count * wt(g)) / wsum : g.count; const c = Math.round(acc) - done; done += c; out.push({ ...g, count: c }); }
-    }
-    return out;
   },
 
   /** When the horde breaks, whatever was still waiting beyond the valley melts away with it. */

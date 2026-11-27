@@ -258,7 +258,7 @@ function ringSection(m, segs, k) {
         const nq = Math.floor((lz - rise - Z) / 0.8);
         for (let q = 0; q < nq; q++) for (const sd of [-1, 1]) m.box(fc * (th + 0.12), sd * (hw + (q % 2 ? 0.35 : 0.55)), Z + 0.4 + q * 0.8, 0.3, q % 2 ? 0.7 : 1.1, 0.74, q % 2 ? STONE : STONE_LT);
       }
-      if (s.kind === 'door' && !s.leaves) return; // (an open arch, unless the `door` rule hangs leaves in it)
+      if (s.kind === 'door' && !s.leaves) return; // (an open arch, unless the battle has hung leaves in it)
       if (s.breached) { brokenGate(m, hw, lz); return; }
       // two leaves of upright planks, strapped and studded with iron
       const x = 3.2, H2 = lz - Z;

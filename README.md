@@ -276,9 +276,8 @@ npm run matrix                                        # every challenge x policy
 npm run checks                                        # does the siege behave? pass or fail, with numbers
 ```
 
-Presets are `first-night`, `garrison`, `three-hundred` and `empty`, plus the four original
-scenarios kept as `classic-garrison`, `classic-three-hundred`, `classic-combined` and
-`classic-recon` (not offered in the game; see the flags below). `--policy auto` plays
+Presets are `first-night`, `garrison`, `three-hundred` and `empty`, plus `benchmark` (thirty
+thousand against a reinforced garrison, not offered in the game; `?bench` uses it). `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
 `--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
@@ -315,20 +314,6 @@ the whole fight, captains who cannot be killed or who bunch together, warg rider
 leave the reserve, forces going back and forth, alert floods, surges at a sector that is still
 firing, an empty stretch of wall ignored, soldiers stuck for good, troops in front of the wall
 walked past, a horde that will not come round through the Deep for the postern (or does while the
-wall is manned), a door from the wall that is never battered or is walked through while it holds, hordes too big to fit, shots fired through friends or along a wall, men left with no
-line of fire or fidgeting between places, defenders packed into one spot, and the keep used as a
-free win.
-
-### Feature flags and the developer menu
-
-Every siege rule added on top of the original game sits behind a flag (`FEATURES` in
-`src/config.js`): `fixes`, `captains`, `warlord`, `clock`, `fields`, `physics`, `crews`,
-`throwdown`, `suppress`, `shields`, `tier2`, `intel`, `layout`, `lanes`, `postern` and `door`. All are on by default. With all
-of them off the battle plays exactly as it did before they existed, to the same state hash
-(`node tools/headless.js --preset classic-garrison --policy auto --ff none` ends on `473e12de`).
-
-- In the browser, **Dev** in the top bar lists them with a switch each, and during a battle shows
-  the siege counters. Changes apply to the next battle (`layout` when a horde is next drawn up)
-  and are remembered in the browser. The menu is a temporary testing aid.
-- Headless, `--ff` takes `all`, `none`, a list to switch on alone (`--ff crews,physics`) or a
-  list to switch off (`--ff -shields,-intel`). `tools/matrix.js` passes it through.
+wall is manned), a door from the wall that is never battered or is walked through while it holds,
+hordes too big to fit, shots fired through friends or along a wall, men left with no line of fire
+or fidgeting between places, defenders packed into one spot, and the keep used as a free win.

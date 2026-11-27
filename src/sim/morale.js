@@ -55,7 +55,6 @@ export const moraleMethods = {
     sx.fill(0, 0, ng); sy.fill(0, 0, ng); gn.fill(0, 0, ng);
     for (let i = 0, n = this.n; i < n; i++) { if (!this.alive[i]) continue; const g = this.grp[i]; sx[g] += this.x[i]; sy[g] += this.y[i]; gn[g]++; }
     const on = this.opt.morale !== false;
-    const capOn = this.ff.captains, supOn = this.ff.suppress;
     for (let g = 0; g < ng; g++) {
       const cnt = gn[g];
       if (!cnt) continue;
@@ -69,7 +68,7 @@ export const moraleMethods = {
         const s = (this.gSup[g] *= SUP_FADE);
         sup = this.gExempt[g] || this.gFearless[g] ? 0 : Math.min(2.5, s / Math.max(8, cnt));
         this.gPin[g] = sup >= 1.2 ? 2 : sup >= 0.5 ? 1 : 0;
-      } else if (supOn && !this.gExempt[g]) {
+      } else if (!this.gExempt[g]) {
         // volleys and rocks pin the platoons they land on: a slower, wilder fire, but never a loss of nerve
         let lvl = (this.gSup[g] *= SUP_FADE) / Math.max(6, cnt);
         if (lvl > 0.3) for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const r = UNITS[this.type[ci]].aura, dx = this.x[ci] - cx, dy = this.y[ci] - cy; if (dx * dx + dy * dy < r * r) { lvl *= 0.6; break; } }
@@ -82,7 +81,7 @@ export const moraleMethods = {
       }
       if (this.gExempt[g] || !on) continue;
       let insp = 0;
-      if (capOn && team === ORC) {
+      if (team === ORC) {
         // the nearest living captain: he steadies the company, and it is to him that it falls back if it breaks
         let bd = 1e12, bi = -1;
         for (const ci of this.cmds[team]) { if (!this.alive[ci]) continue; const dx = this.x[ci] - cx, dy = this.y[ci] - cy, d2 = dx * dx + dy * dy; if (d2 < bd) { bd = d2; bi = ci; } }
@@ -97,12 +96,12 @@ export const moraleMethods = {
       const cap = 100 - 18 * this.gBreaks[g];
       let m = this.gMorale[g] + (regen - pressure * (team === ORC ? 13 : 30) - 6 * Math.min(1.5, sup)) * 0.5;
       if (m > cap) m = cap; else if (m < 0) m = 0;
-      if (capOn && team === ORC && insp && m < 30 && pressure < 1.4) m = 30; // under his eye a company stands, short of a massacre
+      if (team === ORC && insp && m < 30 && pressure < 1.4) m = 30; // under his eye a company stands, short of a massacre
       this.gMorale[g] = m;
       if (st <= G_SHAKEN) {
         if (m <= 20 && (team === ORC || this.time - this.gRoutT[g] > 40 || !this.gBreaks[g])) this._break(g, cnt);
         else this.gState[g] = m < 45 ? G_SHAKEN : G_OK;
-      } else if (st === G_ROUT && ((m >= 60 && this.time - this.gRoutT[g] > 20) || (capOn && team === ORC && insp && this.time - this.gRoutT[g] > 6))) {
+      } else if (st === G_ROUT && ((m >= 60 && this.time - this.gRoutT[g] > 20) || (team === ORC && insp && this.time - this.gRoutT[g] > 6))) {
         this.gState[g] = G_OK; if (m < 50) this.gMorale[g] = 50; this.stats.rallied++;
         if (this.time > this._moraleLogT[1]) { this._moraleLogT[1] = this.time + 90; this.events.push({ type: 'log', text: 'A broken company rallies and turns back to the fight', cls: '', x: cx, y: cy }); }
       }
@@ -118,7 +117,7 @@ export const moraleMethods = {
       for (let h = 0; h < this.ng; h++) {
         if (h === g || this.gTeam[h] !== ORC || this.gExempt[h] || this.gState[h] >= G_ROUT) continue;
         const dx = this.gCx[h] - this.gCx[g], dy = this.gCy[h] - this.gCy[g];
-        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.ff.captains && this.gInsp[h] ? 2 : 8));
+        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8));
       }
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {

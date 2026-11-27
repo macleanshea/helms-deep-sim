@@ -1,6 +1,6 @@
 // Crewed siege engines. Mixed into Sim.prototype.
 //
-// With the `crews` rule on, a ladder, ram, siege tower or catapult is timber: small arms cannot
+// A ladder, ram, siege tower or catapult is timber: small arms cannot
 // hurt it and it cannot move itself. Uruk-hai (and trolls, for the heavy engines) nearby are
 // drafted into its crew, take a place beside it and walk it forward. Its pace follows how much
 // of a crew it has; with too few it is set down where it stands until more hands arrive, which
@@ -148,8 +148,8 @@ export const engineMethods = {
 
   /**
    * A raised ladder L: defenders standing at its head, with no attacker yet on the wall beside
-   * them, heave it back off. A ladder with men on it is harder to shift. With crews on it falls
-   * to the foot of the wall and can be raised again; otherwise it is lost.
+   * them, heave it back off. A ladder with men on it is harder to shift. It falls to the foot of
+   * the wall and can be raised again.
    */
   _throwCheck(L) {
     if ((this.tick + L) % 5) return;
@@ -180,10 +180,8 @@ export const engineMethods = {
     this.stats.thrown++;
     this.fx.dust(x, y, this.map.groundZ(x, y), 3); this.fx.sound('ladder', x, y, 0.7);
     this._alert('ladDown' + this.segSector(k), 20, `A ladder is thrown down from ${this.sectors[this.segSector(k)].name}`, 'good', x, y);
-    if (this.ff.crews) {
-      s.ladders--; s.claimed++; this._unlink(L);
-      this.state[L] = S_MOVE; this.eHalt[L] = this.time + 6; this.cd2[L] = 0; this.eEver[L] = 0; this.eIdle[L] = this.time;
-      this.x[L] = this.px[L] = s.ox; this.y[L] = this.py[L] = s.oy;
-    } else this.kill(L, null);
+    s.ladders--; s.claimed++; this._unlink(L);
+    this.state[L] = S_MOVE; this.eHalt[L] = this.time + 6; this.cd2[L] = 0; this.eEver[L] = 0; this.eIdle[L] = this.time;
+    this.x[L] = this.px[L] = s.ox; this.y[L] = this.py[L] = s.oy;
   },
 };

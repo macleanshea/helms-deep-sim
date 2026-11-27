@@ -1,7 +1,7 @@
 // Application glue: state machine (setup -> battle -> debrief), isometric camera, input,
 // the frame loop and the 2D overlay (selection, cursors, markers, losses, minimap).
 
-import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, FEATURES, featureFlags, CAPTAIN_REACH } from './config.js';
+import { WORLD_W, WORLD_H, DT, DEF, ORC, UNITS, U, C, SUPPORT, WEAPONS, CAPTAIN_REACH } from './config.js';
 import { buildMap, KEEP } from './map.js';
 import { buildPreset, makeGroup, groupPositions, groupBounds, forceCost, horde, PRESETS } from './scenarios.js';
 import { scoreBattle } from './score.js';
@@ -108,7 +108,6 @@ function resize() {
 // ------------------------------------------------------------- setup state
 function rebuildPreview() {
   app.previewDirty = false;
-  app.setup.options.ff = app.flags;
   app.sim = new Sim(map, app.setup, null);
   ui.updateHud();
 }
@@ -124,7 +123,7 @@ app.isSandbox = () => !!(app.setup && app.setup.options.sandbox);
  * both armies (the whole horde on the field at once) for the player to change as they like.
  */
 app.loadPreset = (key, sandbox = app.isSandbox(), quiet = false) => {
-  app.setup = buildPreset(map, key, sandbox, app.flags);
+  app.setup = buildPreset(map, key, sandbox);
   app.presetKey = key;
   app.selGroup = null; app.tool = null;
   ui.refreshPresetList(); ui.setPreset(key); ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
@@ -145,7 +144,7 @@ app.enterMode = (mode) => {
 app.optionsChanged = () => { app.previewDirty = true; };
 /** Sandbox: replace the generated horde with a fresh one of n, drawn up on the field. Hand-placed attackers stay. */
 app.raiseHorde = (n) => {
-  app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n, { waves: 1, layout: app.flags.layout }));
+  app.setup.groups = app.setup.groups.filter((g) => g.team !== ORC || g.phase == null).concat(horde(n, { waves: 1 }));
   app.selGroup = null;
   groupsChanged(); ui.refreshPalette();
   ui.toast(`A horde of ${fmt(n)} is drawn up in the valley.`);
@@ -205,7 +204,6 @@ app.startBattle = () => {
   const spent = forceCost(app.setup.groups);
   if (!app.isSandbox() && spent > app.setup.budget) { ui.toast(`The garrison is ${fmt(spent - app.setup.budget)} requisition points over budget.`, 'warn'); audio.play('deny'); return; }
   app.battleSpent = spent; app.lastScore = null;
-  app.setup.options.ff = app.flags;
   fx.reset(); renderer.clearDecals();
   // the sandbox rolls its dice from the seed in Settings; a challenge keeps its own
   app.sim = new Sim(map, app.isSandbox() ? { ...app.setup, options: { ...app.setup.options, seed: Math.max(1, +app.settings.seed | 0 || 1) } } : app.setup, fx);
@@ -549,7 +547,7 @@ function rangeRings(c, def, x, y, alpha) {
   if (def.aura) {
     const col = '240,179,74';
     c.strokeStyle = `rgba(${col},${alpha * 0.8})`; c.lineWidth = 1.2; c.setLineDash([2, 5]);
-    const reach = Math.round(def.aura * (def.team === ORC && app.flags.captains ? CAPTAIN_REACH : 1));
+    const reach = Math.round(def.aura * (def.team === ORC ? CAPTAIN_REACH : 1));
     c.beginPath(); const p = ring(c, x, y, z0, reach); c.stroke(); c.setLineDash([]);
     label(p, reach, `${def.team === DEF ? 'steadies' : 'drives on'} ${reach} m`, col);
   }
@@ -1198,23 +1196,6 @@ function frame(now) {
   }
   if (app.mode === 'battle' && (mmFrame++ & 3) === 0) drawMinimap();
 }
-
-// ------------------------------------------------- developer feature flags
-// A temporary testing aid: each of the siege rules can be switched off. Remembered on this browser.
-const FLAGS_KEY = 'hd-dev-flags-v1';
-app.flags = featureFlags(null);
-try { const saved = JSON.parse(localStorage.getItem(FLAGS_KEY)); if (saved && typeof saved === 'object') for (const k in FEATURES) if (saved[k] === false) app.flags[k] = false; } catch { /* private mode */ }
-/** Switch one rule (or with k 'all'/'none', every rule). Takes effect in the next battle; the layout rule when a horde is next drawn up. */
-app.setFlag = (k, on) => {
-  const was = app.flags.layout;
-  if (k === 'all' || k === 'none') for (const q in FEATURES) app.flags[q] = k === 'all'; else if (FEATURES[k]) app.flags[k] = !!on;
-  try { localStorage.setItem(FLAGS_KEY, JSON.stringify(app.flags)); } catch { /* private mode */ }
-  if (app.mode !== 'battle' && app.setup) {
-    // a challenge's enemy is fixed, so it can simply be drawn up again; a sandbox may hold the player's own work
-    if (was !== app.flags.layout && !app.isSandbox() && app.presetKey) app.loadPreset(app.presetKey, false, true);
-    else app.previewDirty = true;
-  }
-};
 
 // ---------------------------------------------------------------- settings
 const SETTINGS_KEY = 'hd-settings-v2';

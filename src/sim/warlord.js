@@ -9,7 +9,6 @@
 //
 // It works without the director too: in a sandbox the whole horde is one wave on the field.
 //
-// Each rule here sits behind a feature flag (sim.ff, see FEATURES in config.js).
 
 import { CELL, GW, GH, DEF, ORC, T, OB, UNITS, U, C } from '../config.js';
 import { KEEP } from '../map.js';
@@ -22,13 +21,13 @@ const ALLIN = 240;               // the final effort begins this long before daw
 const NATURAL = [2, 1, 0];       // the sector each lane faces: low y is the cliff end
 const OBSERVE = 450;             // how far off the horde can count heads on a wall (m)
 const F_CULVERT = 3, F_HUNT = 4, F_GATE = 9; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
-const F_POST = 5, F_POSTG = 6; // to the postern: for those who can climb a ladder, and for those who cannot (`postern`)
+const F_POST = 5, F_POSTG = 6; // to the back doors: for those who can climb a ladder, and for those who cannot
 
 /** Seconds for a formation of this type to cover `dist` metres, allowing for the shield wall's pace. */
-function travel(type, dist, shields) {
+function travel(type, dist) {
   const d = UNITS[U[type]];
   let v = d.speed || 1;
-  if (shields && (type === 'uruk' || type === 'ladder')) {
+  if (type === 'uruk' || type === 'ladder') { // the last stretch behind locked shields
     const band = Math.min(dist, 385), vb = Math.min(v, 3.36); // 0.7 of an Uruk's pace
     return (dist - band) / v + band / vb;
   }
@@ -55,7 +54,6 @@ export const warlordMethods = {
   // ------------------------------------------------------------ task forces
   /** A new attacker formation has come onto the field: put it in its lane's force. */
   _wlAdd(gid, g) {
-    if (!this.ff.warlord) return;
     const wl = this.wl, wave = g.phase || 0;
     const reserve = g.type === 'warg';
     const lane = g.y < 344 ? 0 : g.y < 616 ? 1 : 2;
@@ -111,12 +109,11 @@ export const warlordMethods = {
   },
 
   /**
-   * Objectives by lane when the Deeping Wall has been given up. Without the `postern` rule everything goes for
-   * the gate. With it the two northern forces come round through the Deep to the postern while the southern one
-   * (with the ram) keeps the gate busy; once one door is down, everyone makes for it.
+   * Objectives by lane when the Deeping Wall has been given up: the two northern forces come round through
+   * the Deep to the back doors while the southern one (with the ram) keeps the gate busy; once one door is
+   * down, everyone makes for it.
    */
   _keepSecs() {
-    if (!this.ff.postern) return [3, 3, 3];
     const P = this.segs[this.map.POSTERN], G = this.segs[this.map.GATE];
     if (G.breached) return [3, 3, 3];
     if (P.breached) return [4, 4, 4];
@@ -146,7 +143,6 @@ export const warlordMethods = {
 
   /** The y a ladder crew of company g should make for, or -1 to leave it to the crew. */
   _forceAimY(g) {
-    if (!this.ff.warlord) return -1;
     const f = this.wl.forces[this.gForce[g]];
     if (!f || f.sector < 0) return -1;
     return this.sectors[f.sector >= 3 ? 0 : f.sector].y;
@@ -165,7 +161,6 @@ export const warlordMethods = {
    * time matches what is left of the slowest's. `items`: [{ type, x, y, lane }]. Returns seconds per item.
    */
   _wlStagger(items, plan) {
-    const shields = this.ff.shields, crews = this.ff.crews;
     const gate = this.segs[this.map.GATE];
     const has = [{}, {}, {}];
     for (const it of items) has[it.lane][it.type] = true;
@@ -174,9 +169,9 @@ export const warlordMethods = {
       const sec = plan.sec[it.lane], o = it.type === 'ram' || sec === 3 ? gate : sec === 4 ? this._postFoot() : this.sectors[sec];
       let dist = Math.hypot(o.x - it.x, o.y - it.y) * 1.06;
       if (it.type === 'archer') dist = Math.max(0, dist - 100);
-      // with crewed engines, the companies that carry the ladders keep the ladders' pace
-      const as = crews && it.type === 'uruk' && has[it.lane].ladder ? 'ladder' : it.type;
-      return travel(as, dist, shields);
+      // the companies that carry the ladders keep the ladders' pace
+      const as = it.type === 'uruk' && has[it.lane].ladder ? 'ladder' : it.type;
+      return travel(as, dist);
     });
     // Per lane: the slow engines (and the trolls that push them) step off at once; the body follows
     // when its own travel time matches what the engines have left, but never waits more than 90 s.
@@ -190,7 +185,7 @@ export const warlordMethods = {
     const wait = body.map((b, l) => Math.max(0, Math.min(90, slow[l] - b)));
     return items.map((it) => {
       if (it.esc || it.type === 'warg' || it.type === 'catapult' || it.type === 'tower' || it.type === 'ram') return 0;
-      if (it.type === 'troll') return crews && has[it.lane].tower ? 0 : wait[it.lane];
+      if (it.type === 'troll') return has[it.lane].tower ? 0 : wait[it.lane];
       return wait[it.lane];
     });
   },
@@ -201,7 +196,6 @@ export const warlordMethods = {
    * Returns a new list of formations; the head-count is unchanged.
    */
   _wlEscorts(groups) {
-    if (!this.ff.crews) return groups;
     const lane = (g) => (g.y < 344 ? 0 : g.y < 616 ? 1 : 2);
     const out = groups.map((g) => ({ ...g }));
     for (let l = 0; l < 3; l++) {
@@ -225,7 +219,6 @@ export const warlordMethods = {
 
   /** The battle opens: plan for the troops on the field and set their step-off times. */
   _wlStart(groups) {
-    if (!this.ff.warlord) return;
     const wl = this.wl;
     if (!wl.forces.length) return;
     this._morale(true); // company centres
@@ -250,13 +243,12 @@ export const warlordMethods = {
 
   // ------------------------------------------------------------- the plan in play
   _warlord() {
-    const ff = this.ff, wl = this.wl;
+    const wl = this.wl;
     if (this.result) return;
-    if (ff.fields) this._fieldWatch();
-    if (!ff.warlord && !ff.shields && !ff.intel && !ff.tier2) return;
+    this._fieldWatch();
     this._wlSurvey();
-    if (ff.shields) this._wlShields();
-    if (!ff.warlord || this.routing) return;
+    this._wlShields();
+    if (this.routing) return;
 
     // --- strength and position of each force
     for (const f of wl.forces) {
@@ -276,7 +268,7 @@ export const warlordMethods = {
     }
 
     // --- crossbows and berserkers keep behind the shields of the leading companies until the wall is close
-    if (ff.shields) {
+    {
       for (const f of wl.forces) {
         if (f.reserve) continue;
         let lead = -1e9;
@@ -314,7 +306,7 @@ export const warlordMethods = {
         if (hunt && wl.resOut === 0) {
           wl.resOut = 2;
           let any = false;
-          for (const f of wl.forces) if (f.reserve) for (const gid of f.groups) { this.gOrder[gid] = 0; this.gField[gid] = ff.fields ? F_HUNT + 1 : 0; if (this.gAlive[gid]) any = true; }
+          for (const f of wl.forces) if (f.reserve) for (const gid of f.groups) { this.gOrder[gid] = 0; this.gField[gid] = F_HUNT + 1; if (this.gAlive[gid]) any = true; }
           if (any) this._alert('wargHunt', 60, 'Warg riders are riding down your troops outside the walls', 'bad', wl.exX, wl.exY, true);
         } else if (wl.resOut === 2 && this.time - wl.huntT > 12) {
           wl.resOut = 0;
@@ -367,7 +359,7 @@ export const warlordMethods = {
 
     // --- captains are shared out among the forces: one that has lost its only captain gets another after a
     // pause, and a force with captains to spare lends one to a force with fewer
-    if (ff.captains) {
+    {
       const cnt = new Map();
       for (const ci of this.cmds[ORC]) { if (!this.alive[ci]) continue; const q = wl.forces[this.gForce[this.grp[ci]]]; if (q) cnt.set(q.id, (cnt.get(q.id) || 0) + 1); }
       let lo = null, lc = 1e9, hi = null, hc = -1;
@@ -396,7 +388,7 @@ export const warlordMethods = {
       }
     }
 
-    if (ff.tier2) this._wlTier2();
+    this._wlTier2();
   },
 
   /** One pass over the field: footholds, troops caught in the open, what can be seen of each sector. */
@@ -438,7 +430,7 @@ export const warlordMethods = {
     const empty = allDef > 0 && top[0] + top[1] + top[2] < 0.1 * allDef && inKeep > 0.6 * allDef;
     if (!empty) wl.emptyT = -1; else if (wl.emptyT < 0) wl.emptyT = this.time;
     const gone = empty && this.time - wl.emptyT >= 10;
-    if (gone !== wl.abandoned && this.ff.warlord) {
+    if (gone !== wl.abandoned) {
       wl.abandoned = gone;
       if (gone) {
         let any = false;
@@ -446,7 +438,7 @@ export const warlordMethods = {
         for (const f of wl.forces) { if (f.reserve || f.sector < 0 || f.sector >= 3) continue; f.sector = ks[f.lane]; any = true; for (const gid of f.groups) this._wlField(gid, f); }
         const round = ks[0] === 4, at = round ? this._postFoot() : { x: this.segs[this.map.GATE].ox, y: this.segs[this.map.GATE].oy };
         if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, round ? 'The Deeping Wall stands empty — the host is coming round through the Deep for the postern' : 'The Deeping Wall stands empty — the host turns on the Hornburg', 'bad', at.x, at.y, true);
-      } else if (this.ff.postern) {
+      } else {
         // men back on the wall: those coming round for the postern turn on the wall in front of them again
         for (const f of wl.forces) { if (f.sector !== 4) continue; f.sector = NATURAL[f.lane]; for (const gid of f.groups) this._wlField(gid, f); }
       }
@@ -526,7 +518,7 @@ export const warlordMethods = {
    * Returns a few words for the forming-up alert, or ''.
    */
   _wlAdapt(w) {
-    if (!this.ff.tier2 || !this.dir) return '';
+    if (!this.dir) return '';
     const st = this.stats, d = this.dir;
     let note = '';
     // towers that never reach the wall are sent as ladders and the company they would have carried
@@ -567,7 +559,7 @@ export const warlordMethods = {
     if (t >= 0 && this.alive[t] && this.team[t] === DEF && !this.el[t]) { const dx = this.x[t] - x, dy = this.y[t] - y; if (dx * dx + dy * dy < 100) return false; }
     if ((this.tick + i) % 10 === 0 || this.tx[i] === 0) {
       // the leading half of his companies
-      const f = this.ff.warlord ? this.wl.forces[this.gForce[g]] : null;
+      const f = this.wl.forces[this.gForce[g]];
       let n = 0, sx = 0, sy = 0, lead = -1e9, tot = 0;
       const scan = (h) => {
         const a = this.gAlive[h];
@@ -600,7 +592,7 @@ export const warlordMethods = {
     }
     const dx = this.tx[i] - x, dy = this.ty[i] - y, l = Math.sqrt(dx * dx + dy * dy);
     if (l < 6) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return true; }
-    if (dx > 10 && this._flow(x, y, this.gField[g] && this.ff.fields ? this._fieldFor(g, ((y / CELL) | 0) * GW + ((x / CELL) | 0)) : this.orcDir)) {
+    if (dx > 10 && this._flow(x, y, this.gField[g] ? this._fieldFor(g, ((y / CELL) | 0) * GW + ((x / CELL) | 0)) : this.orcDir)) {
       // going forward: follow the path his companies took, leaning toward his place
       const mx = this.fdx * 0.5 + (dx / l) * 0.5, my = this.fdy * 0.5 + (dy / l) * 0.5, ml = Math.sqrt(mx * mx + my * my) || 1;
       this._move(i, mx / ml, my / ml, l > 30 ? speed * 1.2 : speed, d.sz, 0, 1); // he hurries when he has fallen behind
@@ -632,7 +624,7 @@ export const warlordMethods = {
 
   /** The path to the postern (null once it is down, close by, or not yet solved). `ground`: for those who cannot climb a ladder. */
   _posternField(c, ground = true) {
-    if (this.segs[this.map.POSTERN].breached || (this.ff.door && this.segs[this.map.DOOR].breached)) return null; // a back door is open: the fight leads in
+    if (this.segs[this.map.POSTERN].breached || (this.segs[this.map.DOOR].breached)) return null; // a back door is open: the fight leads in
     const fl = this.fields[ground ? F_POSTG : F_POST];
     fl.want = this.time;
     return fl.ready && !fl.close[c] ? fl.dir : null;
@@ -665,7 +657,7 @@ export const warlordMethods = {
     const NC = GW * GH, cost = this.fCost || (this.fCost = new Uint16Array(NC)), mt = this.mtype, ob = this.ob, elev = this.elev;
     for (let c = 0; c < NC; c++) {
       const t = mt[c];
-      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR && this.ff.door ? 310 : 0; continue; } // (as in _nav)
+      if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR ? 310 : 0; continue; } // (as in _nav)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
       if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
@@ -688,9 +680,9 @@ export const warlordMethods = {
     } else if (k === F_POST || k === F_POSTG) {
       const q = this._postFoot();
       src[ns++] = this.map.cellOf(q.x, q.y);
-      // (`door`) for those on the wall, the door from its walk into the court is the other back door
+      // for those on the wall, the door from its walk into the court is the other back door
       const ds = this.segs[this.map.DOOR];
-      if (k === F_POST && this.ff.door && !ds.breached) src[ns++] = this.map.cellOf(ds.x, ds.y);
+      if (k === F_POST && !ds.breached) src[ns++] = this.map.cellOf(ds.x, ds.y);
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];

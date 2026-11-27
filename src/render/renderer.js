@@ -639,7 +639,7 @@ export class Renderer {
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
   _fillUnits(cam, sim, al, vw, vh, tier, clock, torches) {
     const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
-    const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, crews = sim.ff.crews, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
+    const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
     const c = Math.cos(cam.yaw), s = Math.sin(cam.yaw), z0 = cam.zoom;
     const hw = vw / 2 + 60, hh = vh / 2 + 120;
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
@@ -696,7 +696,7 @@ export class Renderer {
       const vs = um_i.variants, h2 = Math.imul(i, 2246822519) >>> 20;
       let m = d.role === R.LADDER && st === S_DONE ? this.meshes.ladderUp : vs.length > 1 ? vs[h2 % vs.length] : vs[0];
       // with crewed engines the carriers are soldiers of their own: draw the timber alone
-      if (crews && d.crew) { if (d.role === R.LADDER && st !== S_DONE) m = ladderBare || m; else if (d.role === R.RAM) m = ramBare || m; }
+      if (d.crew) { if (d.role === R.LADDER && st !== S_DONE) m = ladderBare || m; else if (d.role === R.RAM) m = ramBare || m; }
       // locked shields: the rank leans in behind them, and catches the light
       const sh = team[i] !== DEF && gShield[grp[i]] && crewOf[i] < 0 && d.sz === 0 ? 1 : 0;
       // no two soldiers stand quite the same height or wear quite the same shade

@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url';
 import { buildMap, KEEP } from '../src/map.js';
 import { buildPreset, horde, makeGroup, PRESETS } from '../src/scenarios.js';
 import { Sim, S_WAIT, S_MOVE, S_DONE } from '../src/sim/sim.js';
-import { DEF, ORC, UNITS, U, C, T, featureFlags } from '../src/config.js';
+import { DEF, ORC, UNITS, U, C, T } from '../src/config.js';
 import { autopilot } from './autopilot.js';
 
 const map = buildMap();
@@ -168,7 +168,7 @@ function crowded(sim, i) {
   return full >= 2;
 }
 
-const preset = (key, seed, ff = null, sandbox = false) => { const s = buildPreset(map, key, sandbox, ff); s.options.seed = seed; return s; };
+const preset = (key, seed, sandbox = false) => { const s = buildPreset(map, key, sandbox); s.options.seed = seed; return s; };
 const results = [];
 /** `open`: a known, unsolved problem. It is reported as OPEN and does not fail the run. */
 function verdict(name, ok, what, detail, open = false) { results.push({ name, ok, open }); console.log(`${ok ? 'PASS' : open ? 'OPEN' : 'FAIL'}  ${name}: ${what}\n      ${detail}`); }
@@ -238,7 +238,7 @@ const CHECKS = {
     verdict('captains: can be hunted', lost(H) >= Math.max(2, n0 * 0.3) && lost(H) > lost(base), `a commander hunting them killed ${lost(H)} of ${n0} (the stand-in, not hunting, ${lost(base)}); wanted at least 30% and more than the stand-in`,
       `killed by: ${JSON.stringify(H.capKilled)} · air strikes ${H.calls.air || 0} · the hunter ${H.sim.result && H.sim.result.win ? 'won' : 'lost'}`);
     // eight captains placed in one heap in a sandbox, with companies across the valley
-    const s = preset('garrison', 1, null, true);
+    const s = preset('garrison', 1, true);
     s.groups = s.groups.filter((g) => g.team === DEF);
     for (const y of [140, 276, 412, 548, 684, 820]) s.groups.push(makeGroup('uruk', 300, 300, y, Math.PI / 2, 100));
     s.groups.push(makeGroup('chief', 8, 240, 480, Math.PI / 2, 20));
@@ -261,7 +261,7 @@ const CHECKS = {
       rows.push(`${key}/${seed}: loosed at ${P.wargs.firstLoose < 0 ? 'never' : Math.round(P.wargs.firstLoose) + ' s'} of ${Math.round(end)} (${P.wargs.why || '-'}), held ${pct(P.wargs.heldS / Math.max(1, P.wargs.heldS + P.wargs.looseS))} of their time`);
     }
     // a sandbox has no dawn: are they ever used there?
-    const sb = play(preset('garrison', 1, null, true), { policy: 'auto', max: 1500 });
+    const sb = play(preset('garrison', 1, true), { policy: 'auto', max: 1500 });
     const sbUsed = sb.wargs.firstLoose >= 0;
     verdict('wargs', ok && sbUsed, `loosed with at least a minute of battle left in every challenge: ${ok ? 'yes' : 'NO'}; in a sandbox (no dawn): ${sbUsed ? 'loosed at ' + Math.round(sb.wargs.firstLoose) + ' s (' + sb.wargs.why + ')' : 'NEVER'}`, rows.join('\n      '));
   }],
@@ -295,10 +295,10 @@ const CHECKS = {
   }],
   intel: ['The horde finds a stretch of wall left empty', () => {
     // strip every defender off the cliff end of the Deeping Wall and see where the main effort goes
-    const pick = (ff) => {
+    const pick = () => {
       const picks = [];
       for (const seed of [1, 2, 3]) {
-        const s = preset('garrison', seed, ff);
+        const s = preset('garrison', seed);
         const probe = new Sim(map, s, null);
         s.groups = s.groups.filter((g) => !(g.team === DEF && UNITS[U[g.type]].cls === C.INF && map.seg[map.cellOf(g.x, g.y)] >= 0 && probe.sectorAt(g.x, g.y) === 2));
         const P = play(s, { policy: 'auto', max: 700 });
@@ -306,7 +306,7 @@ const CHECKS = {
       }
       return picks;
     };
-    const seen = pick(null), share = seen.filter((v) => v === 2).length / Math.max(1, seen.length);
+    const seen = pick(), share = seen.filter((v) => v === 2).length / Math.max(1, seen.length);
     verdict('intel', seen.length >= 3 && share >= 0.6, `with the cliff end of the wall left unmanned, ${pct(share)} of ${seen.length} main efforts went for it (wanted 60% or more)`, `sectors chosen (0 keep end, 1 centre, 2 cliff end): ${seen.join(' ')}`);
   }],
   stuck: ['Nobody is stuck for good, and a rout gets through the ranks behind it', () => {
@@ -372,13 +372,10 @@ const CHECKS = {
       rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
     }
     keepDoors = doors;
-    const ff = featureFlags(null);
     verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
-      ff.postern ? `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')}${ff.door ? ` · door ${doors.map((d) => d.door).join(', ')}` : ''}`
-        : 'the horde turns on the keep and sends its sappers at the gate, but cannot force the causeway before dawn', true);
+      `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')} · door ${doors.map((d) => d.door).join(', ')}`, true);
   }],
   deep: ['Given an empty wall, the horde comes round through the Deep; while the wall is manned it does not', () => {
-    if (!featureFlags(null).postern) return;
     if (!keepDoors) CHECKS.keep[1]();
     const fell = keepDoors.filter((d) => d.deep >= 20 && d.post !== 'untouched').length;
     let wrong = 0; for (const { P } of battles()) wrong += P.postWrong || 0;
@@ -386,7 +383,6 @@ const CHECKS = {
       keepDoors.map((d) => `${d.deep} in the Deep, postern ${d.post}`).join(' · '));
   }],
   door: ['Attackers on the keep end of the wall batter the door into the court, and nobody walks through it while it holds', () => {
-    if (!featureFlags(null).door) return;
     // the garrison in the Hornburg, two hundred Uruk-hai already on the wall walk by the keep
     // (fixed group ids: formation jitter is seeded by id, and the ids run on as other checks build scenarios)
     const groups = [makeGroup('rifle', 120, KEEP.cx - 40, KEEP.cy - 10, Math.PI / 2, 40, { id: 1 }), makeGroup('rifle', 60, KEEP.cx - 20, KEEP.cy - 40, Math.PI / 2, 30, { id: 2 })];

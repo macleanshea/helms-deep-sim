@@ -1,6 +1,6 @@
 // Formation layout and preset orders of battle.
 
-import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS, featureFlags } from './config.js';
+import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS } from './config.js';
 import { KEEP, N_WALL, WALL_HALF } from './map.js';
 import { mulberry } from './rng.js';
 
@@ -93,8 +93,8 @@ export function groupBounds(g) {
 }
 
 // ---- helpers for presets -------------------------------------------------
-// In the new challenges (with the `lanes` rule) the wall garrisons stand two deep at the parapet
-// rather than three deep across the walk. Set by buildPreset; the classic scenarios never see it.
+// In the challenges the wall garrisons stand two deep at the parapet
+// rather than three deep across the walk. Set by buildPreset; the hidden benchmark does not use it.
 let twoDeep = false;
 
 function alongWall(map, type, count, t0, t1, off = 0) {
@@ -150,8 +150,8 @@ function waveKinds(W) {
  * tagged with their `phase` and held off-map (their x is the distance behind the wave's front
  * rank, so it is negative) until the assault director brings them on.
  *   mix: unit shares and counts, `waves` (how many), `kinds` (the character of each wave, instead of the
- *        usual probe-then-assaults), `sizes` (relative infantry weight per wave),
- *        `layout` (true: draw each wave up by task force rather than in uniform ranks by type).
+ *        usual probe-then-assaults), `sizes` (relative infantry weight per wave). Each wave is drawn
+ *        up by task force.
  */
 export function horde(total, mix = {}) {
   const m = { uruk: 0.7, archer: 0.2, berserker: 0.06, warg: 0.03, ...mix };
@@ -166,7 +166,7 @@ export function horde(total, mix = {}) {
     ladder: mix.ladders ?? Math.max(4, Math.round(total / 170)), troll: mix.trolls ?? Math.round(total / 420), ram: mix.rams ?? Math.max(1, Math.round(total / 3000)),
     sapper: mix.sappers ?? Math.max(2, Math.round(total / 900)), catapult: mix.catapults ?? Math.round(total / 900),
     // drawn up by task force there is a captain to every lane of every wave that has any
-    chief: mix.chiefs ?? Math.max(1, Math.round(total / (mix.layout ? 800 : 1500))),
+    chief: mix.chiefs ?? Math.max(1, Math.round(total / 800)),
     tower: mix.towers ?? Math.round(total / 3600),
   };
   // share each type out over the waves by weight, keeping the totals exact
@@ -202,7 +202,7 @@ export function horde(total, mix = {}) {
       for (let k = 0; k < cnt; k++) { const [y, back] = at(k); g.push(makeGroup(type, 1, x - back, y, V, 0, { phase: w, kind: kinds[w], hd: 4 })); if (back + 8 > deep) deep = back + 8; }
       return deep;
     };
-    if (mix.layout) {
+    {
       // By task force. The slow engines stand in front, for they step off first, with the trolls that
       // push them close behind; the ladders are carried inside the body of Uruk-hai; the captains are
       // spread across the whole front behind their own companies; sappers stand well apart; and the
@@ -218,22 +218,11 @@ export function horde(total, mix = {}) {
       next(Math.max(column('archer'), 0));
       next(Math.max(column('berserker'), singles('sapper', (k) => [443 + (k & 1 ? -1 : 1) * 46 * Math.ceil(k / 2), 6 + (k % 2) * 12])));
       next(column('warg', [lanes[0], lanes[5]], 90));
-    } else {
-      // cavalry leads: warg riders put behind the infantry would be stuck at its pace
-      next(column('warg', [lanes[1], lanes[4]], 70));
-      next(column('berserker'));
-      next(column('ladder'));
-      next(column('tower', [lanes[2], lanes[1], lanes[3]], 40));
-      next(column('uruk'));
-      next(column('archer'));
-      // the siege train follows the infantry; the captains drive each wave on from its rear
-      next(Math.max(column('troll', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('sapper', [443], 36), column('ram', [gaps[3] - 4], 30)));
-      next(Math.max(column('catapult', [lanes[0], lanes[2], lanes[3], lanes[5]], 60), column('chief', [gaps[0], gaps[2], gaps[4]], 20)));
     }
     if (w === 0) {
       // the vanguard stands on the field with its rear rank just inside the valley mouth
       // (drawn up by task force, the front rank stands back out of reach of the mortars in the Deep)
-      const shift = mix.layout ? Math.min(440, Math.max(300, 24 - x)) : Math.min(600, Math.max(380, 24 - x));
+      const shift = Math.min(440, Math.max(300, 24 - x));
       for (let k = first; k < g.length; k++) g[k].x += shift;
     }
   }
@@ -241,7 +230,7 @@ export function horde(total, mix = {}) {
 }
 
 const NOTABLE = [['tower', 'siege tower'], ['ram', 'ram'], ['troll', 'troll'], ['catapult', 'catapult'], ['sapper', 'sapper'], ['ladder', 'ladder crew'], ['warg', 'warg rider'], ['berserker', 'berserker']];
-/** Per-wave strength and what to expect from it, read off the wave tags on attacker groups. `crews`: count as the crewed-engines rule does. */
+/** Per-wave strength and what to expect from it, read off the wave tags on attacker groups. `crews`: count engines as timber, not troops (as the battle does for its head-counts; the director's pacing counts them). */
 export function waveSummary(groups, crews = false) {
   const waves = [];
   for (const g of groups) {
@@ -309,7 +298,7 @@ export const PRESETS = [
   {
     key: 'first-night', name: 'First Night', level: 'Easy',
     blurb: 'A company on the centre of the wall and thirty-two hundred coming in three waves, with ladders, a ram and sappers. A short night to learn the siege.',
-    build: (map, sb, lay) => ({
+    build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
         ...alongRing('rifle', 10, 175, 215), ...alongRing('at', 3, 175, 205),
@@ -318,7 +307,7 @@ export const PRESETS = [
         // a platoon kept below the wall: the enemy cannot count it, and it can be sent up wherever the ladders land
         makeGroup('rifle', 16, 1030, 450, Math.PI / 2, 30),
         ...alongWall(map, 'wire', 44, 0.28, 0.72, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(3200, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
+        ...horde(3200, { waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
       ],
       options: { dawn: 600, cpStart: 10, cpRate: 3 / 60 },
     }),
@@ -326,77 +315,40 @@ export const PRESETS = [
   {
     key: 'garrison', name: 'The Hornburg Garrison', level: 'Medium',
     blurb: 'Five hundred behind wire and mines, against eighteen thousand Uruk-hai in four waves with towers, trolls and catapults.',
-    build: (map, sb, lay) => ({
+    build: (map, sb) => ({
       groups: [...garrison(map, 0.6), makeGroup('tank', 1, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 2, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map),
-        ...horde(18000, { layout: lay, waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
+        ...horde(18000, { waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
       options: { dawn: 1200, cpRate: 2 / 60 },
     }),
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles', level: 'Hard',
     blurb: 'A lone rifle company with few heavy weapons, and ten thousand at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
-    build: (map, sb, lay) => ({
+    build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
         ...alongRing('rifle', 60, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
         makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(10000, { layout: lay, waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
+        ...fieldWorks(map, 0.6), ...horde(10000, { waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
       ],
       options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
     }),
   },
-  // The four original scenarios, as they were. Not offered in the game: with every rule switched off they
-  // replay the old battles exactly, which is how a change to the rules is shown not to have disturbed anything.
+  // Not offered in the game: the heaviest load there is, for the ?bench run (see render/perf.js).
   {
-    key: 'classic-garrison', name: 'Classic: The Hornburg Garrison', hidden: true,
-    blurb: 'A reinforced battalion behind wire and mines, against twenty thousand Uruk-hai in five waves.',
-    build: (map, sb, lay) => ({
-      groups: [...garrison(map, 1), makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 4, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map), ...horde(20000, { layout: lay, waves: sb ? 1 : 5 })],
-      options: { dawn: 1200, cpRate: 2 / 60 },
-    }),
-  },
-  {
-    key: 'classic-three-hundred', name: 'Classic: Three Hundred Rifles', hidden: true,
-    blurb: 'A lone rifle company and eight thousand at the gate. Hold until dawn — how you spend your support will decide this.',
-    build: (map, sb, lay) => ({
-      groups: [
-        ...alongWall(map, 'rifle', 170, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7),
-        ...alongRing('rifle', 70, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
-        makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y), makeGroup('rifle', 24, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24),
-        makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
-        ...fieldWorks(map, 0.6), ...horde(8000, { layout: lay, waves: sb ? 1 : 4 }),
-      ],
-      options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
-    }),
-  },
-  {
-    key: 'classic-combined', name: 'Classic: Combined Arms vs. the Host', hidden: true,
+    key: 'benchmark', name: 'Benchmark: Combined Arms vs. the Host', hidden: true,
     blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
-    build: (map, sb, lay) => ({
+    build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),
         makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
         makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
         makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
-        ...fieldWorks(map, 1.3), ...horde(30000, { layout: lay, waves: sb ? 1 : 6 }),
+        ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
       options: { dawn: 1200, cpStart: 10, cpRate: 3 / 60 },
-    }),
-  },
-  {
-    key: 'classic-recon', name: 'Classic: Recon Platoon', hidden: true,
-    blurb: 'Forty-odd soldiers and twenty-two hundred orcs in three waves. A short night to learn the controls.',
-    build: (map, sb, lay) => ({
-      groups: [
-        ...alongWall(map, 'rifle', 26, 0.35, 0.65), ...alongWall(map, 'mg', 4, 0.4, 0.6), ...alongWall(map, 'marksman', 3, 0.42, 0.58),
-        ...alongRing('rifle', 8, 180, 210), ...alongRing('at', 2, 175, 200), makeGroup('mortar', 2, 1070, 460, Math.PI / 2, 12), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
-        makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
-        ...alongWall(map, 'wire', 40, 0.3, 0.7, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(2200, { layout: lay, waves: sb ? 1 : 3, ladders: 10, trolls: 3, rams: 1, sappers: 2, catapults: 2, chiefs: 2, towers: 1 }),
-      ],
-      options: { dawn: 600, cpStart: 10, cpRate: 3 / 60 },
     }),
   },
   { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
@@ -416,13 +368,12 @@ export function forceCost(groups) {
  * and the win conditions start at SANDBOX_OPTIONS (no relief; the horde gives up when only a
  * remnant is left) for the player to change.
  */
-export function buildPreset(map, key, sandbox = false, ff = null) {
+export function buildPreset(map, key, sandbox = false) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
   nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
-  twoDeep = !p.hidden && featureFlags(ff).lanes;
-  const s = p.build(map, sandbox, featureFlags(ff).layout);
+  twoDeep = !p.hidden;
+  const s = p.build(map, sandbox);
   twoDeep = false;
-  if (ff) s.options.ff = ff;
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
   if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);
   return { groups: s.groups, options, budget: forceCost(s.groups) };

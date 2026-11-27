@@ -1,4 +1,4 @@
-// Lines of fire for the garrison. Mixed into Sim.prototype; the `lanes` rule.
+// Lines of fire for the garrison. Mixed into Sim.prototype.
 //
 // A soldier cannot shoot through the men in front of him. Standing still, each defender on foot
 // has a rank, counted from the friends in a narrow lane ahead of him:
@@ -98,7 +98,7 @@ export const postMethods = {
     if (rank === 3 || d.cmd || (this.target[i] < 0 && this.time - this.fireT[i] > 12) || this._orcClose(x, y, lv)) pose = 0;
     this.rank[i] = rank; this.pose[i] = pose;
     // too many bodies in one spot: shuffle out of it
-    if (this.ff.physics && this.time >= this.seekT[i] && this.occ[(((y / FINE) | 0) * FW + ((x / FINE) | 0)) * 2 + lv] > FULL) this._settle(i, d, x, y, eg);
+    if (this.time >= this.seekT[i] && this.occ[(((y / FINE) | 0) * FW + ((x / FINE) | 0)) * 2 + lv] > FULL) this._settle(i, d, x, y, eg);
   },
 
   /** May a man on a wall (outward normal this._anx,_any) fire at something offset ex,ey from him? */

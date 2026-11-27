@@ -6,37 +6,23 @@
 // Flags: --preset, --seed, --max (seconds), --policy none|auto|dump, --horde n, --opt key=value (repeatable;
 // support.<kind>=n reaches the support table), --json (one summary line, nothing else), --quiet,
 // --verify (run twice and compare state hashes). HORDE=n in the environment still works.
-// --ff sets the feature flags (see FEATURES in config.js): "all" (default), "none" (the game as it was
-// before any of them), or a list such as "crews,shields" (only these on) or "-shields,-intel" (all but these).
 import { pathToFileURL } from 'node:url';
 import { buildMap } from '../src/map.js';
 import { buildPreset, horde, forceCost, PRESETS } from '../src/scenarios.js';
 import { scoreBattle } from '../src/score.js';
 import { Sim } from '../src/sim/sim.js';
-import { DEF, ORC, UNITS, FEATURES, featureFlags } from '../src/config.js';
+import { DEF, ORC, UNITS } from '../src/config.js';
 import { autopilot } from './autopilot.js';
 
 let sharedMap = null;
 
-/** Parse an --ff value into a flag table (null: everything on). */
-export function parseFlags(spec) {
-  if (!spec || spec === 'all') return null;
-  if (spec === 'none') return featureFlags('none');
-  const names = spec.split(',').map((t) => t.trim()).filter(Boolean);
-  for (const n of names) if (!FEATURES[n.replace(/^-/, '')]) throw new Error(`unknown feature "${n}" (try ${Object.keys(FEATURES).join(', ')})`);
-  const only = names.filter((n) => !n.startsWith('-')), off = names.filter((n) => n.startsWith('-')).map((n) => n.slice(1));
-  const out = {};
-  for (const k in FEATURES) out[k] = only.length ? only.includes(k) : !off.includes(k);
-  return out;
-}
-
 /** Run one battle to its end (or `max` seconds) and return a summary object. */
 export function runBattle(cfg = {}) {
-  const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null, ff = null } = cfg;
+  const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null } = cfg;
   if (!PRESETS.some((p) => p.key === preset)) throw new Error(`unknown preset "${preset}" (try ${PRESETS.map((p) => p.key).join(', ')})`);
   const map = sharedMap || (sharedMap = buildMap());
-  const setup = buildPreset(map, preset, false, ff);
-  if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN, { layout: featureFlags(ff).layout }));
+  const setup = buildPreset(map, preset, false);
+  if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN));
   setup.options.seed = seed;
   for (const [k, v] of Object.entries(opts)) {
     if (k.startsWith('support.')) setup.options.support[k.slice(8)] = v; else setup.options[k] = v;
@@ -128,7 +114,6 @@ function parseArgs(argv) {
     else if (k === 'seed') cfg.seed = +v;
     else if (k === 'max') cfg.max = +v;
     else if (k === 'horde') cfg.hordeN = +v;
-    else if (k === 'ff') cfg.ff = parseFlags(v);
     else throw new Error(`unknown flag --${k}`);
   }
   if (pos[0]) cfg.preset = pos[0];
