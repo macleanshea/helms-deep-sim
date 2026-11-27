@@ -87,7 +87,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 9 | Asset pipeline and unit production | pipeline done; every soldier, beast and vehicle in the game has a model (seven kinds of the horde, ten of the garrison); siege engines and aircraft to come |
 | 10 | Fortress art pass | |
 | 11 | Cliffs, ground, backdrop | |
-| 12 | Caching and polish | |
+| 12 | Caching and polish | models are kept on the device (`sw.js`) and load with no connection; the rest to come |
 
 Budgets are starting targets at 1440p on the owner's machine, to be rebased on the baseline.
 
@@ -318,8 +318,15 @@ distant mountains. Budget: static scene GPU ≤ 3.5 ms.
 
 ### 12. Caching and polish
 
-A service worker (cache-first for `/assets/game/`), `navigator.storage.persist()`, README updated.
-Runtime assets capped at 100 MB, about 10 MB before first play.
+**Done:** `sw.js`, a service worker that touches only `/assets/game/`. A model's files carry a hash of
+their contents in their names, so once fetched they are kept and never asked for again; the manifest is
+asked of the network each time (and kept as a fallback for when there is none), and files it no longer
+names are dropped. The page and the code never pass through it, so a new version of the game is never held
+back. The browser is also asked (`navigator.storage.persist()`) not to evict them. `?sw=0` leaves it off.
+The models are 12 MB in all today; they load after the game has started, the built-in ones standing in
+until each arrives.
+
+**To come:** README updated; a cap on runtime assets (100 MB, about 10 MB before first play).
 
 ## Guard rails
 

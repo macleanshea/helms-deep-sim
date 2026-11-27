@@ -1277,7 +1277,13 @@ app.lodAt = (scale) => { const keep = renderer.heroScale; renderer.heroScale = s
 if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
 // unit models built from files arrive after the game is up: until then (or with ?assets=0) the built-in ones stand in
 renderer.fx = fx;
-if (params.get('assets') !== '0') app.assetsReady = loadUnitPacks((name, pack, image) => renderer.addUnitAsset(name, pack, image));
+if (params.get('assets') !== '0') {
+  // the models are kept on the device by a service worker (sw.js), and the browser is asked not to throw them out
+  // when it is short of room; neither is needed for the game to run
+  if ('serviceWorker' in navigator && params.get('sw') !== '0') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  app.assetsReady = loadUnitPacks((name, pack, image) => renderer.addUnitAsset(name, pack, image));
+}
 const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];
 app.homeView = () => { app.cam.yaw = DEFAULT_YAW; fitCamera(); };
