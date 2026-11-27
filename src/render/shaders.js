@@ -238,6 +238,7 @@ in vec3 vW; in vec3 vN; in vec3 vC; flat in float vMat; out vec4 o;
 uniform sampler2D uDecal;
 ${NOISE_LITE}${LIGHT}${MATERIAL}
 uniform vec3 uBases;   // the floors walls stand on above the valley's: the court, the inner court, the upper court
+uniform vec4 uRound[4]; // the round works (horn tower, upper court, inner court, the ring): centre, how far out their faces reach, and the radius their courses are laid at
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
   float id = floor(vMat + 0.5);
@@ -249,6 +250,23 @@ void main(){
   if (top) { q = vW.xy; qx = dpx.xy; qy = dpy.xy; T = vec3(1.,0.,0.); Bt = vec3(0.,1.,0.); u = vW.x + vW.y; if (L == 1.) L = 2.; }
   else if (an.x > an.y) { q = vW.yz; qx = dpx.yz; qy = dpy.yz; T = vec3(0.,1.,0.); Bt = vec3(0.,0.,1.); u = vW.y; }
   else { q = vW.xz; qx = dpx.xz; qy = dpy.xz; T = vec3(1.,0.,0.); Bt = vec3(0.,0.,1.); u = vW.x; }
+  if (!top) {
+    // a round wall's stone is laid round it, by the length of its arc: laid flat from one side, the courses stretched and
+    // broke every eighth of a turn. (The one seam is on the side that faces the mountain.)
+    vec2 hn = n.xy/max(length(n.xy), 1e-4);
+    for (int i = 0; i < 4; i++) {
+      vec2 d = vW.xy - uRound[i].xy; float r = length(d);
+      if (r < uRound[i].z && r > 1.) {
+        vec2 e = d/r;
+        if (abs(dot(hn, e)) > 0.92) {
+          vec2 tg = vec2(-e.y, e.x); float k = uRound[i].w/r;
+          q = vec2(atan(-d.y, -d.x)*uRound[i].w, vW.z); qx = vec2(dot(dpx.xy, tg)*k, dpx.z); qy = vec2(dot(dpy.xy, tg)*k, dpy.z);
+          T = vec3(tg, 0.); Bt = vec3(0.,0.,1.); u = q.x;
+          break;
+        }
+      }
+    }
+  }
   if (id > 16.5) { q = q.yx; qx = qx.yx; qy = qy.yx; vec3 t = T; T = Bt; Bt = t; }
   vec4 A = matA(L, q, qx, qy), B = matB(L, q, qx, qy);
   c *= A.rgb;

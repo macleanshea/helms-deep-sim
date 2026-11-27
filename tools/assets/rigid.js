@@ -10,7 +10,7 @@ import { ident, mul } from './glb.js';
 const TURN = 180; // frames in the turret's full turn: two degrees a frame
 
 /** The first mesh of a file with no skeleton: positions, normals, texture coordinates, triangles, and its colour image. */
-export function staticMesh(g, nose = '+z') {
+export function staticMesh(g, nose = '+z', scale = null) {
   const { gltf, accessor } = g, prim = gltf.meshes[0].primitives[0];
   const pos = accessor(prim.attributes.POSITION), nrm = accessor(prim.attributes.NORMAL), uv = accessor(prim.attributes.TEXCOORD_0), nv = pos.length / 3;
   const index = Uint32Array.from(prim.indices != null ? accessor(prim.indices, false) : Array.from({ length: nv }, (_, k) => k));
@@ -19,13 +19,19 @@ export function staticMesh(g, nose = '+z') {
   if (a == null) throw new Error(`nose "${nose}": one of +z, -z, +x, -x`);
   if (a) { const c = Math.round(Math.cos(a)), s = Math.round(Math.sin(a)); for (const A of [pos, nrm]) for (let v = 0; v < nv; v++) { const x = A[v * 3], z = A[v * 3 + 2]; A[v * 3] = x * c + z * s; A[v * 3 + 2] = -x * s + z * c; } }
   const mat = gltf.materials && gltf.materials[prim.material], tex = mat && mat.pbrMetallicRoughness && mat.pbrMetallicRoughness.baseColorTexture;
+  // (`scale`: across, up, along. The generator makes a tower as broad as it likes; the game needs it a given height and a given width)
+  if (scale) for (let v = 0; v < nv; v++) {
+    let l = 0;
+    for (let k = 0; k < 3; k++) { pos[v * 3 + k] *= scale[k]; nrm[v * 3 + k] /= scale[k]; l += nrm[v * 3 + k] ** 2; }
+    l = Math.sqrt(l) || 1; for (let k = 0; k < 3; k++) nrm[v * 3 + k] /= l;
+  }
   const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
   for (let v = 0; v < nv; v++) for (let k = 0; k < 3; k++) { lo[k] = Math.min(lo[k], pos[v * 3 + k]); hi[k] = Math.max(hi[k], pos[v * 3 + k]); }
   return { pos, nrm, uv, index, nv, lo, hi, image: tex ? gltf.textures[tex.index].source : null };
 }
 
 export function rigid(g, opts = {}) {
-  const M = staticMesh(g, opts.nose), { pos, nv, lo, hi } = M, H = hi[1] - lo[1], L = hi[2] - lo[2], Wd = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
+  const M = staticMesh(g, opts.nose, opts.scale), { pos, nv, lo, hi } = M, H = hi[1] - lo[1], L = hi[2] - lo[2], Wd = hi[0] - lo[0], mid = (lo[0] + hi[0]) / 2;
   const names = ['hull'], joints = new Uint8Array(nv * 4), weights = new Float32Array(nv * 4);
   for (let v = 0; v < nv; v++) weights[v * 4] = 1;
   const pivots = [[mid, lo[1], (lo[2] + hi[2]) / 2]], clips = [{ name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from(ident()) }];
@@ -56,9 +62,53 @@ export function rigid(g, opts = {}) {
     clips[0] = { name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from([...ident(), ...ident()]) };
     clips.push({ name: 'turret', loop: true, frames: TURN, stride: 0, mats });
   }
+  // A part that moves when the engine strikes: a catapult's arm that whips up and over about its axle (`arm`), or a ram's
+  // log that draws back and lunges (`slide`). It is whatever lies in a box given in shares of the whole (across, up, along),
+  // and its one clip is "attack".
+  //   "arm":   { "box": [x0, x1, y0, y1, z0, z1], "pivot": [up, along], "swing": degrees }
+  //   "slide": { "box": [...], "travel": share of the length }
+  const part = opts.arm || opts.slide;
+  if (part && !opts.turret) {
+    names.push(opts.arm ? 'arm' : 'log');
+    const [x0, x1, y0, y1, z0, z1] = part.box;
+    for (let v = 0; v < nv; v++) { const fx = (pos[v * 3] - lo[0]) / Wd, fy = (pos[v * 3 + 1] - lo[1]) / H, fz = (pos[v * 3 + 2] - lo[2]) / L; if (fx >= x0 && fx <= x1 && fy >= y0 && fy <= y1 && fz >= z0 && fz <= z1) joints[v * 4] = 1; }
+    const p = opts.arm ? [mid, lo[1] + part.pivot[0] * H, lo[2] + part.pivot[1] * L] : [mid, lo[1], (lo[2] + hi[2]) / 2];
+    pivots.push(p);
+    const F = 27, mats = new Float32Array(F * 2 * 16), ease = (t) => t * t * (3 - 2 * t);
+    for (let f = 0; f < F; f++) {
+      const t = f / (F - 1), m = ident();
+      if (opts.arm) {
+        // up and over in the first fifth, against the stop; then wound slowly back down
+        const a = ((part.swing || 80) * Math.PI / 180) * (t < 0.2 ? Math.sin((t / 0.2) * Math.PI / 2) : 1 - ease((t - 0.2) / 0.8)), c = Math.cos(a), s2 = Math.sin(a);
+        const r = ident(); r[5] = c; r[6] = s2; r[9] = -s2; r[10] = c; // about the axle (x): what lies behind it rises
+        const to = ident(); to[12] = p[0]; to[13] = p[1]; to[14] = p[2];
+        const back = ident(); back[12] = -p[0]; back[13] = -p[1]; back[14] = -p[2];
+        m.splice(0, 16, ...mul(to, mul(r, back)));
+      } else {
+        // drawn back, hurled forward past where it hung, and let swing home
+        const d = part.travel * L * (t < 0.45 ? -ease(t / 0.45) : t < 0.6 ? -1 + 1.9 * ease((t - 0.45) / 0.15) : 0.9 * (1 - ease((t - 0.6) / 0.4)));
+        m[14] = d;
+      }
+      mats.set(ident(), f * 32); mats.set(m, f * 32 + 16);
+    }
+    clips[0] = { name: 'idle', loop: true, frames: 1, stride: 0, mats: Float32Array.from([...ident(), ...ident()]) };
+    clips.push({ name: 'attack', loop: false, frames: F, stride: 0, mats });
+  }
   // The shell is one piece, so some triangles have corners on both the hull and the turret, and would be stretched
   // into sheets as it turns. They go with the turret, as a skirt round its foot: their hull corners are copied for it.
   let { pos: P, nrm: N, uv: U, index: I } = M, J = joints, Wt = weights;
+  if (part && !opts.turret) {
+    // (the same for an arm or a log: a triangle with a corner on it goes with it whole)
+    const copy = new Map(), extra = [], idx = Uint32Array.from(I);
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = J[idx[t] * 4], b = J[idx[t + 1] * 4], c = J[idx[t + 2] * 4];
+      if (a + b + c === 0 || a + b + c === 3) continue;
+      for (let k = 0; k < 3; k++) { const v = idx[t + k]; if (J[v * 4]) continue; if (!copy.has(v)) { copy.set(v, nv + extra.length); extra.push(v); } idx[t + k] = copy.get(v); }
+    }
+    const n2 = nv + extra.length, grow = (A, w) => { const B = new A.constructor(n2 * w); B.set(A); extra.forEach((v, q) => B.set(A.subarray(v * w, v * w + w), (nv + q) * w)); return B; };
+    P = grow(P, 3); N = grow(N, 3); U = grow(U, 2); J = grow(J, 4); Wt = grow(Wt, 4); I = idx;
+    for (let q = nv; q < n2; q++) J[q * 4] = 1;
+  }
   if (opts.turret) {
     const copy = new Map(), extra = [];
     const idx = Uint32Array.from(I);

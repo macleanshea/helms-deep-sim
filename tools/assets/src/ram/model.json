@@ -1,0 +1,63 @@
+{
+  "unit": "ram",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/ram.jpg",
+    "prompt": "tools/assets/concepts/ram.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21e9e-c8ca-7165-ab8f-560b08535a69",
+      "remesh": "01a21ea0-6553-70f9-bad3-6799c1428a0a"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "log"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 61425
+    },
+    "nrm": {
+      "offset": 245700,
+      "length": 61425
+    },
+    "uv": {
+      "offset": 491400,
+      "length": 40950
+    },
+    "joints": {
+      "offset": 655200,
+      "length": 81900
+    },
+    "weights": {
+      "offset": 737100,
+      "length": 81900
+    },
+    "index": {
+      "offset": 1064700,
+      "length": 29991
+    },
+    "ibm": {
+      "offset": 1184664,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 27,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

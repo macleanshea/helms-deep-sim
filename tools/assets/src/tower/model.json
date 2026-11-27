@@ -1,0 +1,55 @@
+{
+  "unit": "tower",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/tower.jpg",
+    "prompt": "tools/assets/concepts/tower.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21e9d-49d2-771b-b474-766c1f41bfd6",
+      "remesh": "01a21e9f-84c1-7199-9d2f-3eb24960bd25"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 57063
+    },
+    "nrm": {
+      "offset": 228252,
+      "length": 57063
+    },
+    "uv": {
+      "offset": 456504,
+      "length": 38042
+    },
+    "joints": {
+      "offset": 608672,
+      "length": 76084
+    },
+    "weights": {
+      "offset": 684756,
+      "length": 76084
+    },
+    "index": {
+      "offset": 989092,
+      "length": 28110
+    },
+    "ibm": {
+      "offset": 1101532,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

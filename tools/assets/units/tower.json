@@ -1,0 +1,29 @@
+{
+  "height": 18,
+  "texture": 1024,
+  "lods": [
+    12000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1024x1536",
+  "rigid": {
+    "nose": "-x",
+    "file": "assets-src/tower/model.glb",
+    "scale": [
+      0.75,
+      1,
+      0.75
+    ]
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/tower.jpg",
+    "prompt": "tools/assets/concepts/tower.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21e9d-49d2-771b-b474-766c1f41bfd6",
+      "remesh": "01a21e9f-84c1-7199-9d2f-3eb24960bd25"
+    }
+  }
+}

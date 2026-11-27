@@ -16,14 +16,16 @@
  * @param src     { w, h, px }: the source picture, RGB bytes, row 0 at v = 0
  * @param W, H    size of the picture to paint
  * @param regions [x, y, w, h] in it for each level
+ * @param byBone  keep vertices of different bones apart even where they share a place (machines)
  * @returns { px: Uint8Array(W * H * 3), levels: [{ from: Int32Array, uv: Float32Array, index: Uint32Array, charts }] }
  */
-export function rebake(m, levels, src, W, H, regions) {
+export function rebake(m, levels, src, W, H, regions, byBone = false) {
   const nv = m.pos.length / 3, pos = m.pos;
   // places: vertices that share a position
   const place = new Int32Array(nv), seen = new Map(), rep = [];
   for (let v = 0; v < nv; v++) {
-    const k = `${Math.round(pos[v * 3] * 1e5)},${Math.round(pos[v * 3 + 1] * 1e5)},${Math.round(pos[v * 3 + 2] * 1e5)}`;
+    // (byBone: a machine's turret and hull meet in vertices that share a place but not a bone, and must stay two)
+    const k = `${Math.round(pos[v * 3] * 1e5)},${Math.round(pos[v * 3 + 1] * 1e5)},${Math.round(pos[v * 3 + 2] * 1e5)}${byBone ? ',' + m.joints[v * 4] : ''}`;
     let p = seen.get(k); if (p == null) { p = rep.length; seen.set(k, p); rep.push(v); }
     place[v] = p;
   }
@@ -64,17 +66,17 @@ export function rebake(m, levels, src, W, H, regions) {
       if (best !== cls[t] && bc >= 2 && facing(t, best) > 0.3) cls[t] = best;
     }
     // a scrap of a few triangles facing its own way joins the neighbour it shares most edges with, where it can be seen from there
-    for (let pass = 0; pass < 3; pass++) {
+    for (let pass = 0; pass < (level ? 5 : 3); pass++) {
       const comp = new Int32Array(nt).fill(-1); let nc = 0;
       for (let seed = 0; seed < nt; seed++) {
         if (comp[seed] >= 0) continue;
         const mem = [seed], id = nc++; comp[seed] = id;
         for (let h = 0; h < mem.length; h++) for (const n of adj[mem[h]]) if (comp[n] < 0 && cls[n] === cls[seed]) { comp[n] = id; mem.push(n); }
-        if (mem.length > 8) continue;
+        if (mem.length > (level ? 24 : 10)) continue;
         const votes = new Map();
         for (const t of mem) for (const n of adj[t]) if (cls[n] !== cls[seed]) votes.set(cls[n], (votes.get(cls[n]) || 0) + 1);
         let best = -1, bc = 0;
-        for (const [c, k] of votes) if (k > bc && mem.every((t) => facing(t, c) > 0.15)) { bc = k; best = c; }
+        for (const [c, k] of votes) if (k > bc && mem.every((t) => facing(t, c) > (level ? 0.08 : 0.15))) { bc = k; best = c; }
         if (best >= 0) for (const t of mem) cls[t] = best;
       }
     }
@@ -114,7 +116,7 @@ export function rebake(m, levels, src, W, H, regions) {
       charts.push({ c, tris, u0, v0, w: u1 - u0, h: v1 - v0, turn: v1 - v0 > u1 - u0 });
     }
     // ---- pack them into the level's part of the picture: the largest scale at which they all fit, on shelves
-    const pad = 2, order = charts.map((_, k) => k).sort((a, b) => Math.min(charts[b].w, charts[b].h) - Math.min(charts[a].w, charts[a].h));
+    const pad = level ? 1 : 2, order = charts.map((_, k) => k).sort((a, b) => Math.min(charts[b].w, charts[b].h) - Math.min(charts[a].w, charts[a].h));
     const fit = (k, commit) => {
       let x = 0, y = 0, shelf = 0;
       for (const ci of order) {
@@ -131,6 +133,7 @@ export function rebake(m, levels, src, W, H, regions) {
     for (let it = 0; it < 40; it++) { const mid = (lo + hi) / 2; if (fit(mid, false)) lo = mid; else hi = mid; }
     if (!fit(lo, true)) throw new Error(`level ${level}: ${charts.length} patches do not fit ${RW} x ${RH} texels`);
     const K = lo;
+    if (K * Math.sqrt(area) < 8) throw new Error(`level ${level}: ${charts.length} patches leave no room to paint in ${RW} x ${RH} texels`);
     // ---- vertices, and the painting
     const key = new Map(), from = [], uv = [], index = new Uint32Array(nt * 3), tx = [0, 0, 0], ty = [0, 0, 0];
     let filled = 0, sr = 0, sg = 0, sb = 0;

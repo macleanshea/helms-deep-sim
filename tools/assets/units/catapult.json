@@ -1,0 +1,39 @@
+{
+  "length": 6.4,
+  "texture": 768,
+  "lods": [
+    12000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "rigid": {
+    "nose": "+x",
+    "file": "assets-src/catapult/model.glb",
+    "arm": {
+      "box": [
+        0.3,
+        0.7,
+        0.55,
+        1.01,
+        -0.01,
+        0.68
+      ],
+      "pivot": [
+        0.56,
+        0.76
+      ],
+      "swing": 80
+    }
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/catapult.jpg",
+    "prompt": "tools/assets/concepts/catapult.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21e9d-4736-7689-bd87-17584a921383",
+      "remesh": "01a21e9e-965c-7654-be5b-e2ce38a63754"
+    }
+  }
+}

@@ -691,6 +691,11 @@ export class Renderer {
     gl.drawElements(gl.TRIANGLES, this.terrain.count, gl.UNSIGNED_INT, 0);
     p = this.pStruct;
     gl.useProgram(p.p); this._common(p.u, env);
+    if (p.u.uRound) {
+      // (each radius is nudged so that a whole number of 8 m stone tiles goes round: the pattern then meets itself at the seam)
+      const K = LAYOUT.keep, lay = (r) => (Math.max(1, Math.round((2 * Math.PI * r) / 8)) * 8) / (2 * Math.PI);
+      gl.uniform4fv(p.u.uRound, [K.tower.x, K.tower.y, K.tower.r + K.tower.foot + 1.5, lay(K.tower.r), K.t2.x, K.t2.y, K.t2.r + 1.5, lay(K.t2.r), K.t1.x, K.t1.y, K.t1.r + 1.5, lay(K.t1.r), K.cx, K.cy, K.r + K.half + 2.5, lay(K.r + K.half)]);
+    }
     if (p.u.uBases) gl.uniform3f(p.u.uBases, LAYOUT.keep.t1.z - 11.2, LAYOUT.keep.t1.z - 0.2, LAYOUT.keep.t2.z - 0.2); // (the court is 11 m below the inner court)
     gl.bindVertexArray(this.struct.vao);
     gl.drawArrays(gl.TRIANGLES, 0, this.struct.count);
@@ -995,7 +1000,7 @@ export class Renderer {
           cl = C.turret; let a = (trot[i] - yaw) / 6.283185307; a -= Math.floor(a); fr = Math.min(cl.frames - 1, a * cl.frames);
         } else if (st === S_CLIMB) { cl = C.climb || C.walk; fr = (time * cl.fps * 1.4 + i * 7) % cl.frames; }
         else if (C.attack && ft < 0.9 && sp < 1.5) { cl = C.attack; fr = Math.min(cl.frames - 1, (ft / 0.9) * cl.frames); }
-        else if (sp > 0.3) {
+        else if (sp > 0.3 && C.walk) { // (an engine has no stride: it rolls as it stands)
           const eng = crewOf[i] >= 0 ? UNITS[type[crewOf[i]]] : null;
           cl = (eng ? (eng.role === R.LADDER ? C.carry : C.push) : sh ? C.shield : sp > 2.6 ? C.run : C.walk) || C.walk;
           // his stride keeps time with the ground he covers, within what the clip can bear without looking wound up or drugged

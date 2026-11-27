@@ -256,11 +256,16 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   heads, a room behind lit from the floor up or left a dim hollow) with the hall's body run back into the mountain
   and rock lumps closed round its front; night mist lying low in the valley; stair treads no longer striped.
 
+- **After the third look:** ramps meet their doors and the ground without a gap; the hall stands clear of the rock
+  with every upper arch lit; the stream runs down the valley; ammunition caches may stand on the upper courts.
+  The horde's torches light the ground and the ranks round them: each frame the torch-bearers in view are
+  splatted into a second small map (`Renderer._bakeHordeTorches()`), which the same lighting code reads. Many
+  torches together saturate instead of adding without end.
+
 **Still to do toward the references:** painted stone textures with arc-length coordinates on the curved walls,
-baked ambient occlusion, weathering relative to each wall's foot, the square gatehouse's hoarding and deep arch,
-the horn tower's crown and the two-tier hall front (as sculpted pieces from Meshy), rock outcrops under the
-walls, dressing (banners, barrels, carts), the horde's own torches lighting the ground, an HDR pipeline, rain as
-particles, mist, a moon and directional lightning.
+baked ambient occlusion, the square gatehouse's hoarding and deep arch, the horn tower's crown and the two-tier
+hall front (as sculpted pieces from Meshy), rock outcrops under the walls, more dressing (barrels, carts), an HDR
+pipeline, rain as particles, a moon and directional lightning.
 
 ### 6. One animated path for every unit
 
@@ -362,9 +367,35 @@ corner) instead of smearing the texture across its many small islands, and a dec
 turret so nothing shows through when it turns. **Still rough:** the warg's rider sits in one fixed pose; the image
 model refused the first wording of the howitzer's concept and took a plainer one.
 
-**The rest of the roster,** in this order: siege engines (ladder, ram, catapult, tower: they have bare and
-crewed forms, and the ladder and tower must fit the wall, so the built-in ones stay until that is worked
-through); aircraft (drawn by the support code, not as units); supply caches and obstacles.
+**A picture of its own for every level of detail.** The generator cuts each figure's texture into about a
+thousand small islands. Reduce the triangles and most survivors have corners on two or three islands, so the
+picture between them is a smear: a troll seen close was covered in shards, and every soldier a little.
+`tools/assets/rebake.js` now gives each level a layout of its own (flat patches seen along the axis their
+triangles face, packed side by side) and paints the original picture into it from the nearest point of the full
+model. One image holds all four levels: the finest in a square on top, the rest in a band beneath, the gear's
+swatches in the band's corner. Vertex counts fell too (a place is now split only where two patches meet).
+Machines are painted the same way (their turret and hull kept apart where they meet), which replaced the flat
+facets their lower levels had: a siege tower seen from across the valley is hides and timber, not confetti.
+Before and after: `docs/progress/units-repaint/`.
+
+**The side tint is by zoom alone.** It used to follow each unit's own distance from the camera, which in a
+tilted view painted the far half of a block red and left the near half plain. Now one figure for the whole
+view: none closer than 5.5 px per metre, full by 2.6.
+
+**Trolls take the stairs.** A size rule barred them from every stair and stair head, so they stood at the foot
+of the courts' stairs. Big units now use stairs like anyone (ladders still not); engines and vehicles cannot.
+
+**Siege engines.** The ram, the catapult and the siege tower are generated models now (105 credits; about 910
+of 3,100 spent in all). The image model refused the ram's first concept wording and took it described as a
+museum reconstruction. `tools/assets/rigid.js` gained a moving part cut out by a box: the catapult's arm whips
+up and over about its axle and is wound back (`arm`), the ram's log draws back and lunges (`slide`); both play
+as the engine's "attack" clip. The tower is squeezed to three-quarters of the width the generator gave it and
+made 18 m tall, so that its boarding bridge lies on the Deeping Wall's parapet where the rules dock it (4.6 m
+from the wall's face). Its bridge is always down. Crews are still the soldiers who push them. Pictures:
+`docs/progress/engines/`.
+
+**The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
+one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 
 ### 10. Fortress art pass
 

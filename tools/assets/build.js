@@ -237,39 +237,23 @@ function buildUnit(name) {
   const reduced = recipe.lods.map((target, level) => { const want = Math.max(40, target - kitOf(level).reduce((a, q) => a + q.tris.length / 3, 0)); return want >= m.index.length / 3 ? m.index : simplify(m.pos, m.uv, m.index, want); });
   // A figure's levels are each painted a picture of their own (see rebake.js): the generator's texture is in a thousand
   // islands, and reduced triangles smear across them. One image holds them all: the finest level in a square on top,
-  // the rest in a band a quarter as tall beneath it, and the gear's swatches in the band's last eighth.
+  // the rest in a band half as tall beneath it, and the gear's swatches in the band's last eighth.
   let paint = null, TW = 0, TH = 0, swRect = null;
-  if (colour && !recipe.rigid) {
+  if (colour) {
     if (reduced.length > 4) throw new Error(`${name}: ${reduced.length} levels of detail (4 at most)`);
     const size = recipe.texture || 512, raw = path.join(os.tmpdir(), `hd-${name}-${process.pid}.rgb`);
     const [sw, sh] = execFileSync('python3', ['-I', path.join(here, 'texture.py'), 'raw', colour, raw], { encoding: 'utf8' }).trim().split(' ').map(Number);
     const src = { w: sw, h: sh, px: new Uint8Array(fs.readFileSync(raw)) }; fs.unlinkSync(raw);
-    TW = size * colour.split('+').length; TH = size + size / 4;
-    const q = size / 4;
+    TW = size * colour.split('+').length; TH = size + size / 2;
+    const q = size / 2;
     swRect = [(TW * 7) / 8, size, TW / 8, q];
-    paint = rebake(m, reduced, src, TW, TH, [[0, 0, TW, size], [0, size, TW / 2, q], [TW / 2, size, TW / 4, q], [(TW * 3) / 4, size, TW / 8, q]]);
+    paint = rebake(m, reduced, src, TW, TH, [[0, 0, TW, size], [0, size, TW / 2, q], [TW / 2, size, TW / 4, q], [(TW * 3) / 4, size, TW / 8, q]], !!recipe.rigid);
   }
   // (where a swatch sits in the image: the old strip under the picture, or the block of four beside the lesser levels)
   const swatchUV = (k) => paint ? [(swRect[0] + ((k % 2) + 0.5) * swRect[2] / 2) / TW, (swRect[1] + ((k >> 1) + 0.5) * swRect[3] / 2) / TH] : [(k + 0.5) / 4, 16.5 / 17];
   recipe.lods.forEach((target, level) => {
     const kit = kitOf(level), gearVerts = kit.reduce((a, q) => a + q.verts.length, 0), gearTris = kit.reduce((a, q) => a + q.tris.length / 3, 0);
     const idx = reduced[level];
-    if (recipe.rigid && level >= 1 && !gearVerts) {
-      // A machine's lower levels. Its texture is cut into thousands of small islands, and a reduced triangle whose
-      // corners lie on three of them smears across the lot. So each triangle here takes one colour, that of its
-      // first corner: at the distance these levels are seen from, a machine in flat facets of its own colours.
-      const nc = idx.length, vbf = Buffer.alloc(nc * 28), ibf = Buffer.alloc(nc * 2);
-      for (let c = 0; c < nc; c++) {
-        const v = idx[c], v0 = idx[c - (c % 3)], b = c * 28;
-        for (let e = 0; e < 3; e++) { vbf.writeFloatLE(P[v * 3 + e], b + e * 4); vbf.writeInt8(Math.max(-127, Math.min(127, Math.round(N[v * 3 + e] * 127))), b + 12 + e); }
-        const u = m.uv[v0 * 2] - Math.floor(m.uv[v0 * 2]), t = m.uv[v0 * 2 + 1] - Math.floor(m.uv[v0 * 2 + 1]);
-        vbf.writeUInt16LE(Math.round(u * 65535), b + 16); vbf.writeUInt16LE(Math.round(t * vScale * 65535), b + 18);
-        vbf.writeUInt8(m.joints[v * 4], b + 20); vbf.writeUInt8(255, b + 24);
-        ibf.writeUInt16LE(c, c * 2);
-      }
-      lods.push({ triangles: nc / 3, vertices: nc, influences: 1, vertexOffset: add(vbf), indexOffset: add(ibf) });
-      return;
-    }
     // the level's vertices: each the number of one of the model's, and where in the image it reads its colour
     let from, uvs, tri;
     if (paint) { const B = paint.levels[level]; from = B.from; uvs = B.uv; tri = B.index; }
@@ -328,7 +312,7 @@ function buildUnit(name) {
     fs.writeFileSync(path.join(OUT, texFile), bytes);
     fs.unlinkSync(outTmp);
   }
-  const header = Buffer.from(JSON.stringify({ name, height: +((hi[1] - lo[1]) * s).toFixed(3), ...(recipe.length ? { span: +(Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * s).toFixed(2) } : {}), bones: nb, boneNames: props ? [...m.skin.names, 'prop'] : m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
+  const header = Buffer.from(JSON.stringify({ name, height: +((hi[1] - lo[1]) * s).toFixed(3), ...(recipe.length || recipe.rigid ? { span: +(Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * s).toFixed(2) } : {}), bones: nb, boneNames: props ? [...m.skin.names, 'prop'] : m.skin.names, fps: S.fps, frames: frames.length, clips, lods, animOffset, texture: texFile, source: recipe.source || null }));
   const pre = Buffer.alloc(8); pre.write('HDU1', 0, 'latin1'); pre.writeUInt32LE(header.length, 4);
   const headPad = Buffer.alloc((4 - ((8 + header.length) & 3)) & 3);
   const pack = Buffer.concat([pre, header, headPad, ...sections]);

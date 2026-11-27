@@ -1,89 +1,104 @@
 {
   "units": {
     "uruk": {
-      "pack": "uruk.761345f4a0.bin",
-      "texture": "uruk.9c6187bfb8.webp",
-      "bytes": 1132224
+      "pack": "uruk.e21a9c7e95.bin",
+      "texture": "uruk.b03a1a3686.webp",
+      "bytes": 1131524
     },
     "archer": {
-      "pack": "archer.681121974b.bin",
-      "texture": "archer.fe06dbad60.webp",
-      "bytes": 680708
+      "pack": "archer.ee6a6cd573.bin",
+      "texture": "archer.c5ea91b4ce.webp",
+      "bytes": 680372
     },
     "berserker": {
-      "pack": "berserker.1f7f3326a6.bin",
-      "texture": "berserker.1b3683b418.webp",
-      "bytes": 555684
+      "pack": "berserker.5e83616b45.bin",
+      "texture": "berserker.9811275be2.webp",
+      "bytes": 554984
     },
     "chief": {
-      "pack": "chief.b76e0963ba.bin",
-      "texture": "chief.06116ee053.webp",
-      "bytes": 609048
+      "pack": "chief.c8868282ae.bin",
+      "texture": "chief.8e6b62b22c.webp",
+      "bytes": 608348
     },
     "sapper": {
-      "pack": "sapper.573548be2e.bin",
-      "texture": "sapper.452af3f776.webp",
-      "bytes": 658940
+      "pack": "sapper.8ab583ffba.bin",
+      "texture": "sapper.87618b74d5.webp",
+      "bytes": 658604
     },
     "troll": {
-      "pack": "troll.129169c3a0.bin",
-      "texture": "troll.75e895cf63.webp",
-      "bytes": 495104
+      "pack": "troll.f3526f0b71.bin",
+      "texture": "troll.920cc6d75f.webp",
+      "bytes": 494040
     },
     "rifle": {
-      "pack": "rifle.4cfdd59969.bin",
-      "texture": "rifle.4af399206c.webp",
-      "bytes": 504920
+      "pack": "rifle.dc061bc275.bin",
+      "texture": "rifle.332283a905.webp",
+      "bytes": 503688
     },
     "mg": {
-      "pack": "mg.4f64ca2ded.bin",
-      "texture": "mg.aff73ab791.webp",
-      "bytes": 503652
+      "pack": "mg.fe1e0bfbc1.bin",
+      "texture": "mg.ccba01ab5e.webp",
+      "bytes": 502392
     },
     "marksman": {
-      "pack": "marksman.ed813976d8.bin",
-      "texture": "marksman.334aa34d18.webp",
-      "bytes": 549864
+      "pack": "marksman.3052c5a0e8.bin",
+      "texture": "marksman.1eddd67174.webp",
+      "bytes": 549276
     },
     "grenadier": {
-      "pack": "grenadier.a08c14c7ba.bin",
-      "texture": "grenadier.d8b393e763.webp",
-      "bytes": 513120
+      "pack": "grenadier.7f5c91378c.bin",
+      "texture": "grenadier.c222ef883f.webp",
+      "bytes": 512112
     },
     "at": {
-      "pack": "at.4edc820a37.bin",
-      "texture": "at.902d71b9b6.webp",
-      "bytes": 512516
+      "pack": "at.65bf2a9e57.bin",
+      "texture": "at.5612feaf74.webp",
+      "bytes": 511396
     },
     "cmd": {
-      "pack": "cmd.eb6b379311.bin",
-      "texture": "cmd.f8a5890ba8.webp",
-      "bytes": 497428
+      "pack": "cmd.a46a281eee.bin",
+      "texture": "cmd.102b1e4a46.webp",
+      "bytes": 496560
     },
     "mortar": {
-      "pack": "mortar.eb59589f9e.bin",
-      "texture": "mortar.114ea7fe89.webp",
-      "bytes": 477564
+      "pack": "mortar.9f5085a5fe.bin",
+      "texture": "mortar.0493bf339d.webp",
+      "bytes": 476444
     },
     "warg": {
-      "pack": "warg.190b4d00f3.bin",
-      "texture": "warg.a2d6d7e62d.webp",
-      "bytes": 315172
+      "pack": "warg.511163ed44.bin",
+      "texture": "warg.9d5c48e309.webp",
+      "bytes": 314332
     },
     "tank": {
-      "pack": "tank.965838f1be.bin",
-      "texture": "tank.252477242b.webp",
-      "bytes": 931960
+      "pack": "tank.a40d727666.bin",
+      "texture": "tank.a35195e0f6.webp",
+      "bytes": 549032
     },
     "ifv": {
-      "pack": "ifv.64f19967e9.bin",
-      "texture": "ifv.d3bc666ae2.webp",
-      "bytes": 921492
+      "pack": "ifv.ae058b1b4d.bin",
+      "texture": "ifv.185482d989.webp",
+      "bytes": 522324
     },
     "howitzer": {
-      "pack": "howitzer.e143ac951a.bin",
-      "texture": "howitzer.ee04fe3ebb.webp",
-      "bytes": 972856
+      "pack": "howitzer.891f605fe9.bin",
+      "texture": "howitzer.734f18d991.webp",
+      "bytes": 567248
+    },
+    "catapult": {
+      "pack": "catapult.1965ae298d.bin",
+      "texture": "catapult.185702f4fc.webp",
+      "bytes": 515536
+    },
+    "ram": {
+      "pack": "ram.e5dc1a1743.bin",
+      "texture": "ram.279af1b84f.webp",
+      "bytes": 553720
+    },
+    "tower": {
+      "pack": "tower.e2577ee792.bin",
+      "texture": "tower.a84ba12e34.webp",
+      "bytes": 588312
     }
   }
 }
