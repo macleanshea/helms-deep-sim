@@ -468,7 +468,6 @@ function hallArcade(m, map, t) {
     m.box(-2.5, 0, H / 2, 5, L + 3, H, STONE);                              // the front wall, thick, running back into the rock
     m.box(0.25, 0, 0.5, 0.9, L + 3.4, 1.0, STONE_DK);                        // plinth
     m.box(0.3, 0, H - 2.6, 0.9, L + 3.2, 0.5, STONE_LT);                     // string course over the arches
-    m.box(0.35, 0, H + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                   // cornice
     for (let k = 0; k < bays; k++) {
       const y = (k + 0.5 - bays / 2) * bw, w = bw * 0.62, hs = H - 6.6, arch = [], ring = [];
       // the opening: a tall doorway with a round head; behind it, the dark of the hall, here and there a fire
@@ -479,9 +478,21 @@ function hallArcade(m, map, t) {
       m.box(0.14, y, H - 1.5, 0.3, 0.9, 1.5, STONE_LT); slit(m, 0.3, y, H - 1.5, 0.5, 1.1, k % 2 === 0);
       if (k > 0) m.box(0.45, y - bw / 2, (H - 2.6) / 2, 0.9, bw * 0.16, H - 2.6, STONE_LT);
     }
-    for (const sd of [-1, 1]) m.box(0.5, sd * (L / 2 + 0.6), H / 2, 1.6, 1.8, H + 1.5, STONE_LT);     // end piers
+    // the upper storey: a gallery of smaller arches under the eaves, most of them lit from the hall within
+    const H2 = 7.5, nb2 = bays * 2;
+    m.box(-2.5, 0, H + H2 / 2, 5, L + 3, H2, STONE);
+    for (let k = 0; k < nb2; k++) {
+      const y = (k + 0.5 - nb2 / 2) * (L / nb2), w = (L / nb2) * 0.5, top2 = [];
+      for (let q = 0; q <= 6; q++) { const a = (q / 6) * Math.PI; top2.push([y + Math.cos(a) * w / 2, H + 1.6 + 2.4 + Math.sin(a) * w / 2]); }
+      m.withMat(k % 3 !== 2 ? MAT.EMIT : MAT.PLAIN, () => m.extrudeX([[y + w / 2, H + 1.6], ...top2, [y - w / 2, H + 1.6]], 0, 0.14, k % 3 !== 2 ? dim(LAMP, 0.5) : DARK));
+      m.box(0.2, y + (L / nb2) / 2, H + 1.6 + 1.7, 0.5, (L / nb2) * 0.22, 3.6, STONE_LT);
+    }
+    m.box(0.3, 0, H + 1.2, 0.9, L + 3.2, 0.45, STONE_LT);
+    m.box(0.35, 0, H + H2 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);
+    for (const sd of [-1, 1]) m.box(0.5, sd * (L / 2 + 0.6), (H + H2) / 2, 1.6, 1.8, H + H2 + 1.5, STONE_LT);     // end piers
     // the roof: a slate pent running back and up into the mountain
-    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, H + 0.5], [0.9, L / 2 + 1.7, H + 0.5], [-7, L / 2 + 1.7, H + 4.8], [-7, -L / 2 - 1.7, H + 4.8]], [[0.9, -L / 2 - 1.7, H + 0.8], [0.9, L / 2 + 1.7, H + 0.8], [-7, L / 2 + 1.7, H + 5.1], [-7, -L / 2 - 1.7, H + 5.1]], SLATE));
+    const HR = H + H2;
+    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, HR + 0.5], [0.9, L / 2 + 1.7, HR + 0.5], [-7, L / 2 + 1.7, HR + 4.8], [-7, -L / 2 - 1.7, HR + 4.8]], [[0.9, -L / 2 - 1.7, HR + 0.8], [0.9, L / 2 + 1.7, HR + 0.8], [-7, L / 2 + 1.7, HR + 5.1], [-7, -L / 2 - 1.7, HR + 5.1]], SLATE));
   });
 }
 
@@ -510,6 +521,47 @@ export function torchSites(map) {
   }
   for (const st of map.stairs) { const px = -st.dy, py = st.dx; out.push({ x: st.x - st.dx * 1.5 + px * (st.half + 1), y: st.y - st.dy * 1.5 + py * (st.half + 1), z: st.z0 }); }
   return out.filter((t) => map.type[map.cellOf(t.x, t.y)] !== 1);
+}
+
+const GREEN = [0.13, 0.27, 0.16], CREAM = [0.72, 0.68, 0.56];
+/** A banner on a tall pole: a long green cloth with a pale band, hanging a little off the vertical as if in a wind from the west. */
+function banner(m, x, y, z, h = 9, len = 4.6) {
+  m.withMat(MAT.TIMBER, () => m.box(x, y, z + h / 2, 0.16, 0.16, h, WOOD));
+  m.withMat(MAT.IRON, () => m.box(x + 0.75, y, z + h - 0.25, 1.5, 0.07, 0.07, IRON));
+  m.withMat(MAT.CLOTH, () => {
+    m.push().translate(x + 0.8, y, z + h - 0.3).rotY(-0.1);
+    m.box(0, 0, -len / 2, 1.3, 0.05, len, GREEN); m.box(0, 0.03, -len * 0.3, 0.9, 0.03, 0.5, CREAM); m.box(0, -0.03, -len * 0.3, 0.9, 0.03, 0.5, CREAM);
+    m.pop();
+  });
+}
+
+/**
+ * What makes the place look lived in and fought from: a timber fighting gallery roofed in slate over the gate, and
+ * banners on the gatehouse, the bastions, the horn tower's foot and before the hall. None of it is in anyone's way:
+ * posts and poles are thinner than a man, and the gallery's roof is above the heads of those who stand under it.
+ */
+function dressing(m, map) {
+  const g = map.segments[map.GATE], f = map.flanks[0], top = RING_TOP;
+  const P = (u, v, z) => [g.x + g.nx * u + g.tx * v, g.y + g.ny * u + g.ty * v, z];
+  // the gallery: posts at the corners of the platform over the gate, a plank parapet toward the field, a slate roof
+  const u0 = -KEEP.half + 0.6, u1 = KEEP.half + 1.4, hw = f.v0 + 0.4, zr = top + 3.3;
+  m.withMat(MAT.TIMBER, () => {
+    for (const u of [u0, u1]) for (const v of [-hw, hw]) { const p = P(u, v, 0); m.box(p[0], p[1], top + zr / 2 - top / 2 + 0.0, 0.32, 0.32, zr - top, WOOD, 0, Math.atan2(g.ny, g.nx)); }
+    m.frame([g.x, g.y, 0], [g.nx, g.ny], [g.tx, g.ty], () => {
+      m.box(u1 + 0.1, 0, top + 1.0, 0.14, hw * 2, 0.9, dim(WOOD, 0.9));          // the breast of planks, with a gap to shoot through below the eaves
+      m.box((u0 + u1) / 2, 0, zr - 0.12, u1 - u0 + 0.5, hw * 2 + 0.5, 0.2, dim(WOOD, 0.8));
+      for (let k = -2; k <= 2; k++) m.box(u1 + 0.75, k * hw * 0.42, top - 0.5, 1.5, 0.24, 0.24, dim(WOOD, 0.75));   // the beams it oversails on
+    });
+  });
+  m.withMat(MAT.SLATE, () => m.frame([g.x, g.y, 0], [g.nx, g.ny], [g.tx, g.ty], () => {
+    const um = (u0 + u1) / 2, e = 0.7;
+    m.prism([[u0 - e, -hw - e, zr], [u1 + e, -hw - e, zr], [u1 + e, hw + e, zr], [u0 - e, hw + e, zr]], [[um - 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, -hw * 0.55, zr + 2.6], [um + 0.4, hw * 0.55, zr + 2.6], [um - 0.4, hw * 0.55, zr + 2.6]], SLATE);
+  }));
+  for (const fl of map.flanks) { const p = P(fl.u1 - 1.0, (fl.v1 - 1.0) * fl.sd, top); banner(m, p[0], p[1], p[2], 10, 5.2); }
+  for (const b of map.bastions) banner(m, b.x + Math.cos(b.a) * (b.r - 1.6), b.y + Math.sin(b.a) * (b.r - 1.6), top, 8, 4);
+  const tw = KEEP.tower, t2 = KEEP.t2;
+  banner(m, tw.x - tw.r - 2.2, tw.y - 3, KEEP.t1.z, 11, 6);
+  for (const sd of [-1, 1]) { const a = Math.atan2(t2.y - KEEP.t1.y, t2.x - KEEP.t1.x) + Math.PI + sd * 0.5; const x = t2.x + Math.cos(a) * (t2.r - 2), y = t2.y + Math.sin(a) * (t2.r - 2); if (map.tierAt(x, y) === 2) banner(m, x, y, t2.z, 9, 4.6); }
 }
 
 /** A brazier: an iron basket of coals on a post, burning. */
@@ -542,6 +594,7 @@ export function buildStructures(map, segs, cache = new Map()) {
   for (let k = 0; k < N_WALL; k++) piece('w' + k, `${down(k)}${down(k - 1)}${down(k + 1)}`, (m) => wallSection(m, map, segs, k, bound, H, BASE));
   for (let k = 0; k < N_RING; k++) piece('r' + k, (segs[N_WALL + k].breached ? '1' : '0') + (segs[N_WALL + k].leaves ? 'L' : ''), (m) => ringSection(m, map, segs, k));
   piece('platforms', '', (m) => platforms(m, map));
+  piece('dressing', '', (m) => dressing(m, map));
   piece('fires', '', (m) => { for (const t of torchSites(map)) brazier(m, t); });
   piece('stairs', '', (m) => stairs(m, map));
   piece('ward', '', (m) => innerWard(m, map));

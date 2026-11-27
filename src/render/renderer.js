@@ -370,7 +370,15 @@ export class Renderer {
     for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
       const o = (j * nx + i) * 6, X = v[o], Y = v[o + 1], z = v[o + 2];
       const a = Math.min(HM_W - 1, Math.max(0, Math.round(i * st))), b = Math.min(HM_H - 1, Math.max(0, Math.round(j * st))), rock = hm[(b * HM_W + a) * 4 + 1];
-      const w = ss(0.55, 0.9, rock) * ss(16, 44, z) * ss(K.r + 24, K.r + 70, Math.hypot(X - K.cx, Y - K.cy));
+      const dk = Math.hypot(X - K.cx, Y - K.cy);
+      // the rock the Hornburg stands on: its smooth skirt is broken into ribs and hollows, so the wall grows out of crag
+      const ws = ss(K.r + K.half + 1.5, K.r + K.half + 4.5, dk) * (1 - ss(K.r + K.half + 9, K.r + K.half + 13, dk)) * ss(0.4, 2, z) * ss(0.05, 0.3, rock);
+      if (ws > 0.01) {
+        const cut = ((1 - ridge(X / 15 + 3.1, Y / 15 + 7.7)) * 0.65 + (1 - ridge(X / 7 + 1.3, Y / 7)) * 0.35) * 3.2 * ws;
+        v[o + 2] = z - cut; moved[j * nx + i] = 1;
+        continue;
+      }
+      const w = ss(0.55, 0.9, rock) * ss(16, 44, z) * ss(K.r + 24, K.r + 70, dk);
       if (w < 0.01) continue;
       // strata: each band of height is a ledge, then a sheer rise, then the slope it had (the bands wander, so no ledge runs level for long)
       const S = 36, wob = (vn(X / 170, Y / 170) - 0.5) * 1.6, q = z / S + wob, f = q - Math.floor(q);
