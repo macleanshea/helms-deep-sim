@@ -24,11 +24,27 @@ export function parsePack(buf) {
  * @param onUnit    (name, pack, image) called once for each unit as it finishes loading
  * @param progress  optional (done, total)
  */
-export async function loadUnitPacks(onUnit, progress) {
+/** A sculpted piece of the fortress (tools/assets/prop.js): its shape alone, to be drawn in the game's own stone. */
+export function parseProp(buf) {
+  const dv = new DataView(buf);
+  if (String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3)) !== 'HDP1') throw new Error('not a prop file');
+  const hl = dv.getUint32(4, true), h = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 8, hl))), al = (n) => (n + 3) & ~3;
+  let o = al(8 + hl);
+  const pos = new Int16Array(buf, o, h.places * 3); o = al(o + h.places * 6);
+  const nrm = new Int8Array(buf, o, h.places * 3); o = al(o + h.places * 3);
+  const shade = new Uint8Array(buf, o, h.places); o = al(o + h.places);
+  const index = h.wide ? new Uint32Array(buf, o, h.triangles * 3) : new Uint16Array(buf, o, h.triangles * 3);
+  return { ...h, pos, nrm, shade, index };
+}
+
+export async function loadUnitPacks(onUnit, progress, onProp) {
   let manifest;
   try { const r = await fetch(`${BASE}manifest.json`, { cache: 'no-cache' }); if (!r.ok) return 0; manifest = await r.json(); } catch { return 0; }
   const names = Object.keys(manifest.units || {});
   let done = 0;
+  if (onProp) for (const [name, p] of Object.entries(manifest.props || {})) {
+    fetch(BASE + p.file).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((b) => onProp(name, parseProp(b))).catch((err) => console.warn(`fortress piece "${name}" did not load; the built-in one stays`, err));
+  }
   await Promise.all(names.map(async (name) => {
     const u = manifest.units[name];
     try {

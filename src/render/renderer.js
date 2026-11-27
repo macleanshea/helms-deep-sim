@@ -522,9 +522,12 @@ export class Renderer {
     ]);
   }
 
+  /** A sculpted piece of the fortress has arrived: the fortress is built again with it in place of the built-in one. */
+  addProp(name, prop) { (this.props || (this.props = {}))[name] = prop; this.structVersion = -1; }
+
   _updateStructures(sim) {
     const gl = this.gl;
-    const mesh = buildStructures(this.map, sim.segs, this.structCache);
+    const mesh = buildStructures(this.map, sim.segs, this.structCache, this.props);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.struct.vbo);
     gl.bufferData(gl.ARRAY_BUFFER, mesh.data, gl.DYNAMIC_DRAW);
     this.struct.count = mesh.count;

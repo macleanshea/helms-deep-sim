@@ -396,7 +396,7 @@ function stairs(m, map) {
  * The Hornburg's inner courts: the great drum of the inner court, the upper court against the cliff with the hall
  * cut into the rock behind it, and the horn tower. Their heights and the heads of their stairs are the map's.
  */
-function innerWard(m, map) {
+function innerWard(m, map, props) {
   const buried = (x, y, z) => map.terrZ(x, y) > z + 1.5; // set into the mountain: no need for parapets
   const court = (t, tier, z0, n = 72) => {
     // battered retaining wall with a string course under the parapet
@@ -418,8 +418,31 @@ function innerWard(m, map) {
   const t1 = KEEP.t1, t2 = KEEP.t2, tw = KEEP.tower;
   court(t1, 1, PLATEAU_Z - 1);
   court(t2, 2, PLATEAU_Z - 1, 48);
-  hornTower(m, tw.x, tw.y, tw.r, PLATEAU_Z - 1, tw.top);
+  if (props && props.horn) sculpted(m, props.horn, tw.x, tw.y, PLATEAU_Z - 1, tw.top - (PLATEAU_Z - 1), tw.r + tw.foot);
+  else hornTower(m, tw.x, tw.y, tw.r, PLATEAU_Z - 1, tw.top);
   hallArcade(m, map, t2);
+}
+
+/**
+ * A sculpted piece (see tools/assets/prop.js) set on its axis at (x, y), standing on z0, `height` tall, its foot
+ * reaching `foot` metres out. Only its shape comes from the file: it is laid in the same stone as the walls, each
+ * place a little lighter or darker as the sculptor shaded it (windows, joints, hollows).
+ */
+function sculpted(m, prop, x, y, z0, height, foot) {
+  const { pos, nrm, shade, index } = prop, kxy = prop.xy * (foot / prop.foot), kz = height / 32767, sx = foot / prop.foot;
+  const P = (p) => [x + pos[p * 3] * kxy, y + pos[p * 3 + 1] * kxy, z0 + pos[p * 3 + 2] * kz];
+  const N = (p) => { const a = nrm[p * 3] / sx, b = nrm[p * 3 + 1] / sx, c = nrm[p * 3 + 2] / height, l = Math.hypot(a, b, c) || 1; return [a / l, b / l, c / l]; };
+  const C = (p) => { const k = Math.max(0.42, Math.min(1.22, 0.35 + 0.65 * (shade[p] / 128))); return [STONE[0] * k, STONE[1] * k, STONE[2] * k]; };
+  for (let t = 0; t < index.length; t += 3) {
+    const ia = index[t], ib = index[t + 1], ic = index[t + 2], a = P(ia), b = P(ib), c = P(ic);
+    const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+    let fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx; const l = Math.hypot(fx, fy, fz);
+    if (l < 1e-9) continue;
+    fx /= l; fy /= l; fz /= l;
+    // rounded where the sculpt is round, a hard edge where it turns sharply: a corner takes the face's own normal past about 35 degrees
+    const f = [fx, fy, fz], pick = (n) => (n[0] * fx + n[1] * fy + n[2] * fz > 0.82 ? n : f);
+    m._tri(a, b, c, pick(N(ia)), pick(N(ib)), pick(N(ic)), C(ia), C(ib), C(ic), 0);
+  }
 }
 
 /**
@@ -616,7 +639,7 @@ function brazier(m, t) {
  * Build (or refresh) the fortress mesh. `cache` carries the built pieces between calls.
  * Returns { data, count } in the 20-byte vertex layout, unindexed.
  */
-export function buildStructures(map, segs, cache = new Map()) {
+export function buildStructures(map, segs, cache = new Map(), props = null) {
   const H = WALL_H, BASE = -4, pieces = [];
   const piece = (id, key, fn) => {
     let c = cache.get(id);
@@ -636,7 +659,7 @@ export function buildStructures(map, segs, cache = new Map()) {
   piece('dressing', '', (m) => dressing(m, map));
   piece('fires', '', (m) => { for (const t of torchSites(map)) brazier(m, t); });
   piece('stairs', '', (m) => stairs(m, map));
-  piece('ward', '', (m) => innerWard(m, map));
+  piece('ward', props && props.horn ? 'sculpted' : '', (m) => innerWard(m, map, props));
   piece('ramps', '', (m) => { ramp(m, map, map.causeway, map.causeHalf, map.causeZ, -3, true); ramp(m, map, map.rear, map.rearHalf, map.rearZ, -3, true); });
   for (const s of segs) if (s.breached) piece('x' + s.id, '', (m) => rubble(m, map, s));
   let bytes = 0;

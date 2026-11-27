@@ -323,7 +323,8 @@ function buildUnit(name) {
 }
 
 const names = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-const all = fs.readdirSync(path.join(here, 'units')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5));
+const all = fs.readdirSync(path.join(here, 'units')).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5))
+  .filter((n) => !JSON.parse(fs.readFileSync(path.join(here, 'units', `${n}.json`), 'utf8')).prop); // (a piece of the fortress is made by prop.js)
 const manifestFile = path.join(OUT, 'manifest.json');
 const manifest = fs.existsSync(manifestFile) ? JSON.parse(fs.readFileSync(manifestFile, 'utf8')) : { units: {} };
 for (const n of names.length ? names : all) manifest.units[n] = buildUnit(n);

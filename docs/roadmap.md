@@ -269,10 +269,17 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   (and a little of the moon's) by it, most at the floor and less with each metre above: wall feet, court corners
   and stair wells sit in shade. One more texture read a fragment.
 
-**Still to do toward the references:** painted stone textures, the square gatehouse's hoarding and deep arch,
-the horn tower's crown and the two-tier hall front as sculpted pieces (the plan is the generator's shape under
-the game's own stone shader, so a sculpted piece is as sharp as the walls beside it), rock outcrops under the
-walls, more dressing (barrels, carts), an HDR pipeline, rain as particles. Lightning already lights by
+- **A sculpted horn tower, in the game's own stone.** The tower is the generator's shape (35 credits), but only
+  its shape: `tools/assets/prop.js` keeps places, normals, triangles and how light or dark the sculptor painted
+  each place (windows, joints, hollows), 106 KB in all. `structures.js sculpted()` sets it on the tower's footing
+  at the height the layout gives and lays the fortress's stone over it, so it is as sharp as the walls beside it
+  at any zoom and its courses run round the shaft. It arrives with the unit models (`manifest.props`); until
+  then, and if it fails to load, the built-in tower stands. The rules are unchanged: the footprint was already
+  solid. The same path will take the hall front and the gatehouse.
+
+**Still to do toward the references:** painted stone textures, the square gatehouse's hoarding and deep arch and
+the two-tier hall front as sculpted pieces by the same path, rock outcrops under the walls, more dressing
+(barrels, carts), an HDR pipeline, rain as particles. Lightning already lights by
 direction (it raises the moon's light and the sky's, and shadows fall with it). A moon in the sky was tried and
 taken out: the game's camera never lifts far enough to show sky.
 

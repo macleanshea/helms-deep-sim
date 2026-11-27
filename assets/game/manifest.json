@@ -100,5 +100,11 @@
       "texture": "tower.a84ba12e34.webp",
       "bytes": 588312
     }
+  },
+  "props": {
+    "horn": {
+      "file": "horn-prop.c9d79b0d13.bin",
+      "bytes": 108468
+    }
   }
 }

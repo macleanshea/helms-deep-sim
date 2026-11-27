@@ -1383,7 +1383,7 @@ if (params.get('assets') !== '0') {
   // when it is short of room; neither is needed for the game to run
   if ('serviceWorker' in navigator && params.get('sw') !== '0') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  app.assetsReady = loadUnitPacks((name, pack, image) => renderer.addUnitAsset(name, pack, image));
+  app.assetsReady = loadUnitPacks((name, pack, image) => renderer.addUnitAsset(name, pack, image), null, (name, prop) => renderer.addProp(name, prop));
 }
 const perf = new Perf(app, renderer);
 app.keepCentre = [KEEP.cx, KEEP.cy];

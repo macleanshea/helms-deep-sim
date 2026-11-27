@@ -1,0 +1,23 @@
+{
+  "height": 50,
+  "texture": 1024,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1024x1536",
+  "portrait": "tools/assets/concepts/ref-stone.png",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/horn/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/horn.jpg",
+    "prompt": "tools/assets/concepts/horn.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21ec8-05f8-7648-8120-c0d83cd63dfb",
+      "remesh": "01a21ec9-0130-77bd-aab1-bfc4fc83bb29"
+    }
+  }
+}
