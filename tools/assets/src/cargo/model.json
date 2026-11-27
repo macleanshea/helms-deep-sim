@@ -1,0 +1,55 @@
+{
+  "unit": "cargo",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/cargo.jpg",
+    "prompt": "tools/assets/concepts/cargo.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f35-cf56-70f8-847b-d23fad4111bf",
+      "remesh": "01a21f36-ca10-7013-9b0b-507a0f0043ce"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 37830
+    },
+    "nrm": {
+      "offset": 151320,
+      "length": 37830
+    },
+    "uv": {
+      "offset": 302640,
+      "length": 25220
+    },
+    "joints": {
+      "offset": 403520,
+      "length": 50440
+    },
+    "weights": {
+      "offset": 453960,
+      "length": 50440
+    },
+    "index": {
+      "offset": 655720,
+      "length": 29976
+    },
+    "ibm": {
+      "offset": 775624,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

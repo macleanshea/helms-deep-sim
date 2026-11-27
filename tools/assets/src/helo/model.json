@@ -1,0 +1,63 @@
+{
+  "unit": "helo",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/helo.jpg",
+    "prompt": "tools/assets/concepts/helo.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f36-1cfc-74c0-9521-c3e3a4666213",
+      "remesh": "01a21f37-172e-7598-a015-8456b6d84a91"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "turret"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 57303
+    },
+    "nrm": {
+      "offset": 229212,
+      "length": 57303
+    },
+    "uv": {
+      "offset": 458424,
+      "length": 38202
+    },
+    "joints": {
+      "offset": 611232,
+      "length": 76404
+    },
+    "weights": {
+      "offset": 687636,
+      "length": 76404
+    },
+    "index": {
+      "offset": 993252,
+      "length": 30159
+    },
+    "ibm": {
+      "offset": 1113888,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "turret",
+      "loop": true,
+      "frames": 180,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

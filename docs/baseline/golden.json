@@ -1,10 +1,10 @@
 {
   "map grids": "ad9b41d9eaf200c6",
-  "map terrain": "5926347d8952ba0a",
+  "map terrain": "11ed303a491eaa0c",
   "map lines": "d189b8c5821fcf5b",
   "map functions": "4d90e1ddfda9b0d4",
-  "fortress mesh": "146010 0074989ca15bef52",
-  "fortress mesh, breached": "150516 f36f43bca7b7f5a1",
+  "fortress mesh": "147090 c83bccd85d791b21",
+  "fortress mesh, breached": "151596 168614bc5fdaf186",
   "battle first-night, no orders, seed 1": "b9d028f8 loss at 528.5 s, 0/91 v 1602/3175",
   "battle first-night, stand-in commander, seed 1": "dbbcb254 win at 600 s, 16/91 v 448/3175",
   "battle garrison, no orders, seed 1": "3b97322a loss at 862.5 s, 0/497 v 7622/18106",

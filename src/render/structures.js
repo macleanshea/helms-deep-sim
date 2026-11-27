@@ -179,6 +179,8 @@ function wallSection(m, map, segs, k, bound, H, BASE) {
   if (k === 0 || prevDown) m.wall(a.i, [a.o[0] + a.nx * BAT * 0.5, a.o[1] + a.ny * BAT * 0.5], BASE, H, -a.tx, -a.ty, k ? CORE : STONE_DK);
   if (k === N_WALL - 1 || nextDown) m.wall(b.i, [b.o[0] + b.nx * BAT * 0.5, b.o[1] + b.ny * BAT * 0.5], BASE, H, b.tx, b.ty, k < N_WALL - 1 ? CORE : STONE_DK);
   battlement(m, a.o, b.o, H, [s.nx, s.ny]);
+  // a banner every sixth section, on a pole at the walk's inner edge, clear of the parapet's loops (it falls with its section)
+  if (k % 6 === 3 && !s.culvert) banner(m, s.x - s.nx * (WALL_HALF - 0.9), s.y - s.ny * (WALL_HALF - 0.9), H, 8.5, 4.4);
   // low kerb on the inner edge
   m.frameBox([(a.i[0] + b.i[0]) / 2 + s.nx * 0.25, (a.i[1] + b.i[1]) / 2 + s.ny * 0.25, H + 0.22], [(b.i[0] - a.i[0]) / 2, (b.i[1] - a.i[1]) / 2, 0], [s.nx * 0.25, s.ny * 0.25, 0], [0, 0, 0.22], STONE_LT);
   if (k % 4 === 2) buttress(m, [s.x + s.nx * (WALL_HALF + 0.5), s.y + s.ny * (WALL_HALF + 0.5)], [s.nx, s.ny], [s.tx, s.ty], 3.0, BASE, H - 2.2, 2.6);

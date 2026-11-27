@@ -410,6 +410,19 @@ made 18 m tall, so that its boarding bridge lies on the Deeping Wall's parapet w
 from the wall's face). Its bridge is always down. Crews are still the soldiers who push them. Pictures:
 `docs/progress/engines/`.
 
+**Aircraft.** The strike jet, the cargo aircraft, the gunship and the transport helicopter are generated models
+(140 credits), drawn by name from the same packs as the units; a helicopter's rotor is the machine builder's
+turning part with no deck under it. The transport was asked for with one rotor so that it could turn.
+
+**After the owner's fourth look** (pictures in `docs/progress/third-look/`): whether soldiers are dots or figures
+is now one choice for the whole view, by zoom, like the tint (taken unit by unit it split a block in a tilted
+view; the triangle budget's bias still moves the change closer in under load); the siege tower keeps 7,000,
+3,500 and 1,200 triangles at its lower levels (its hides fell apart below that); a formation's box and its range
+rings fit where its units actually stand; place names fade out between 4 and 6.5 px per metre; the stream is
+gathered to the culvert arch's width at the Deeping Wall; banners stand along the Deeping Wall, every sixth
+section; and the ground is repainted toward the film's valley: bleached tawny tussock over pale grey river
+gravel, cooler slate rock, a cooler daylight.
+
 **The rest of the roster,** in this order: the scaling ladder (it must lie against the wall, so the built-in
 one stays); aircraft (drawn by the support code, not as units); supply caches and obstacles.
 

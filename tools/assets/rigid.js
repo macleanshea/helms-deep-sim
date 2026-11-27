@@ -129,7 +129,7 @@ export function rigid(g, opts = {}) {
     const rr = Math.min(foot.length ? foot[Math.floor(foot.length * 0.85)] : 0.2 * L, opts.turret.reach ? opts.turret.reach * L : Infinity, 0.36 * Wd); // (never wider than the hull it lies on)
     let near = -1, nd = 1e9; // the deck's colour: that of the hull vertex nearest the turret's foot, just under the cut
     for (let v = 0; v < nv; v++) if (J[v * 4] === 0 && P[v * 3 + 1] > cutY - 0.08 * H) { const d = Math.abs(Math.hypot(P[v * 3] - pv[0], P[v * 3 + 2] - pv[2]) - rr * 1.1); if (d < nd) { nd = d; near = v; } }
-    if (near >= 0 && rr > 0) {
+    if (near >= 0 && rr > 0 && opts.turret.deck !== false) { // (a rotor has no deck under it: "deck": false)
       const SEG = 14, n3 = P.length / 3, add = SEG + 1, grow2 = (A, w) => { const B = new A.constructor((n3 + add) * w); B.set(A); return B; };
       P = grow2(P, 3); N = grow2(N, 3); U = grow2(U, 2); J = grow2(J, 4); Wt = grow2(Wt, 4);
       const I2 = new Uint32Array(I.length + SEG * 3); I2.set(I);

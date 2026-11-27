@@ -219,7 +219,9 @@ export function buildMap() {
     }
     if (cd < 0 && dk > KEEP.r + 18) {
       const sd = Math.abs(y - streamY(x));
-      water = sstep(5.5, 1.2, sd);
+      // (at the Deeping Wall the stream is gathered into a channel the width of the culvert's arch, and spreads again beyond it)
+      const ch = sstep(36, 9, Math.abs(x - culv.x));
+      water = sstep(5.5 - 3.3 * ch, 1.2 - 0.5 * ch, sd);
       z -= sstep(9, 2, sd) * 1.4;
       dirt = Math.max(dirt, sstep(9, 4, sd) * 0.5 * (1 - water));
       const wn = wallNearest(x, y);

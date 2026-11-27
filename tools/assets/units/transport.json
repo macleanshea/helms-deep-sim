@@ -1,0 +1,34 @@
+{
+  "length": 22,
+  "texture": 1024,
+  "lods": [
+    10000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/tank.webp",
+  "rigid": {
+    "nose": "-x",
+    "file": "assets-src/transport/model.glb",
+    "turret": {
+      "above": 0.845,
+      "pivot": [
+        0.66,
+        0
+      ],
+      "reach": 0.5,
+      "deck": false
+    }
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/transport.jpg",
+    "prompt": "tools/assets/concepts/transport.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f36-7ba1-7484-a1aa-a5c4b4640561",
+      "remesh": "01a21f37-27a6-70e3-8768-bd7cdea9e8bf"
+    }
+  }
+}

@@ -96,9 +96,29 @@
       "bytes": 553720
     },
     "tower": {
-      "pack": "tower.e2577ee792.bin",
-      "texture": "tower.a84ba12e34.webp",
-      "bytes": 588312
+      "pack": "tower.b316ab7c10.bin",
+      "texture": "tower.5004424a30.webp",
+      "bytes": 963120
+    },
+    "jet": {
+      "pack": "jet.f54abc7b36.bin",
+      "texture": "jet.2596dc2bd1.webp",
+      "bytes": 430912
+    },
+    "cargo": {
+      "pack": "cargo.aba4084c5e.bin",
+      "texture": "cargo.2955ad56c5.webp",
+      "bytes": 374692
+    },
+    "helo": {
+      "pack": "helo.ff12a650a1.bin",
+      "texture": "helo.3f19ccac2f.webp",
+      "bytes": 471052
+    },
+    "transport": {
+      "pack": "transport.9efe06f07f.bin",
+      "texture": "transport.24fac8f65f.webp",
+      "bytes": 459368
     }
   },
   "props": {

@@ -258,7 +258,7 @@ export class Renderer {
    */
   addUnitAsset(name, pack, image) {
     const gl = this.gl, unit = UNITS.findIndex((d) => d.key === name);
-    if (unit < 0 || !pack.lods.length || !image) return;
+    if (!pack.lods.length || !image) return; // (a pack that is no unit's is an aircraft: drawn by name, see _fillDynamic)
     const a = { name, clip: pack.clip, height: pack.height, big: Math.max(1, (pack.span || 0) / 2.4), n: 0, gcap: 0, ibuf: gl.createBuffer(), lods: [],
       lists: [0, 1, 2, 3].map(() => { const idata = new ArrayBuffer(64 * ISTRIDE); return { cap: 64, n: 0, f: new Float32Array(idata), u8: new Uint8Array(idata) }; }) };
     // every frame of every clip: a row a frame, three texels a bone
@@ -288,7 +288,7 @@ export class Renderer {
       a.lods.push({ vao, count: l.triangles * 3, prog: this.pSkin[l.influences] || this.pSkin[4] });
     }
     gl.bindVertexArray(null);
-    this.assets[name] = a; this.unitAsset[unit] = a;
+    this.assets[name] = a; if (unit >= 0) this.unitAsset[unit] = a;
     if (this.fx) this.fx.model3d = this.unitAsset;
   }
 
@@ -939,6 +939,9 @@ export class Renderer {
     let dots = 0, drawn = 0;
     this._nHT = 0;
     // the side tint: none from WASH_FROM px per metre in, full by WASH_FULL, the same for every unit in view
+    // Dots or figures is likewise one choice for the whole view, by the zoom: taken unit by unit, a tilted view drew the far
+    // half of a block as a red carpet of dots and the near half as men. (Under load the bias moves the change closer in.)
+    const dotsNow = cam.zoom * dprI < zDot * 1.3;
     let W = (WASH_FROM - cam.zoom * dprI) / (WASH_FROM - WASH_FULL); W = W < 0 ? 0 : W > 1 ? 1 : W; W = W * W * (3 - 2 * W);
     for (let i = 0, n = sim.n; i < n; i++) {
       if (!alive[i]) continue;
@@ -979,7 +982,7 @@ export class Renderer {
           PFv[o + 8] = 1; PFv[o + 9] = 2; PFv[o + 10] = 0; PFv[o + 11] = 0; PFv[o + 12] = 0;
         }
       }
-      if (tier === 3 && d.size < 7) {
+      if (dotsNow && d.size < 7) {
         // far view: a coloured dot. cyan = armed defender, amber = out of ammunition, red = attacker
         if (dots >= this.partMax) continue; // (the particle buffer is full: a horde this size is a carpet of dots already)
         const o = dots * PF;
@@ -1087,6 +1090,18 @@ export class Renderer {
     }
     for (const a of sim.aircraft) {
       const x = a.px + (a.x - a.px) * al, y = a.py + (a.y - a.py) * al, z = a.z == null ? 100 : (a.pz ?? a.z) + (a.z - (a.pz ?? a.z)) * al;
+      const A = this.assets[a.kind];
+      if (A) {
+        // a model from files: the level of detail its size on screen earns, and for a helicopter the rotor's turn (its one clip)
+        const cs = this._cs, L = this._L, bias = this.lodBias, w = (x - cs.ex) * cs.fx + (y - cs.ey) * cs.fy + (z - cs.ez) * cs.fz;
+        if (w < cs.near) continue;
+        const zb = (cs.f / w / (this._dpr || 1)) * A.big;
+        this._tier = zb >= Math.max(L.hero * 3.2, 30) * bias ? 0 : zb >= L.hero * bias ? 1 : zb >= L.box * bias ? 2 : 3;
+        const spin = A.clip.turret, fr = spin ? spin.start + (((clock * 3.1 + x * 0.01) % 1) * spin.frames) : A.clip.idle.start;
+        this._put(A, x, y, a.kind === 'helo' ? z + Math.sin(clock * 1.3 + x) * 1.5 : z, a.rot, 1, fr, 235, 235, 235, 0, 0, 0, 0);
+        this._tier = 0;
+        continue;
+      }
       if (a.kind === 'jet') this._put(M.jet, x, y, z, a.rot, 1.7, 0, 235, 235, 235, 0, 0, 0, 0);
       else if (a.kind === 'cargo') this._put(M.cargo, x, y, z, a.rot, 1, 0, 235, 235, 235, 0, 0, 0, 0);
       else if (a.kind === 'helo') this._put(M.helo, x, y, z + Math.sin(clock * 1.3 + x) * 1.5, a.rot, 1.25, 0, 235, 235, 235, 0, 0, 0, 0);

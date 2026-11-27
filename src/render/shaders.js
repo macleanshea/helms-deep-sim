@@ -142,7 +142,7 @@ void main(){
     vec4 b1 = matB(3., vW.yz, dpx.yz, dpy.yz), b2 = matB(3., vW.xz, dpx.xz, dpy.xz);
     // the same layer much larger gives the face its big fractures and hides the repeat
     vec3 big = wx*matA(3., vW.yz*0.21, dpx.yz*0.21, dpy.yz*0.21).rgb + wy*matA(3., vW.xz*0.21, dpx.xz*0.21, dpy.xz*0.21).rgb;
-    vec3 rk = vec3(0.43,0.42,0.40) * (wx*a1.rgb + wy*a2.rgb) * mix(vec3(1.), big, 0.75);
+    vec3 rk = vec3(0.4,0.42,0.46) * (wx*a1.rgb + wy*a2.rgb) * mix(vec3(1.), big, 0.75);
     rk *= 0.86 + 0.28*noise(vW.xy*0.021 + vW.z*0.013);
     rk *= 1. - 0.25*smoothstep(0.55, 0.95, noise(vec2((vW.x + vW.y)*0.3, vW.z*0.012 + 3.)));   // rain streaks
     vec2 p1 = b1.xy*2.-1., p2 = b2.xy*2.-1.;
@@ -186,38 +186,38 @@ void main(){
   vec3 n = normalize(vec3(-hx, -hy, 2.*e*0.9));
   float dif = max(dot(n, normalize(vec3(-0.5,0.4,0.76))),0.);
   float rock = smoothstep(0.3,0.7, m.g + (fbm(w/13.)-.5)*.35);
-  // a high, hard valley: thin grey-green turf, bleached and wind-burnt, more stone than pasture
+  // a high, hard valley under a grey sky: bleached tawny tussock, more straw than green, over pale river gravel
   float g1 = fbm(w/90.), g2 = fbm(w/11.+31.), g3 = noise(w*1.9), g4 = fbm(w/3.2+5.);
-  vec3 grass = mix(vec3(0.18,0.2,0.14), vec3(0.29,0.29,0.2), smoothstep(0.25,0.75,g1));
-  grass = mix(grass, vec3(0.14,0.17,0.11), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.5);
-  grass = mix(grass, vec3(0.4,0.37,0.27), smoothstep(.5,.8,g2)*.65);
-  grass = mix(grass, vec3(0.27,0.22,0.2), smoothstep(.66,.8,fbm(w/17.+120.))*.35);
+  vec3 grass = mix(vec3(0.25,0.25,0.2), vec3(0.37,0.35,0.27), smoothstep(0.25,0.75,g1));
+  grass = mix(grass, vec3(0.2,0.22,0.19), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.45);
+  grass = mix(grass, vec3(0.49,0.45,0.33), smoothstep(.5,.8,g2)*.6);
+  grass = mix(grass, vec3(0.3,0.28,0.26), smoothstep(.66,.8,fbm(w/17.+120.))*.35);
   grass *= 0.8 + 0.28*g3 + 0.18*(g4-.5);
   // trampled earth and mud: darker and wetter in the ruts
-  vec3 dirt = mix(vec3(0.27,0.22,0.16), vec3(0.45,0.38,0.28), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
+  vec3 dirt = mix(vec3(0.27,0.24,0.2), vec3(0.44,0.4,0.33), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
   dirt *= 0.86 + 0.14*smoothstep(0.2, 0.6, abs(sin(w.x*0.9 + fbm3(w/6.)*6.)));
   // rock seen from above: fractured slabs with lichen and gravel in the joints
   vec2 wq = w + vec2(fbm3(w/23.), fbm3(w/23.+40.))*16.;
   vec2 vb = voro(wq/16.), vs = voro(wq/5.);
   float macro = fbm(w/60.+3.);
-  vec3 rk = mix(vec3(0.29,0.28,0.27), vec3(0.53,0.51,0.48), clamp(0.15 + 0.45*macro + 0.35*vb.y, 0., 1.));
+  vec3 rk = mix(vec3(0.25,0.26,0.29), vec3(0.5,0.51,0.54), clamp(0.15 + 0.45*macro + 0.35*vb.y, 0., 1.));
   rk *= mix(0.62, 1., smoothstep(0., 0.08, vb.x)) * mix(0.84, 1., smoothstep(0., 0.07, vs.x));
-  rk = mix(rk, vec3(0.42,0.43,0.32), smoothstep(.55,.78,fbm(w/14.+9.))*.35);
+  rk = mix(rk, vec3(0.41,0.4,0.33), smoothstep(.55,.78,fbm(w/14.+9.))*.28);
   rk *= 0.78+0.44*fbm(w/3.5);
   // scree where the cliff meets the grass
   float scree = smoothstep(0.15, 0.45, m.g) * (1. - smoothstep(0.55, 0.9, m.g));
-  vec3 grav = mix(vec3(0.33,0.31,0.29), vec3(0.5,0.48,0.45), noise(w*3.1)) * (0.8 + 0.3*noise(w*0.7));
+  vec3 grav = mix(vec3(0.4,0.4,0.41), vec3(0.6,0.6,0.6), noise(w*3.1)) * (0.8 + 0.3*noise(w*0.7));
   float dm = clamp(m.b*(0.55+0.9*fbm(w/8.+3.)),0.,1.);
   vec3 c = mix(grass, dirt, dm);
   // bare stony ground showing through the turf in broad patches, and everywhere a little
-  float stony = smoothstep(0.4, 0.68, fbm(w/38.+11.))*0.62 + 0.14;
+  float stony = smoothstep(0.36, 0.66, fbm(w/38.+11.))*0.66 + 0.16;
   c = mix(c, grav*(0.86 + 0.2*g3), stony*(1.-dm*0.7));
   c = mix(c, grav, scree*0.7);
   c = mix(c, rk, rock);
-  vec3 wat = vec3(0.07,0.11,0.12) + 0.06*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);
+  vec3 wat = vec3(0.1,0.14,0.16) + 0.06*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);
   // muddy banks with pebbles at the waterline
   float bank = smoothstep(0.02,0.35,m.a)*(1.-smoothstep(0.35,0.7,m.a));
-  c = mix(c, vec3(0.24,0.21,0.16)*(0.75+0.5*noise(w*2.2)), bank*0.8);
+  c = mix(c, vec3(0.42,0.41,0.4)*(0.75+0.5*noise(w*2.2)), bank*0.8);
   c = mix(c, wat, smoothstep(0.35,0.75,m.a));
   c *= 0.62 + 0.62*dif;
   o = vec4(c,1.);

@@ -46,10 +46,10 @@ const fx = new Fx(audio);
 
 // lighting moods: [ambient, sun/moon, fog, lift]
 const MOOD = {
-  setup: [[0.5, 0.52, 0.55], [0.92, 0.86, 0.76], [0.1, 0.12, 0.14], 0.03],
+  setup: [[0.52, 0.54, 0.58], [0.9, 0.88, 0.83], [0.11, 0.13, 0.15], 0.03],
   night: [[0.3, 0.36, 0.54], [0.46, 0.53, 0.7], [0.025, 0.035, 0.06], 0.26],
   dawn: [[0.5, 0.4, 0.36], [1.05, 0.72, 0.5], [0.16, 0.12, 0.11], 0.04],
-  day: [[0.52, 0.53, 0.55], [0.95, 0.9, 0.8], [0.12, 0.14, 0.16], 0.03],
+  day: [[0.53, 0.55, 0.58], [0.93, 0.9, 0.85], [0.12, 0.14, 0.16], 0.03],
 };
 
 const app = {
@@ -213,6 +213,23 @@ function runBand(g) {
   const st = Math.min(d.spacing * (g.spread || 1), 1.5), ranks = Math.ceil(g.count / Math.max(1, Math.floor(len / st) + 1));
   return { len, out: half, inn: Math.max(-half, half - 2 - (ranks - 1) * 1.6), top: r.wall ? RING_TOP : WALL_H };
 }
+/**
+ * The box a formation really takes up, in its own frame (along its front, and front to back): the bounds of where its
+ * units stand, with half a file's room round them. A block drawn wider than its men fill stands to one side of the
+ * width it was given, so a box of that width ran on past them.
+ */
+const extents = new WeakMap();
+function groupExtent(g) {
+  const key = `${g.x},${g.y},${g.ang},${g.w},${g.count},${g.type},${g.spread || 1},${g.lv ? g.lv.tier + '/' + g.lv.wall : ''}`;
+  let e = extents.get(g);
+  if (e && e.key === key) return e;
+  const d = UNITS[U[g.type]], pos = groupPositions(map, g), n = Math.min(g.count, pos.length / 2), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
+  let a0 = 1e9, a1 = -1e9, p0 = 1e9, p1 = -1e9;
+  for (let k = 0; k < n; k++) { const dx = pos[k * 2] - g.x, dy = pos[k * 2 + 1] - g.y, a = dx * ux + dy * uy, q = -dx * uy + dy * ux; if (a < a0) a0 = a; if (a > a1) a1 = a; if (q < p0) p0 = q; if (q > p1) p1 = q; }
+  if (!n) { const b = groupBounds(g); a0 = -b.hw; a1 = b.hw; p0 = -b.hd; p1 = b.hd; } else { const pad = Math.max(1.2, Math.min(d.spacing * 0.5, 5), (d.rad || 0) + 0.8); a0 -= pad; a1 += pad; p0 -= pad; p1 += pad; }
+  e = { key, a0, a1, p0, p1 }; extents.set(g, e);
+  return e;
+}
 function groupAt(wx, wy) {
   let best = null, ba = 1e12;
   const lockOrc = !app.isSandbox();
@@ -228,10 +245,10 @@ function groupAt(wx, wy) {
       }
       continue;
     }
-    const b = groupBounds(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
+    const b = groupExtent(g), ux = Math.cos(g.ang), uy = Math.sin(g.ang);
     const dx = wx - g.x, dy = wy - g.y;
     const a = dx * ux + dy * uy, p = -dx * uy + dy * ux;
-    if (Math.abs(a) < b.hw + pad && Math.abs(p) < b.hd + pad) { const area = b.hw * b.hd; if (area < ba) { ba = area; best = g; } }
+    if (a > b.a0 - pad && a < b.a1 + pad && p > b.p0 - pad && p < b.p1 + pad) { const area = ((b.a1 - b.a0) * (b.p1 - b.p0)) / 4; if (area < ba) { ba = area; best = g; } }
   }
   return best;
 }
@@ -855,10 +872,12 @@ function drawOverlay(dtReal) {
     // place names
     c.textAlign = 'center'; c.textBaseline = 'middle';
     c.font = `600 ${Math.max(10, Math.min(15, 9 + z * 3))}px ${FONT}`;
-    for (const l of map.labels) {
-      const p = S(l.x, l.y, heightAt(l.x, l.y) + 2), t = l.text.split('').join(' ');
-      c.fillStyle = 'rgba(0,0,0,0.6)'; c.fillText(t, p[0] + 1, p[1] + 1.5);
-      c.fillStyle = 'rgba(255,255,255,0.78)'; c.fillText(t, p[0], p[1]);
+    // (they are for finding one's way about the valley: closer in, where the places speak for themselves, they fade away)
+    const la = Math.max(0, Math.min(1, (6.5 - z) / 2.5));
+    if (la > 0.01) for (const l of map.labels) {
+      const p = S(l.x, l.y, heightAt(l.x, l.y) + 2), t = l.text.split('').join('\u200a');
+      c.fillStyle = `rgba(0,0,0,${(0.6 * la).toFixed(3)})`; c.fillText(t, p[0] + 1, p[1] + 1.5);
+      c.fillStyle = `rgba(255,255,255,${(0.78 * la).toFixed(3)})`; c.fillText(t, p[0], p[1]);
     }
     // formation outlines
     for (const g of app.setup.groups) {
@@ -878,16 +897,21 @@ function drawOverlay(dtReal) {
           top = Math.min(top, q[1]);
           if (k === (N >> 1)) cxs = q[0];
         }
-      } else for (const [a, p] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-        const q = S(g.x + ux * a * b.hw - uy * p * b.hd, g.y + uy * a * b.hw + ux * p * b.hd, gz);
-        if (a === -1 && p === -1) c.moveTo(q[0], q[1]); else c.lineTo(q[0], q[1]);
+      } else { const e = groupExtent(g); for (const [a, p] of [[e.a0, e.p0], [e.a1, e.p0], [e.a1, e.p1], [e.a0, e.p1]]) {
+        const q = S(g.x + ux * a - uy * p, g.y + uy * a + ux * p, gz);
+        if (a === e.a0 && p === e.p0) c.moveTo(q[0], q[1]); else c.lineTo(q[0], q[1]);
         top = Math.min(top, q[1]); cxs += q[0] / 4;
-      }
+      } }
       c.closePath();
       c.strokeStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 1 : hov ? 0.9 : 0.16})`; c.lineWidth = sel ? 2 : 1;
       c.fillStyle = `rgba(${sel ? '240,179,74' : col},${sel ? 0.14 : hov ? 0.1 : 0.015})`;
       c.fill(); c.stroke();
-      if (sel) rangeRings(c, UNITS[U[g.type]], g.x, g.y, 0.8);
+      if (sel) {
+        // (the rings are drawn round where the units stand, which is not always the middle of the width they were given)
+        let rx = g.x, ry = g.y;
+        if (!g.run) { const e = groupExtent(g), ma = (e.a0 + e.a1) / 2, mp = (e.p0 + e.p1) / 2; rx += ux * ma - uy * mp; ry += uy * ma + ux * mp; }
+        rangeRings(c, UNITS[U[g.type]], rx, ry, 0.8);
+      }
       if (sel || hov) {
         const d = UNITS[U[g.type]];
         const txt = `${d.name} × ${fmt(g.count)}${g.delay ? ` · +${g.delay}s` : ''}`;
