@@ -1,15 +1,15 @@
 {
-  "map grids": "af103549b28e5d72",
-  "map terrain": "fd8ccbeab3991dfe",
-  "map lines": "37286a251e74cc0a",
-  "map functions": "62dde5f415d6a3dd",
-  "fortress mesh": "228312 74e03c53b0a4fc62",
-  "fortress mesh, breached": "231822 375974d76616484c",
-  "battle first-night, no orders, seed 1": "faa66d3c loss at 550 s, 0/91 v 1556/3175",
-  "battle first-night, stand-in commander, seed 1": "34b57f69 win at 600 s, 50/91 v 262/3175",
-  "battle garrison, no orders, seed 1": "1670e617 loss at 883.5 s, 0/497 v 8088/18106",
-  "battle garrison, stand-in commander, seed 1": "7be02ac4 loss at 1087.5 s, 0/497 v 4546/18106",
-  "battle three-hundred, no orders, seed 1": "5c24b76d loss at 608 s, 0/309 v 6158/10098",
-  "battle three-hundred, stand-in commander, seed 2": "e650959b loss at 869 s, 0/309 v 3347/10098",
-  "battle benchmark, no orders, seed 1, first 400 s": "e9b8753c unfinished at 400 s, 965/965 v 22314/30242"
+  "map grids": "3f0c1d06e8aa95af",
+  "map terrain": "b95b62ba3d8f71f2",
+  "map lines": "2556c5dfd4d41db4",
+  "map functions": "c838079abc4e9282",
+  "fortress mesh": "213360 c05f6c896542903e",
+  "fortress mesh, breached": "216870 5db30ab958f3fef1",
+  "battle first-night, no orders, seed 1": "0bdc40ce loss at 556 s, 0/91 v 1520/3175",
+  "battle first-night, stand-in commander, seed 1": "af103e8f loss at 590 s, 0/91 v 1125/3175",
+  "battle garrison, no orders, seed 1": "25a78d80 loss at 834 s, 0/497 v 8612/18106",
+  "battle garrison, stand-in commander, seed 1": "b6eec859 win at 1200 s, 101/497 v 2257/18106",
+  "battle three-hundred, no orders, seed 1": "5a60fb76 loss at 591.5 s, 0/309 v 6023/10098",
+  "battle three-hundred, stand-in commander, seed 2": "ddaf4eaa loss at 767.5 s, 0/309 v 4489/10098",
+  "battle benchmark, no orders, seed 1, first 400 s": "87157b95 unfinished at 400 s, 965/965 v 22342/30242"
 }

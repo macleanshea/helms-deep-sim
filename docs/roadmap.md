@@ -49,7 +49,7 @@ Rules of the game the redesign must keep (from the README and `tools/checks.js`)
 - Difficulty targets: with no orders every challenge is lost; the stand-in commander wins Easy
   nearly always, Medium most nights, Hard under half.
 
-Defects the map lint found in today's map, to be put right in milestone 5:
+Defects the map lint found in the map as it was, all put right in milestone 5:
 
 - An arc of the Hornburg's wall east of the door (over the postern) cannot be walked to or from:
   the wall walk does not carry over the door arch and there is no stair on that side.
@@ -77,10 +77,10 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | # | Milestone | Status |
 | --- | --- | --- |
 | 1 | Sync with main, baseline and guard rails | done, bar the owner's benchmark table |
-| 2 | Layout extraction (no visible change) | 2a done; 2b lands with milestone 5 |
+| 2 | Layout extraction (no visible change) | 2a done; 2b (shapes instead of numbers) still to come: the redesign kept the round Hornburg and the north-south wall, so it was not needed yet |
 | 3 | Perspective camera and engine foundation | camera, per-unit detail, haze and sky done; HDR, depth pre-pass and the frame governor to come |
 | 4 | Simulation decoupled from rendering (still on the main thread) | effects queue done; render records and the order host to come |
-| 5 | Map redesign in greybox, owner signs off | |
+| 5 | Map redesign in greybox, owner signs off | redesigned, lint and balance on target; **the owner's sign-off against the references is wanted** before the layout is frozen |
 | 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
@@ -176,15 +176,35 @@ Done when: golden hashes unchanged, checks pass, no per-frame allocation in the 
 
 ### 5. Map redesign, greybox
 
-New proportions with the Deeping Wall's length as the master dimension. Starting values to settle
-with the owner: Hornburg span 0.30 to 0.35 of the wall's length, the inner drum about 2.2 times the
-outer wall's height, the horn tower about 3.5 times, a short crescent causeway. The Deep becomes a
-narrow gorge: its width shrinks most, its depth as far as re-placed guns and the hidden reserve
-allow. The Hornburg's outer wall becomes a curve of sections like the Deeping Wall, so it can take
-any shape; the wall walk carries over the door. Stairs become flights against the inner wall face.
+**Done, awaiting the owner's eye.** What changed, with the Deeping Wall's length (382 m) as the yardstick:
 
-Done when: lint and checks pass with no known-and-open map defects, the matrix meets the difficulty
-targets, and the owner signs off a top-down view and three perspective views. The layout is then frozen.
+| | Before | Now |
+| --- | --- | --- |
+| The Deep | 13.1 ha, 412 m deep, up to 472 m across: a field wider than the wall is long | 8.3 ha, 348 m deep: a funnel that closes from the wall's width to 140 m across by 200 m back, then a ravine of about 90 m |
+| Causeway | 242 m with a gentle S-bend | a 180 m crescent sweeping out from the gate and round to the north |
+| Inner keep | halls on two terraces | a round drum 27 m above the court on the upper terrace, with the wall's own battlements |
+| Horn tower | a 12 m-radius spired tower behind the terraces | a slender buttressed tower (7.5 m radius, 90 m) on the middle ward toward the Deep |
+| Great hall | free-standing | an arcade of arches against the cliff on the middle ward |
+| Stairs | free-standing blocks with slab fins | flights flush against the inner wall face, one sloping parapet on the open side |
+| Wall over the postern | could not be walked to | a third court stair reaches it |
+| Wall foot on the rock shelf | counted as a place for ladders | not a usable section |
+| Wall half sunk in the cliff | could be stood on, not reached | every ring section is wall from end to end or rock from end to end |
+| Ground | bright pasture | thin grey-green turf with bare stone showing through |
+
+`npm run maplint` passes 8 of 8 with nothing known and open; measurements are in
+`docs/progress/m5-map/maplint.txt` beside the pictures, the balance matrix and the checks. Over five
+seeds the stand-in commander wins Easy 4/5, Medium 4/5 and Hard 2/5, and no orders loses all fifteen
+(the targets: nearly always, most nights, under half). The golden hashes were re-recorded for this layout.
+
+Kept as they were, deliberately: the Hornburg's footprint (a 72 m ring) and the Deeping Wall's line,
+so every rule of the game still holds; the guns' places 230 to 280 m behind the wall, which is what
+stops the Deep being cut shorter. Not yet done, and left for the art passes (milestones 10 and 11):
+the Hornburg growing out of sheer crags rather than standing on a smooth shelf, coursed stone,
+craggy cliff meshes.
+
+**Wanted from the owner:** a look at `docs/progress/m5-map/` (`whole-map`, `hornburg-from-the-valley`,
+`hornburg-from-above-the-deep`, `the-deep-from-the-wall`) against the references. Proportions are
+cheap to change now (they are numbers in `src/layout.js`) and dear once the art is built on them.
 
 ### 6. One animated path for every unit
 

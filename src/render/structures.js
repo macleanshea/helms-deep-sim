@@ -306,22 +306,28 @@ function brokenGate(m, hw, lz) {
   m.mat = MAT.ASHLAR;
 }
 
-/** Wall-walk stairs. */
+/**
+ * Wall-walk stairs: a flight of solid steps laid against the inner face of a wall, with one sloping parapet on
+ * its open side. (Which side is the wall's is read off the map, so a flight can be laid along any wall.)
+ */
 function stairs(m, map) {
   for (const st of map.stairs) {
-    const steps = 16, px = -st.dy, py = st.dx, run = (st.len - 2) / steps;
+    const steps = 16, px = -st.dy, py = st.dx, run = (st.len - 2) / steps, rise = st.z1 - st.z0;
+    const probe = (sd) => map.seg[map.cellOf(st.x + st.dx * st.len * 0.6 + px * (st.half + 2.5) * sd, st.y + st.dy * st.len * 0.6 + py * (st.half + 2.5) * sd)] >= 0;
+    const open = probe(1) ? -1 : 1;
     for (let i = 0; i < steps; i++) {
-      const a0 = i * run, zt = st.z0 + ((st.z1 - st.z0) * (i + 1)) / steps;
+      const a0 = i * run, zt = st.z0 + (rise * (i + 1)) / steps;
       const cx = st.x + st.dx * (a0 + run / 2), cy = st.y + st.dy * (a0 + run / 2);
       m.frameBox([cx, cy, (zt + st.z0 - 4) / 2], [st.dx * run / 2, st.dy * run / 2, 0], [px * st.half, py * st.half, 0], [0, 0, (zt - st.z0 + 4) / 2], i & 1 ? STONE : STONE_LT);
     }
-    const cx = st.x + st.dx * (st.len - 1), cy = st.y + st.dy * (st.len - 1);
-    m.frameBox([cx, cy, (st.z1 + st.z0 - 4) / 2], [st.dx, st.dy, 0], [px * st.half, py * st.half, 0], [0, 0, (st.z1 - st.z0 + 4) / 2], PAVE);
-    // a stepped balustrade down each side
-    for (const sd of [-1, 1]) for (let i = 0; i < steps; i += 4) {
-      const a0 = (i + 2) * run, zt = st.z0 + ((st.z1 - st.z0) * (i + 4)) / steps;
-      m.frameBox([st.x + st.dx * a0 + px * (st.half + 0.2) * sd, st.y + st.dy * a0 + py * (st.half + 0.2) * sd, zt + 0.4], [st.dx * run * 2, st.dy * run * 2, 0], [px * 0.22, py * 0.22, 0], [0, 0, 0.5], STONE_LT);
-    }
+    // the landing at the head, level with the walk
+    const hx = st.x + st.dx * (st.len - 1), hy = st.y + st.dy * (st.len - 1);
+    m.frameBox([hx, hy, (st.z1 + st.z0 - 4) / 2], [st.dx, st.dy, 0], [px * st.half, py * st.half, 0], [0, 0, (rise + 4) / 2], PAVE);
+    // the parapet: a low wall climbing with the steps, a coping on it, and a block to end it at the head
+    const L = st.len - 2, ox = px * (st.half - 0.26) * open, oy = py * (st.half - 0.26) * open, mx = st.x + st.dx * L / 2 + ox, my = st.y + st.dy * L / 2 + oy;
+    m.frameBox([mx, my, st.z0 + rise / 2 + 0.75], [st.dx * L / 2, st.dy * L / 2, rise / 2], [px * 0.26, py * 0.26, 0], [0, 0, 0.6], STONE_LT);
+    m.frameBox([mx, my, st.z0 + rise / 2 + 1.42], [st.dx * L / 2, st.dy * L / 2, rise / 2], [px * 0.36, py * 0.36, 0], [0, 0, 0.09], STONE);
+    m.frameBox([hx + ox, hy + oy, st.z1 + 0.7], [st.dx, st.dy, 0], [px * 0.26, py * 0.26, 0], [0, 0, 0.7], STONE_LT);
   }
 }
 
@@ -400,76 +406,110 @@ function innerWard(m, map) {
   };
   const t1 = KEEP.t1, t2 = KEEP.t2, tw = KEEP.tower;
   terrace(t1, PLATEAU_Z - 1);
-  terrace(t2, t1.z - 1, 36);
-  // steps from the outer court up to the middle ward, and on up to the citadel
+  // steps from the outer court up to the middle ward
   flight(t1, 206 * DEG, -1, PLATEAU_Z, t1.z, 16);
   flight(t1, 262 * DEG, 1, PLATEAU_Z, t1.z, 16);
-  flight(t2, 218 * DEG, -1, t1.z, t2.z, 15, 2.8);
-  // the middle ward: barracks, stores and the old hall
-  hall(t1.x + Math.cos(250 * DEG) * 31, t1.y + Math.sin(250 * DEG) * 31, 340 * DEG, 18, 9, t1.z, 7);
-  hall(t1.x + Math.cos(300 * DEG) * 33, t1.y + Math.sin(300 * DEG) * 33, 30 * DEG, 14, 8, t1.z, 6, 5);
-  hall(t1.x + Math.cos(196 * DEG) * 32, t1.y + Math.sin(196 * DEG) * 32, 106 * DEG, 13, 8, t1.z, 6, 5);
+  // the middle ward: a barracks and a store under the keep's wall
+  hall(t1.x + Math.cos(250 * DEG) * 33, t1.y + Math.sin(250 * DEG) * 33, 340 * DEG, 16, 8, t1.z, 6, 5);
+  hall(t1.x + Math.cos(196 * DEG) * 34, t1.y + Math.sin(196 * DEG) * 34, 106 * DEG, 12, 7, t1.z, 5, 4);
   for (const a of [228, 322]) turret(m, t1.x + Math.cos(a * DEG) * (t1.r + 0.5), t1.y + Math.sin(a * DEG) * (t1.r + 0.5), 4.4, PLATEAU_Z - 1, t1.z + 7);
-  // the citadel: the keep's great hall abutting the tower
-  {
-    const a = Math.atan2(t2.y - tw.y, t2.x - tw.x) + Math.PI * 0.12;
-    const hx = tw.x + Math.cos(a + Math.PI) * -15, hy = tw.y + Math.sin(a + Math.PI) * -15;
-    hall(hx, hy, a + Math.PI / 2, 24, 13, t2.z, 16, 8);
-    for (const sd of [-1, 1]) {
-      const c = Math.cos(a + Math.PI / 2), s2 = Math.sin(a + Math.PI / 2);
-      turret(m, hx + c * 12.5 * sd + Math.cos(a) * 6.5, hy + s2 * 12.5 * sd + Math.sin(a) * 6.5, 3.2, t2.z, t2.z + 22);
-    }
-  }
-  turret(m, t2.x + Math.cos(200 * DEG) * (t2.r + 0.3), t2.y + Math.sin(200 * DEG) * (t2.r + 0.3), 4, t1.z - 1, t2.z + 8);
-  greatTower(m, tw.x, tw.y, tw.r, t2.z);
+  drumKeep(m, t2.x, t2.y, t2.r, t1.z - 1, KEEP.drumTop);
+  hornTower(m, tw.x, tw.y, tw.r, t1.z - 1, tw.top);
+  hallArcade(m, map, t1);
 }
 
-/** The great tower: battered base, a long shaft in stages, a corbelled gallery, a lantern and a slate spire. */
-function greatTower(m, x, y, r, z) {
-  const n = 28;
-  m.lathe([[r + 2.4, -4], [r + 0.45, 8], [r + 0.45, 8], [r + 0.8, 8.25], [r + 0.8, 8.8], [r + 0.4, 9.05], [r + 0.4, 9.05],
-    [r - 0.5, 30], [r - 0.5, 30], [r + 0.2, 30.3], [r + 0.2, 31.1], [r - 0.6, 31.4], [r - 0.6, 31.4],
-    [r - 1.7, 51.3], [r - 1.7, 51.3], [r + 0.5, 53.6], [r + 0.5, 54.5], [r + 0.5, 54.5], [0, 54.5, PAVE]], n, STONE, 0, [x, y, z], 'z', { capA: false });
-  // corbels under the gallery and its parapet
-  const ng = 26;
-  for (let k = 0; k < ng; k++) {
-    const a = (k / ng) * TAU, c = Math.cos(a), s = Math.sin(a), w = 1.5;
-    m.frame([x + c * (r + 0.5), y + s * (r + 0.5), z + 54.5], [c, s], [-s, c], () => {
-      m.box(-0.6, 0, -1.6, 1.2, 0.5, 0.9, STONE_DK);
-      m.box(-0.32, 0, 0.5, 0.64, (TAU * (r + 0.5)) / ng + 0.08, 1.0, STONE_LT);
-      m.box(-0.32, 0, 1.5, 0.64, w, 1.0, STONE_LT);
-      const b = (sx, sy) => [-0.32 + sx * 0.32, sy * w / 2, 2.0], t = (sx, sy) => [-0.32 + sx * 0.1, sy * (w / 2 - 0.14), 2.26];
-      m.prism([b(-1, -1), b(1, -1), b(1, 1), b(-1, 1)], [t(-1, -1), t(1, -1), t(1, 1), t(-1, 1)], STONE);
-    });
-  }
-  // the lantern: a narrower drum ringed with tall lights, crowned with its own battlements
-  const r2 = r - 4.6;
-  m.lathe([[r2 + 0.5, 54.5], [r2, 56.5], [r2, 64.6], [r2, 64.6], [r2 + 0.55, 65.5], [r2 + 0.55, 66.4], [r2 + 0.55, 66.4], [0, 66.4, PAVE]], 20, STONE, 0, [x, y, z], 'z', { capA: false });
-  for (let k = 0; k < 10; k++) {
-    const a = (k / 10) * TAU + 0.2, c = Math.cos(a), s = Math.sin(a);
-    m.frame([x + c * r2, y + s * r2, z + 60.4], [c, s], [-s, c], () => {
-      m.box(0, 0, 0, 0.2, 1.3, 4.6, STONE_LT);
-      slit(m, 0.1, 0, 0, 0.7, 3.8, k % 2 === 0);
-    });
-    m.frame([x + c * (r2 + 0.55), y + s * (r2 + 0.55), z + 66.4], [c, s], [-s, c], () => { m.box(-0.3, 0, 0.4, 0.6, 2.4, 0.8, STONE_LT); m.box(-0.3, 0, 1.2, 0.6, 1.2, 0.8, STONE_LT); });
-  }
-  // the spire: slate with a flared eave, and an iron finial
-  m.withMat(MAT.SLATE, () => m.lathe([[r2 + 0.3, 66.6], [r2 - 0.5, 68], [r2 - 1.4, 71], [2.6, 78], [0.9, 85], [0, 88.5]], 16, SLATE, 0, [x, y, z], 'z', { capA: false }));
-  m.withMat(MAT.IRON, () => { m.tube([x, y, z + 88], [x, y, z + 92.5], 0.12, 0.05, 6, [0.45, 0.4, 0.25]); m.sphere([x, y, z + 89.4], 0.42, [0.6, 0.5, 0.25], 0, 8, 5); });
-  // buttresses up the base, and windows in every bay: narrow loops below, taller lights above
-  for (let k = 0; k < 6; k++) {
-    const a = 0.4 + k * 1.0472, c = Math.cos(a), s = Math.sin(a);
-    buttress(m, [x + c * (r + 0.6), y + s * (r + 0.6)], [c, s], [-s, c], 2.6, z - 4, z + 27, 3.4);
-    for (const zz of [14, 24, 38, 46]) {
-      const rr = zz < 30 ? r + 0.4 - (zz - 8) * 0.041 : r - 0.6 - (zz - 31.4) * 0.055, b = a + 0.52;
-      m.frame([x + Math.cos(b) * rr, y + Math.sin(b) * rr, z + zz], [Math.cos(b), Math.sin(b)], [-Math.sin(b), Math.cos(b)], () => {
-        const tall = zz > 30;
-        m.box(0, 0, 0, 0.24, tall ? 1.5 : 1.0, tall ? 4.2 : 3.0, STONE_LT);
-        slit(m, 0.12, 0, 0, tall ? 0.8 : 0.4, tall ? 3.4 : 2.4, (k + zz) % 3 === 0);
-        m.box(0.1, 0, tall ? -2.3 : -1.7, 0.4, tall ? 1.8 : 1.3, 0.24, STONE_LT);
+/** The inner keep: a great round drum, battered at the foot, banded with string courses, crowned with battlements. */
+function drumKeep(m, x, y, r, z0, zt) {
+  const n = 40, h = zt - z0;
+  m.lathe([[r + 2.2, z0], [r + 0.3, z0 + h * 0.3], [r + 0.3, z0 + h * 0.3], [r + 0.7, z0 + h * 0.3 + 0.3], [r + 0.7, z0 + h * 0.3 + 0.8], [r + 0.2, z0 + h * 0.3 + 1.1], [r + 0.2, z0 + h * 0.3 + 1.1],
+    [r, zt - 2.4], [r, zt - 2.4], [r + 0.5, zt - 2.2], [r + 0.5, zt - 1.8], [r, zt - 1.6], [r, zt - 1.6], [r, zt], [r, zt], [0, zt, PAVE]], n, STONE, 0, [x, y, 0], 'z', { capA: false });
+  for (let k = 0; k < n; k++) {
+    const a0 = (k / n) * TAU, a1 = ((k + 1) / n) * TAU, am = (a0 + a1) / 2, c = Math.cos(am), sn = Math.sin(am);
+    battlement(m, [x + Math.cos(a0) * r, y + Math.sin(a0) * r], [x + Math.cos(a1) * r, y + Math.sin(a1) * r], zt, [c, sn]);
+    if (k % 5 === 2) buttress(m, [x + c * (r + 0.4), y + sn * (r + 0.4)], [c, sn], [-sn, c], 2.6, z0, z0 + h * 0.62, 3.0);
+    // loops in two tiers, a few with a light behind them
+    if (k % 2 === 0) for (const [zz, tall] of [[z0 + h * 0.48, 0], [z0 + h * 0.74, 1]]) {
+      m.frame([x + c * (r + 0.22), y + sn * (r + 0.22), zz], [c, sn], [-sn, c], () => {
+        m.box(0, 0, 0, 0.24, tall ? 1.3 : 1.0, tall ? 3.6 : 2.6, STONE_LT);
+        slit(m, 0.12, 0, 0, tall ? 0.6 : 0.4, tall ? 2.8 : 2.0, (k + tall * 3) % 8 === 0);
       });
     }
   }
+  // a low inner turret for the banner, and the head of the stair that climbs inside the wall
+  m.lathe([[5.2, zt], [4.8, zt + 6], [4.8, zt + 6], [5.4, zt + 6.4], [5.4, zt + 7.2], [5.4, zt + 7.2], [0, zt + 7.2, PAVE]], 16, STONE, 0, [x + r * 0.35, y - r * 0.3, 0], 'z', { capA: false });
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; m.box(x + r * 0.35 + Math.cos(a) * 5.1, y - r * 0.3 + Math.sin(a) * 5.1, zt + 7.9, 1.4, 1.4, 1.4, STONE_LT, 0, a); }
+}
+
+/**
+ * The horn tower: a slender eight-sided shaft on a spreading foot, held by tall buttresses, tapering to an open
+ * belfry of arches under a flat crown. The great horn is slung in the belfry, its mouth to the valley.
+ */
+function hornTower(m, x, y, r, z0, zt) {
+  const n = 8, zb = zt - 11, rt = r * 0.74; // zb: the belfry floor
+  m.lathe([[r + 3.2, z0 - 3], [r + 0.5, z0 + 9], [r + 0.5, z0 + 9], [r + 0.9, z0 + 9.3], [r + 0.9, z0 + 9.9], [r + 0.4, z0 + 10.2], [r + 0.4, z0 + 10.2],
+    [rt, zb - 2.4], [rt, zb - 2.4], [rt + 0.9, zb - 1.2], [rt + 0.9, zb], [rt + 0.9, zb], [0, zb, PAVE]], n, STONE, Math.PI / 8, [x, y, 0], 'z', { capA: false });
+  // four buttresses on the diagonals, climbing most of the way to the belfry
+  for (let k = 0; k < 4; k++) {
+    const a = Math.PI / 4 + k * Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+    buttress(m, [x + c * (r * 0.9), y + s * (r * 0.9)], [c, s], [-s, c], 2.4, z0 - 3, zb - 14, 4.2);
+  }
+  // loops up each face in turn
+  for (let lv = 0; lv < 9; lv++) {
+    const zz = z0 + 14 + lv * ((zb - z0 - 24) / 8), u = (zz - z0 - 10.2) / (zb - 2.4 - z0 - 10.2), rr = (r + 0.4) + (rt - r - 0.4) * Math.max(0, Math.min(1, u));
+    const a = (lv * 3 % 8) * (TAU / 8), c = Math.cos(a), s = Math.sin(a), ap = rr * Math.cos(Math.PI / 8);
+    m.frame([x + c * (ap + 0.12), y + s * (ap + 0.12), zz], [c, s], [-s, c], () => { m.box(0, 0, 0, 0.22, 1.0, 3.2, STONE_LT); slit(m, 0.11, 0, 0, 0.42, 2.5, lv % 3 === 1); });
+  }
+  // the belfry: eight piers, arches between them, a ring beam and a crown of small merlons
+  const rp = rt + 0.3;
+  for (let k = 0; k < 8; k++) {
+    const a = k * (TAU / 8) + Math.PI / 8, c = Math.cos(a), s = Math.sin(a);
+    m.box(x + c * rp, y + s * rp, zb + 3.6, 1.5, 1.5, 7.2, STONE_LT, 0, a);
+    // the arch's haunches: two blocks leaning in from each pier
+    const am = a + TAU / 16, cm = Math.cos(am), sm = Math.sin(am), ra = rp * Math.cos(Math.PI / 8);
+    m.frame([x + cm * ra, y + sm * ra, zb + 6.3], [cm, sm], [-sm, cm], () => { m.box(0, 0, 0.55, 1.2, rp * 0.78, 0.9, STONE); m.box(0, -rp * 0.26, -0.2, 1.1, 0.8, 0.9, STONE); m.box(0, rp * 0.26, -0.2, 1.1, 0.8, 0.9, STONE); });
+  }
+  m.lathe([[rp + 0.9, zb + 7.2], [rp + 1.3, zb + 7.6], [rp + 1.3, zb + 8.4], [rp + 1.3, zb + 8.4], [0, zb + 8.6, PAVE]], n, STONE, Math.PI / 8, [x, y, 0], 'z', { capA: false });
+  for (let k = 0; k < 16; k++) { const a = (k / 16) * TAU; m.box(x + Math.cos(a) * (rp + 0.95), y + Math.sin(a) * (rp + 0.95), zb + 9.2, 0.7, 1.1, 1.3, STONE_LT, 0, a); }
+  m.withMat(MAT.SLATE, () => m.lathe([[rp * 0.7, zb + 8.6], [rp * 0.35, zb + 10.4], [0, zb + 11]], 8, SLATE, Math.PI / 8, [x, y, 0], 'z', { capA: false }));
+  // the horn: a long dark trumpet, its mouth toward the valley (west)
+  m.withMat(MAT.IRON, () => { m.tube([x + rt * 0.5, y, zb + 2.6], [x - rt * 0.2, y, zb + 2.9], 0.22, 0.4, 8, [0.3, 0.22, 0.1]); m.tube([x - rt * 0.2, y, zb + 2.9], [x - rt - 1.4, y, zb + 3.5], 0.4, 1.25, 10, [0.34, 0.25, 0.11]); });
+  m.withMat(MAT.EMIT, () => m.sphere([x, y, zb + 4.6], 0.5, dim(LAMP, 0.9), 0, 8, 5));
+}
+
+/**
+ * The great hall: its front is an arcade of tall arches standing against the cliff at the back of the middle ward,
+ * the hall itself cut into the rock behind. Laid along the stretch of the ward's rim that the mountain covers.
+ */
+function hallArcade(m, map, t) {
+  // find the buried arc of the rim, and stand the front across its middle
+  let best = [0, 0], run = null;
+  for (let k = 0; k <= 720; k++) {
+    const a = (k / 360) * Math.PI, bur = map.terrZ(t.x + Math.cos(a) * (t.r + 6), t.y + Math.sin(a) * (t.r + 6)) > t.z + 9;
+    if (bur && run == null) run = k; else if (!bur && run != null) { if (k - run > best[1] - best[0]) best = [run, k]; run = null; }
+  }
+  if (best[1] - best[0] < 30) return;
+  const am = ((best[0] + best[1]) / 720) * Math.PI, span = Math.min(1.25, ((best[1] - best[0]) / 360) * Math.PI * 0.62);
+  const L = 2 * (t.r - 2) * Math.sin(span / 2), d = (t.r - 2) * Math.cos(span / 2) - 1.5, H = 13, bays = Math.max(3, Math.round(L / 6.4)), bw = L / bays;
+  // a frame standing on the ward at the middle of the front: +x out of the cliff (toward the ward), +y along the front
+  m.frame([t.x + Math.cos(am) * d, t.y + Math.sin(am) * d, t.z], [-Math.cos(am), -Math.sin(am)], [Math.sin(am), -Math.cos(am)], () => {
+    m.box(-2.5, 0, H / 2, 5, L + 3, H, STONE);                              // the front wall, thick, running back into the rock
+    m.box(0.25, 0, 0.5, 0.9, L + 3.4, 1.0, STONE_DK);                        // plinth
+    m.box(0.3, 0, H - 2.6, 0.9, L + 3.2, 0.5, STONE_LT);                     // string course over the arches
+    m.box(0.35, 0, H + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                   // cornice
+    for (let k = 0; k < bays; k++) {
+      const y = (k + 0.5 - bays / 2) * bw, w = bw * 0.62, hs = H - 6.6, arch = [], ring = [];
+      // the opening: a tall doorway with a round head; behind it, the dark of the hall, here and there a fire
+      for (let q = 0; q <= 8; q++) { const a = (q / 8) * Math.PI; arch.push([y + Math.cos(a) * w / 2, 1.0 + hs + Math.sin(a) * w / 2]); ring.push([y + Math.cos(a) * (w / 2 + 0.38), 1.0 + hs + Math.sin(a) * (w / 2 + 0.38)]); }
+      m.extrudeX([[y + w / 2 + 0.38, 1.0], ...ring, [y - w / 2 - 0.38, 1.0]], 0, 0.32, STONE_LT);
+      m.withMat(k % 3 === 1 ? MAT.EMIT : MAT.PLAIN, () => m.extrudeX([[y + w / 2, 1.0], ...arch, [y - w / 2, 1.0]], 0, 0.4, k % 3 === 1 ? dim(LAMP, 0.55) : DARK));
+      // a small light over each arch, and a pier between bays
+      m.box(0.14, y, H - 1.5, 0.3, 0.9, 1.5, STONE_LT); slit(m, 0.3, y, H - 1.5, 0.5, 1.1, k % 2 === 0);
+      if (k > 0) m.box(0.45, y - bw / 2, (H - 2.6) / 2, 0.9, bw * 0.16, H - 2.6, STONE_LT);
+    }
+    for (const sd of [-1, 1]) m.box(0.5, sd * (L / 2 + 0.6), H / 2, 1.6, 1.8, H + 1.5, STONE_LT);     // end piers
+    // the roof: a slate pent running back and up into the mountain
+    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, H + 0.5], [0.9, L / 2 + 1.7, H + 0.5], [-7, L / 2 + 1.7, H + 4.8], [-7, -L / 2 - 1.7, H + 4.8]], [[0.9, -L / 2 - 1.7, H + 0.8], [0.9, L / 2 + 1.7, H + 0.8], [-7, L / 2 + 1.7, H + 5.1], [-7, -L / 2 - 1.7, H + 5.1]], SLATE));
+  });
 }
 
 /**

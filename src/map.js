@@ -225,7 +225,7 @@ export function buildMap() {
     if (z > afRaw[c]) afRaw[c] = z;
   }
   // the keep's towers stand far above the rock they are built on
-  for (const [x, y, r, z] of [[KEEP.tower.x, KEEP.tower.y, KEEP.tower.r + 8, KEEP.t2.z + 86], [KEEP.cx, KEEP.cy, KEEP.r + 10, RING_TOP + 12], [KEEP.t2.x, KEEP.t2.y, KEEP.t2.r, KEEP.t2.z + 26]]) {
+  for (const [x, y, r, z] of [[KEEP.tower.x, KEEP.tower.y, KEEP.tower.r + 8, KEEP.tower.top + 25], [KEEP.cx, KEEP.cy, KEEP.r + 10, RING_TOP + 12], [KEEP.t2.x, KEEP.t2.y, KEEP.t2.r, KEEP.drumTop + 16]]) {
     for (let j = Math.floor((y - r + MARGIN) / AF); j <= (y + r + MARGIN) / AF; j++) for (let i = Math.floor((x - r + MARGIN) / AF); i <= (x + r + MARGIN) / AF; i++) {
       if (i >= 0 && j >= 0 && i < AFW && j < AFH) afRaw[j * AFW + i] = Math.max(afRaw[j * AFW + i], z);
     }
@@ -262,16 +262,20 @@ export function buildMap() {
   const cz = new Float32Array(GW * GH);
   const segCells = segments.map(() => 0);
   const inWard = (x, y) => Math.hypot(x - KEEP.t1.x, y - KEEP.t1.y) < KEEP.t1.r + 4.5; // with the steps that hug it
+  const buried = segments.slice(N_WALL).map((g) => terrZ(g.x, g.y) > PLATEAU_Z + 1.5);
   function classify(x, y) {
     const cd = cliffDist(x, y);
     const dk = Math.hypot(x - KEEP.cx, y - KEEP.cy);
     if (dk < KEEP.r + KEEP.half) {
-      if (cd > 4) return [T.CLIFF, -1];
       if (dk >= KEEP.r - KEEP.half) {
+        // a section of the ring is wall from end to end, or (where the mountain has swallowed it) rock from end to end:
+        // never half of each, which left a stretch of wall walk that could be stood on and not reached
         let a = Math.atan2(y - KEEP.cy, x - KEEP.cx) / DEG; if (a < 0) a += 360;
         const id = N_WALL + Math.min(N_RING - 1, Math.floor(a / RING_STEP));
+        if (buried[id - N_WALL]) return [T.CLIFF, -1];
         return id === DOOR ? [T.DOOR, -1] : [T.WALL, id];
       }
+      if (cd > 4) return [T.CLIFF, -1];
       if (inWard(x, y)) return [T.CLIFF, -1]; // the terraced inner ward: solid masonry and rock
       return [stairAt(x, y) >= 0 ? T.STAIR : T.COURT, -1];
     }
@@ -292,7 +296,12 @@ export function buildMap() {
   const cellOf = (x, y) => Math.min(GH - 1, Math.max(0, (y / CELL) | 0)) * GW + Math.min(GW - 1, Math.max(0, (x / CELL) | 0));
   segments.forEach((s, i) => {
     if (segCells[i] < 2) s.valid = false;
-    if (s.kind === 'wall') { const t = type[cellOf(s.ox, s.oy)]; if (t !== T.GROUND && t !== T.WATER) s.valid = false; }
+    if (s.kind === 'wall') {
+      const c = cellOf(s.ox, s.oy), t = type[c];
+      if (t !== T.GROUND && t !== T.WATER) s.valid = false;
+      // (where the wall runs into the Hornburg's rock its foot is up on the shelf: nothing can be set against it from the valley floor)
+      if (cz[c] > 3.3) s.valid = false;
+    }
   });
 
   // links between a wall walk and the stair head or door beside it (bit k = neighbour direction k)

@@ -169,12 +169,12 @@ void main(){
   vec3 n = normalize(vec3(-hx, -hy, 2.*e*0.9));
   float dif = max(dot(n, normalize(vec3(-0.5,0.4,0.76))),0.);
   float rock = smoothstep(0.3,0.7, m.g + (fbm(w/13.)-.5)*.35);
-  // rough upland pasture: tussocky, part green, part bleached, with clover-dark hollows and heather
+  // a high, hard valley: thin grey-green turf, bleached and wind-burnt, more stone than pasture
   float g1 = fbm(w/90.), g2 = fbm(w/11.+31.), g3 = noise(w*1.9), g4 = fbm(w/3.2+5.);
-  vec3 grass = mix(vec3(0.19,0.24,0.12), vec3(0.33,0.35,0.18), smoothstep(0.25,0.75,g1));
-  grass = mix(grass, vec3(0.15,0.2,0.1), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.55);
-  grass = mix(grass, vec3(0.43,0.40,0.25), smoothstep(.52,.82,g2)*.6);
-  grass = mix(grass, vec3(0.27,0.21,0.2), smoothstep(.66,.8,fbm(w/17.+120.))*.35);
+  vec3 grass = mix(vec3(0.18,0.2,0.14), vec3(0.29,0.29,0.2), smoothstep(0.25,0.75,g1));
+  grass = mix(grass, vec3(0.14,0.17,0.11), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.5);
+  grass = mix(grass, vec3(0.4,0.37,0.27), smoothstep(.5,.8,g2)*.65);
+  grass = mix(grass, vec3(0.27,0.22,0.2), smoothstep(.66,.8,fbm(w/17.+120.))*.35);
   grass *= 0.8 + 0.28*g3 + 0.18*(g4-.5);
   // trampled earth and mud: darker and wetter in the ruts
   vec3 dirt = mix(vec3(0.27,0.22,0.16), vec3(0.45,0.38,0.28), fbm(w/12.+5.)) * (0.82+0.36*noise(w*2.4));
@@ -192,6 +192,9 @@ void main(){
   vec3 grav = mix(vec3(0.33,0.31,0.29), vec3(0.5,0.48,0.45), noise(w*3.1)) * (0.8 + 0.3*noise(w*0.7));
   float dm = clamp(m.b*(0.55+0.9*fbm(w/8.+3.)),0.,1.);
   vec3 c = mix(grass, dirt, dm);
+  // bare stony ground showing through the turf in broad patches, and everywhere a little
+  float stony = smoothstep(0.4, 0.68, fbm(w/38.+11.))*0.62 + 0.14;
+  c = mix(c, grav*(0.86 + 0.2*g3), stony*(1.-dm*0.7));
   c = mix(c, grav, scree*0.7);
   c = mix(c, rk, rock);
   vec3 wat = vec3(0.07,0.11,0.12) + 0.06*pow(noise(vec2(w.x*.3, w.y*1.1)+3.), 3.);

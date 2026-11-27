@@ -48,6 +48,9 @@ const SETUP = [
   ['the-deep-z3', [1180, 470, 3]],
   ['postern-z10', [1045, 660, 10, YAW + 2.2]],
   ['garrison-z36', [962, 500, 36]],
+  ['hornburg-from-the-valley', [930, 705, 5.2, 1.35, -0.2]],
+  ['hornburg-from-above-the-deep', [985, 715, 5, YAW + Math.PI, 0]],
+  ['the-deep-from-the-wall', [1090, 480, 3.4, 1.57, -0.1]],
   ['low-toward-the-wall', [840, 470, 16, YAW, -0.14]],
   ['low-down-the-valley', [958, 430, 22, YAW + Math.PI, -0.12]],
 ];

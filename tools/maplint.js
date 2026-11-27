@@ -17,14 +17,9 @@ const NC = GW * GH;
 const results = [];
 /** `open`: the failure is a known defect of the present map, listed in KNOWN below; reported, but not a failure. */
 const check = (name, ok, detail, open = false) => { results.push({ name, ok, open: !ok && open }); if (!json) console.log(`${ok ? 'PASS' : open ? 'OPEN' : 'FAIL'}  ${name}\n      ${detail}`); };
-// Defects of the map as it stands, found by this lint and left for the redesign to put right. Anything beyond these fails.
-const KNOWN = {
-  // the first wall section's foot is up on the Hornburg's rock shelf: no one can walk to it from the valley
-  wallFeet: [0],
-  // the wall walk does not carry over the door arch, and there is no stair east of it: this arc of the Hornburg's wall
-  // (over the postern), and one section half sunk in the cliff, can be garrisoned at setup but not walked to or from
-  ringWalks: [38, 39, 40, 41, 51, 67, 68, 69, 70, 71, 73],
-};
+// Defects of the map known and left open, by section number: reported, but not failures. (None since the redesign;
+// a new one belongs here only with a note in docs/roadmap.md saying when it will be put right.)
+const KNOWN = { wallFeet: [], ringWalks: [] };
 const within = (ids, known) => ids.every((i) => known.includes(i));
 const cellXY = (c) => [(c % GW) * CELL + CELL / 2, ((c / GW) | 0) * CELL + CELL / 2];
 

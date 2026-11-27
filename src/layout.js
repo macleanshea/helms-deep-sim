@@ -19,7 +19,10 @@ const keep = {
   cx: 960, cy: 710, r: 72, half: 4.5,
   t1: { x: 968, y: 724, r: 48, z: PLATEAU + 8 },
   t2: { x: 990, y: 742, r: 27, z: PLATEAU + 17 },
-  tower: { x: 997, y: 746, r: 12 },
+  // the horn tower stands on the middle ward toward the Deep, slender and far taller than anything else; `drumTop` is
+  // the height of the inner keep's battlements (the keep is the drum that stands on the upper terrace, t2)
+  tower: { x: 1004, y: 712, r: 7.5, top: 90 },
+  drumTop: PLATEAU + 27,
 };
 
 export const LAYOUT = {
@@ -34,9 +37,10 @@ export const LAYOUT = {
    * ends the Deep.
    */
   rim: {
-    north: { a0: 64, a1: 260, x0: 520, x1: 960, deep: 150, dx0: 1000, dx1: 1400, noise: 44, seed: 9.1 },
-    south: { a0: 64, a1: 205, x0: 520, x1: 900, deep: 190, dx0: 1000, dx1: 1400, noise: 44, seed: 3.7 },
-    east: { x: 1394, noise: 26, seed: 1.3 },
+    // behind the wall the two rims close to a ravine little more than a hundred metres across: the Deep is a gorge, not a field
+    north: { a0: 64, a1: 260, x0: 520, x1: 960, deep: 175, dx0: 1000, dx1: 1230, noise: 44, seed: 9.1 },
+    south: { a0: 64, a1: 205, x0: 520, x1: 900, deep: 210, dx0: 1000, dx1: 1230, noise: 44, seed: 3.7 },
+    east: { x: 1330, noise: 26, seed: 1.3 },
   },
 
   /**
@@ -46,22 +50,24 @@ export const LAYOUT = {
   wall: { sections: 38, half: 5, endX: 992, inset: 12, bow: 26, culvert: 0.5, span: [930, 1010] }, // span: the x range it lies within, with room to spare
 
   /** The causeway from the gate down to the valley floor, and the stair from the postern down into the Deep: points after the door itself. */
-  causeway: { via: [[852, 679], [806, 654], [762, 622], [724, 584], [702, 546]], half: 7 },
+  // the causeway: a crescent sweeping out from the gate and round to the north, down to the valley floor in about 180 m
+  causeway: { via: [[850, 676], [812, 652], [784, 614], [772, 568]], half: 7 },
   rear: { via: [[1052, 664], [1066, 634], [1074, 602]], half: 4.5 },
   /** The road the causeway becomes, wandering west down the valley from its foot. */
-  road: { x: 702, y: 546, swing: 46, wave: 210, ease: 160 },
+  road: { x: 772, y: 568, swing: 46, wave: 210, ease: 160 },
 
   /**
    * Stairs to the wall walks. On the Deeping Wall: [where along it (0..1), which way the flight climbs along the wall].
    * In the court: [bearing on the ring, which way round it climbs].
    */
-  stairs: { wall: [[0.2, 1], [0.44, -1], [0.62, 1], [0.84, -1]], court: [[248, -1], [160, 1]] },
+  // (the third court stair, on the side of the Deep, reaches the stretch of wall over the postern)
+  stairs: { wall: [[0.2, 1], [0.44, -1], [0.62, 1], [0.84, -1]], court: [[248, -1], [160, 1], [322, 1]] },
 
   /** The stream: it wanders `swing` metres either side of the culvert with this wavelength, and drifts south as it goes east. */
   stream: { swing: 26, wave: 120, drift: 0.1 },
 
   /** Where the names are written on the ground: offsets from the culvert, from the keep's centre, or absolute. */
-  labels: { wall: [46, 90], hornburg: [-30, -30], causeway: [770, 642], culvert: [-40, -12], deep: [1180, 470], coomb: [380, 480] },
+  labels: { wall: [46, 90], hornburg: [-30, -30], causeway: [800, 668], culvert: [-40, -12], deep: [1130, 480], coomb: [380, 480] },
 
   /**
    * The horde's side of the field. Lines across the valley are given as x, lanes up it as y.
