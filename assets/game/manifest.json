@@ -71,19 +71,19 @@
       "bytes": 347816
     },
     "tank": {
-      "pack": "tank.bfb3004942.bin",
+      "pack": "tank.965838f1be.bin",
       "texture": "tank.252477242b.webp",
-      "bytes": 791400
+      "bytes": 931960
     },
     "ifv": {
-      "pack": "ifv.f01e312c47.bin",
+      "pack": "ifv.64f19967e9.bin",
       "texture": "ifv.d3bc666ae2.webp",
-      "bytes": 777264
+      "bytes": 921492
     },
     "howitzer": {
-      "pack": "howitzer.d0e51473f9.bin",
+      "pack": "howitzer.e143ac951a.bin",
       "texture": "howitzer.ee04fe3ebb.webp",
-      "bytes": 825324
+      "bytes": 972856
     }
   }
 }

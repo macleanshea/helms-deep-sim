@@ -17,30 +17,30 @@
   "parts": {
     "pos": {
       "offset": 0,
-      "length": 59574
+      "length": 59619
     },
     "nrm": {
-      "offset": 238296,
-      "length": 59574
+      "offset": 238476,
+      "length": 59619
     },
     "uv": {
-      "offset": 476592,
-      "length": 39716
+      "offset": 476952,
+      "length": 39746
     },
     "joints": {
-      "offset": 635456,
-      "length": 79432
+      "offset": 635936,
+      "length": 79492
     },
     "weights": {
-      "offset": 714888,
-      "length": 79432
+      "offset": 715428,
+      "length": 79492
     },
     "index": {
-      "offset": 1032616,
-      "length": 29637
+      "offset": 1033396,
+      "length": 29679
     },
     "ibm": {
-      "offset": 1151164,
+      "offset": 1152112,
       "length": 32
     }
   },

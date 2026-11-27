@@ -236,6 +236,22 @@ function buildUnit(name) {
     const kit = gear.filter((q) => level < 3 || q.far), gearVerts = kit.reduce((a, q) => a + q.verts.length, 0), gearTris = kit.reduce((a, q) => a + q.tris.length / 3, 0);
     const want = Math.max(40, target - gearTris);
     const idx = want >= m.index.length / 3 ? m.index : simplify(m.pos, m.uv, m.index, want);
+    if (recipe.rigid && level >= 1 && !gearVerts) {
+      // A machine's lower levels. Its texture is cut into thousands of small islands, and a reduced triangle whose
+      // corners lie on three of them smears across the lot. So each triangle here takes one colour, that of its
+      // first corner: at the distance these levels are seen from, a machine in flat facets of its own colours.
+      const nc = idx.length, vbf = Buffer.alloc(nc * 28), ibf = Buffer.alloc(nc * 2);
+      for (let c = 0; c < nc; c++) {
+        const v = idx[c], v0 = idx[c - (c % 3)], b = c * 28;
+        for (let e = 0; e < 3; e++) { vbf.writeFloatLE(P[v * 3 + e], b + e * 4); vbf.writeInt8(Math.max(-127, Math.min(127, Math.round(N[v * 3 + e] * 127))), b + 12 + e); }
+        const u = m.uv[v0 * 2] - Math.floor(m.uv[v0 * 2]), t = m.uv[v0 * 2 + 1] - Math.floor(m.uv[v0 * 2 + 1]);
+        vbf.writeUInt16LE(Math.round(u * 65535), b + 16); vbf.writeUInt16LE(Math.round(t * vScale * 65535), b + 18);
+        vbf.writeUInt8(m.joints[v * 4], b + 20); vbf.writeUInt8(255, b + 24);
+        ibf.writeUInt16LE(c, c * 2);
+      }
+      lods.push({ triangles: nc / 3, vertices: nc, influences: 1, vertexOffset: add(vbf), indexOffset: add(ibf) });
+      return;
+    }
     const remap = new Int32Array(nv).fill(-1); let n = 0;
     for (const v of idx) if (remap[v] < 0) remap[v] = n++;
     if (n + gearVerts > 65535) throw new Error(`${name}: level ${level} has ${n + gearVerts} vertices (65535 at most)`);

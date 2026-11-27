@@ -70,6 +70,27 @@ export function rigid(g, opts = {}) {
     const n2 = nv + extra.length, grow = (A, w) => { const B = new A.constructor(n2 * w); B.set(A); extra.forEach((v, q) => B.set(A.subarray(v * w, v * w + w), (nv + q) * w)); return B; };
     P = grow(P, 3); N = grow(N, 3); U = grow(U, 2); J = grow(J, 4); Wt = grow(Wt, 4); I = idx;
     for (let q = nv; q < n2; q++) J[q * 4] = 1;
+    // The hull has no deck under the turret (the shell was one piece), and it shows when the turret turns. Lay one:
+    // a disc at the height of the cut, as wide as the turret's foot, in the colour of the deck beside it.
+    const pv = pivots[1], cutY = pv[1];
+    const foot = [];
+    for (let v = 0; v < nv; v++) if (J[v * 4] === 1 && P[v * 3 + 1] < cutY + 0.12 * H && !(P[v * 3 + 2] - pv[2] > 0 && Math.abs(P[v * 3] - pv[0]) < 0.09 * Wd)) foot.push(Math.hypot(P[v * 3] - pv[0], P[v * 3 + 2] - pv[2]));
+    foot.sort((a, b) => a - b);
+    const rr = Math.min(foot.length ? foot[Math.floor(foot.length * 0.85)] : 0.2 * L, opts.turret.reach ? opts.turret.reach * L : Infinity, 0.36 * Wd); // (never wider than the hull it lies on)
+    let near = -1, nd = 1e9; // the deck's colour: that of the hull vertex nearest the turret's foot, just under the cut
+    for (let v = 0; v < nv; v++) if (J[v * 4] === 0 && P[v * 3 + 1] > cutY - 0.08 * H) { const d = Math.abs(Math.hypot(P[v * 3] - pv[0], P[v * 3 + 2] - pv[2]) - rr * 1.1); if (d < nd) { nd = d; near = v; } }
+    if (near >= 0 && rr > 0) {
+      const SEG = 14, n3 = P.length / 3, add = SEG + 1, grow2 = (A, w) => { const B = new A.constructor((n3 + add) * w); B.set(A); return B; };
+      P = grow2(P, 3); N = grow2(N, 3); U = grow2(U, 2); J = grow2(J, 4); Wt = grow2(Wt, 4);
+      const I2 = new Uint32Array(I.length + SEG * 3); I2.set(I);
+      for (let k = 0; k <= SEG; k++) {
+        const q = n3 + k, a = (k / SEG) * Math.PI * 2, r = k === SEG ? 0 : rr; // (the last one is the middle)
+        P[q * 3] = pv[0] + Math.cos(a) * r; P[q * 3 + 1] = cutY - 0.02 * H; P[q * 3 + 2] = pv[2] + Math.sin(a) * r;
+        N[q * 3] = 0; N[q * 3 + 1] = 1; N[q * 3 + 2] = 0; U[q * 2] = U[near * 2]; U[q * 2 + 1] = U[near * 2 + 1]; J[q * 4] = 0; Wt[q * 4] = 1;
+      }
+      for (let k = 0; k < SEG; k++) { const o = I.length + k * 3; I2[o] = n3 + SEG; I2[o + 1] = n3 + ((k + 1) % SEG); I2[o + 2] = n3 + k; }
+      I = I2;
+    }
   }
   const ibm = new Float32Array(names.length * 16);
   pivots.forEach((p, b) => { const m = ident(); m[12] = -p[0]; m[13] = -p[1]; m[14] = -p[2]; ibm.set(m, b * 16); });

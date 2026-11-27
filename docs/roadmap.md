@@ -352,9 +352,10 @@ Far off, a soldier's model is washed toward his side's colour (cyan for the garr
 ammunition, red for the horde, pale steel behind locked shields), as the built-in figures were tinted.
 Pictures of the new models are in `docs/progress/m9-units/`.
 
-**Known rough edges:** the lower levels of the machines have smeared textures (above); where a turret has
-turned, the hull under it is open; the image model refused the first wording of the howitzer's concept
-(it reads talk of guns "emplaced and ready to fire" as a request it should not serve) and took a plainer one.
+**Rough edges since put right:** a machine's lower levels now give each triangle one colour (that of its first
+corner) instead of smearing the texture across its many small islands, and a deck is laid on the hull under the
+turret so nothing shows through when it turns. **Still rough:** the warg's rider sits in one fixed pose; the image
+model refused the first wording of the howitzer's concept and took a plainer one.
 
 **The rest of the roster,** in this order: siege engines (ladder, ram, catapult, tower: they have bare and
 crewed forms, and the ladder and tower must fit the wall, so the built-in ones stay until that is worked
