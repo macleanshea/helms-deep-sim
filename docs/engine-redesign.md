@@ -264,8 +264,11 @@ The kinds now counter different threats:
 
 Two kinds still read as traps, and were changed after this search: anti-vehicle obstacles gave the horde
 standing among them in the garrison's own killing zone half of the protection of a parapet (now 20–30%);
-the commander cost 120 pts and his death shakes everyone near him (now 80 pts). Wire on the Siege Train is
-still unexplained (30 garrisons is a small sample; 18 of them laid some).
+the commander cost 120 pts and his death shakes everyone near him (now 80 pts). Wire on the Siege Train was
+explained later: the garrison generator laid at most one belt and threw the rest of wire's points away (176 pts
+unspent on average where wire was bought). In paired battles (the same garrison with and without a belt) the belt
+is worth more than its price in riflemen (47% of the garrison left against 18%). The generator now lays extra
+belts and spends what is left on riflemen.
 
 ### Performance
 
@@ -317,31 +320,61 @@ Siege Train it did, by far (about 90% alive against 10%), and on Medium a little
   7 in the Deep, reached only once the Deeping Wall is breached, since a ladder cannot be carried over it).
   A ladder crew sent for the ring takes a section near its force's objective and calls a second ladder crew to
   the same foot; the two are lashed (the second ladder's timber goes into the first, its carriers back to the
-  fight) and heaved up: 14 s and five hands, against 4 s for a ladder. Men climb it one at a time, a man every
-  2 s, 10 s up (4 s on a ladder). With four or more on it, each man who steps on risks the lashing giving way
-  (8% for each man past three); a fall from it can kill. Defenders heave it off twice as fast as a ladder, and
-  it breaks apart: it is not raised again.
+  fight) and heaved up: 14 s and five hands, against 4 s for a ladder. A pair is formed only from ladders that have
+  hands to carry them (two or more), within 90 m of each other, of the same force first; the two are carried in
+  together, each by the path to its own foot. A ladder left with fewer than two hands for 20 s gives up its pairing
+  and its stretch; a mate that is not closing is given up after 45 s. Men climb it one at a time, a man every 2 s,
+  10 s up (4 s on a ladder), and 3% of them lose their footing on the way. With four or more on it, each man who
+  steps on risks the lashing giving way (5% for each man past three). Defenders lever it off its hooks at half the
+  speed of a ladder, and it breaks apart: it is not raised again. Only a near hit breaks its timber.
+- *Dead ground at the foot of the rock*: men on the ring walk shooting down at the feet of the ladders hit half as
+  often. Crossbows halted near a foot shoot first at the defenders standing at the head of their own ladders.
 - *Path links between cells that are not neighbors* (`src/sim/flow.js` `jump`): the foot of a lashed ladder,
   on the valley floor, leads to the wall walk it leans on, across the rock. Only the horde's climbing path
   fields carry them. A man at the foot whom the rock stops starts up the ladder.
 - *Three ways in at once* (`_keepSecs` in `src/sim/warlord.js`): when the Deeping Wall is given up, the
   northern force goes over the empty wall and through the Deep for the postern and the door from the wall, the
-  middle force goes up the valley side of the ring with lashed ladders (a new objective; its companies escort the
-  ladders to the feet of the rock and its crossbows halt 60 m short to cover them), the southern force goes for
-  the gate with the ram. Lashed ladders standing against the ring are a way in for every force bound for the
-  back doors.
+  middle force goes up the valley side of the ring with lashed ladders (a new objective; its companies make for
+  the feet their own ladders are bound for, and its crossbows halt 80 m short to cover them), the southern force
+  goes for the gate with the ram. Lashed ladders standing against the ring are a way in for every force bound for
+  the back doors.
 - *No more battering an empty wall*: with the Deeping Wall given up, trolls go with their forces for the
-  Hornburg's doors, and the catapults' battering mission is the postern, then the gate.
+  Hornburg's doors, and the catapults' battering mission is the postern, then the gate. In the final effort the
+  catapults give up their stand-off from the rockets.
+- *The wall judged empty from what the horde has seen* (`_wlSurvey`): two or more sectors looked at in the last
+  30 s and next to nobody on any of them, for 10 s. (It used to count the whole garrison, wherever it stood.) Once
+  given up, the wall is taken back only when a quarter of the garrison's infantry has stood on it for 30 s.
+- *The reserves called up* (`_director` in `src/sim/director.js`): once the wall is seen given up, a waiting wave is
+  called up every 30 s, so the waves reach the Hornburg close together instead of one at a time on the
+  wall-assault timetable. This was the largest single effect (found by a critique run in a workflow): the waves
+  had been crossing the valley alone, each ground down 200-450 m out before the next arrived.
+- *Station-keeping tie-break* (`_companyThink` in `src/sim/company.js`): two companies converging, each seeing the
+  other ahead of it, both crawled at the floor pace; now the one further ahead leads. This touches every battle
+  (golden re-recorded).
 - *The keep check asks the right question* (`tools/checks.js keep`): falling back is a free win where, on the
   same seeds, it wins every night, at least as often as holding the wall, and with a quarter or more of the
   garrison more left.
 
-**Measured so far** (to be completed): without support calls the horde takes the Hornburg with lashed
-ladders up; with the stand-in's support calls the ladder crews are cut down crossing the open valley.
+**Measured** (stand-in commander, seeds 1-3, the garrison ordered into the Hornburg at 1 s, against the same
+garrison holding the wall; `scratchpad` runner equivalent to `npm run checks keep`):
+
+| Challenge | Fall back: won, left | Hold the wall: won, left |
+| --- | --- | --- |
+| First Night | 3/3, 95-98% | 3/3, 60-85% |
+| Escalade | 3/3, 60-78% | 3/3, 88-92% |
+| Siege Train | 1/3, 0-65% | 1/3, 0-38% |
+| The Hornburg Garrison | 0/3 | 2/3, 29-48% |
+| The Three Hundred | 0/3 | 2/3, 9-29% |
+| The Flood | 1/3, 0-20% | 2/3, 14-39% |
+
+Before these changes the Siege Train fall-back won 3/3 with 86-88% left. Falling back at once is now a gamble
+that loses against the large hordes (where lashed ladders go up: 5-14 a night on the Hornburg Garrison, with 14-76
+men up them) and is no longer free anywhere; First Night (a short night against a small horde) is still better in
+the Hornburg, by less than the check's margin. Against the stand-in's support calls the ladder crews of the smaller
+hordes are still cut down in the open: there the Hornburg falls through the postern and the door from the wall.
 
 ## 10. Still open
 
-- Wire's poor showing against the Siege Train (see the search above).
 - Crossbows halt at volley range but do not yet time their volleys to the ladders going up.
 - Feints and a visible reserve for the horde; answering a sally.
 - The `rifles` yardstick and the behavior checks are reported in the pull request.

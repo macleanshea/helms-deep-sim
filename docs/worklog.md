@@ -6,27 +6,18 @@ from **Next**.
 
 ## Next
 
-0. **In progress: lashed ladders** (`src/sim/lashed.js`, the ladder case in `Sim._orc`, `_throwCheck` in
-   `src/sim/engines.js`, field `F_RING` in `src/sim/warlord.js`, jump links in `src/sim/flow.js`). Working: ring
-   feet found (19 sections), ladders pair, are lashed, go up, are climbed and thrown down. Not yet enough: with the
-   stand-in commander the horde dies 100-200 m out from the ring before it gets there (machine guns and rifles on
-   the ring walk, kept in ammo by resupply drops). Not yet drawn by the renderer. Check with
-   `node <scratchpad>/keep2.mjs escalade auto 1` (a probe: everyone into the Hornburg at 1 s).
-1. **The keep is a free win** (`npm run checks keep` reports it OPEN). Ordering everyone into the Hornburg in
-   the first second wins every challenge for the stand-in commander. Make the horde answer it, then rerun the
-   check: catapults onto the crowded court (`_catTarget` in `src/sim/sim.js`), sappers sent for the postern
-   first (`R.SAPPER` in `_orc`), the gate and both back doors attacked at once (`_keepSecs` in
-   `src/sim/warlord.js`). Watch it with the probe pattern in section 5 of `docs/engine-redesign.md` or
-   `node tools/plot.js`.
-2. **Wire against the Siege Train** reads −0.53 in `docs/lab/search2.md` and is not explained. Run
-   `node tools/lab.js --one '{"setting":"wall", ...}' --plot out` with and without a wire belt against a
-   towers pack, and look at what the towers and their troll crews do at the belt.
+1. **Checks after part 4**: `npm run checks` (full), then `npm run matrix` (about 25 minutes). Golden was moved by
+   the station-keeping tie-break (`src/sim/company.js`); re-record with `node tools/golden.js --write` only once the
+   checks and the matrix are sound, and log why. The keep check should now report no FREE row.
+2. **A browser look** at the lashed ladders (`npm start`, the Siege Train or the Hornburg Garrison, order everyone
+   into the Hornburg): the ladder drawn from the valley floor to the parapet, climbers on its rails, and the alerts
+   "Lashed ladders up · Hornburg", "Ladder crews approaching · Hornburg" not wrapping.
 3. **A search for the Flood**: `node tools/lab.js --search flood --n 30 --seeds 2 --tag search3 --md docs/lab/search3.md`
    (about 25 minutes on four cores), then set its suggested garrison and size as was done for the other two.
 4. **Re-run the unit lab** on the final code (`node tools/lab.js --tag after2 --md docs/lab/after2.md`, about
-   12 minutes) and compare with `docs/lab/after1.md`; `after1` was taken part-way through the rebalance.
-5. Crossbows: time their volleys to the ladders going up (they halt at volley range already: `F_STAND` in
-   `src/sim/company.js`).
+   12 minutes) and compare with `docs/lab/after1.md`.
+5. Crossbows: time their volleys to the ladders going up (they halt at volley range, and those at a lashed ladder
+   already shoot at the men at its head: `_headTarget` in `src/sim/lashed.js`).
 
 ## Entries
 
@@ -57,13 +48,21 @@ from **Next**.
 - Decision: a Build challenge's suggested garrison is the answer key, close to the best found; its
   difficulty is the share of random garrisons that hold (Escalade 19 of 30, Siege Train 12 of 30).
 
-### Part 4 (in progress)
+### Part 4 (commits 12592d2 to the head of the branch)
 
 - Asked by the owner: let the attackers lash two ladders together to scale the Hornburg's ring wall, so that an
-  immediate fall-back is not a free win. Built the jump links in the flow solver (inert until used: golden
-  unchanged), ring ladder feet, pairing, raising (14 s, 5 hands), climbing (10 s, one man every 2 s), the lashing
-  giving way under four or more, throw-down that breaks the ladder.
-- Measured: without support calls the horde takes the Hornburg (Escalade seed 1, garrison wiped out at 500 s;
-  two lashed ladders raised and thrown down). With the stand-in commander it does not even reach the walls: most of
-  the horde dies 100-200 m out, to machine guns and rifles on the ring walk. A workflow (keep diagnosis, wire, the
-  renderer's ladders, a code audit, then a critique of the design) is running.
+  immediate fall-back is not a free win. Built the jump links in the flow solver, ring ladder feet (19 sections),
+  pairing, raising (14 s, 5 hands), climbing (10 s, one man every 2 s, 3% slip), the lashing giving way under four
+  or more, throw-down that breaks the ladder, dead ground at the feet, the renderer's lashed ladder.
+- Measured: the ladders work where the horde is large (5-14 raised a night on the Hornburg Garrison), but alone they
+  did not stop the fall-back being free on the Siege Train (86-88% left against 0-38% holding the wall). A critique
+  run found why: the waves kept their wall-assault timetable and crossed the valley one at a time, each ground down
+  200-450 m out. The fix: once the wall is seen given up, the warlord calls up a waiting wave every 30 s (90 s left
+  the Siege Train free; 45 s was bimodal). Also: the wall judged empty from what the horde has seen, the
+  station-keeping tie-break, catapults dropping their stand-off in the final effort.
+- Result (seeds 1-3, fall back against hold): no challenge is free; the fall-back loses on the Hornburg Garrison
+  (0/3), the Three Hundred (0/3), the Flood (1/3) and the Siege Train (1/3); First Night is still better in the
+  Hornburg (95-98% against 60-85%), under the check's 25-point margin. Table in section 9 of
+  `docs/engine-redesign.md`.
+- Golden moved (7 of 13 battles): the tie-break touches every battle. Not yet re-recorded: waiting on the checks.
+- Wire against the Siege Train explained (a generator artifact; section 8).
