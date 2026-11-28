@@ -1203,8 +1203,8 @@ export class Sim {
         }
         if ((this.tick + i) % 10 === 0 && this._catTarget(i, w)) { this.state[i] = S_ACT; this.vx[i] = this.vy[i] = 0; this.cd[i] = 2 + this.rand() * 3; return; }
         if (crewed && speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
-        if (this.catWary) {
-          // rockets have found one of them: the rest keep beyond their reach
+        if (this.catWary && !this.wl.allIn) {
+          // rockets have found one of them: the rest keep beyond their reach (until everything is thrown in)
           const fd = this._fortDist(x, y);
           if (fd < 392) { this._move(i, -1, 0, speed, 2, 0); return; }
           if (fd < 402) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
@@ -1259,7 +1259,7 @@ export class Sim {
   _catTarget(i, w) {
     const x = this.x[i], y = this.y[i];
     const b = this.defBox;
-    const range = w.range * 1.05, wary = this.catWary;
+    const range = w.range * 1.05, wary = this.catWary && !this.wl.allIn; // (in the final effort the engines are thrown in too)
     if (x < b[0] - range || x > b[2] + range) return false;
     if (wary && this._fortDist(x, y) < 390) return false; // inside rocket reach: pull back before shooting again
     {

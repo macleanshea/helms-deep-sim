@@ -2,6 +2,7 @@
 //
 //   node tools/plot.js --preset garrison --at 120,240,360 --out shots/plot
 //   node tools/plot.js --preset first-night --policy auto --every 60 --box 500,150,1150,860 --scale 2
+//   node tools/plot.js --preset siege-train --policy auto --fall 1 --at 300,450   (the garrison in the Hornburg at 1 s)
 //
 // One PNG per time asked for: the ground by kind, wire and obstacles, every unit as a dot colored by
 // what it is (and, for the horde, by company where --by company is given), ladders and breaches. No
@@ -74,11 +75,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const args = process.argv.slice(2), get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
   const preset = get('preset', 'garrison'), seed = +get('seed', 1), policy = get('policy', 'none'), out = get('out', 'shots/plot');
   const every = +get('every', 0), max = +get('max', 2400), by = get('by', 'type'), scale = +get('scale', 1);
+  const fall = get('fall', '') === '1'; // everyone into the Hornburg in the first second
   const box = get('box', null) ? get('box').split(',').map(Number) : null;
   let at = get('at', '') ? get('at').split(',').map(Number) : [];
   if (every) for (let t = every; t <= max; t += every) at.push(t);
   at = [...new Set(at)].sort((a, b) => a - b);
-  const map = buildMap(), setup = buildPreset(map, preset, get('sandbox', '') === '1');
+  const map = buildMap(), setup = buildPreset(map, preset, get('sandbox', '') === '1', get('garrison', 'ref')); // (a Build challenge with its suggested garrison)
   setup.options.seed = seed;
   const sim = new Sim(map, setup, null), pilot = policy === 'none' ? null : autopilot(sim, policy);
   fs.mkdirSync(out, { recursive: true });
@@ -86,6 +88,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (at[0] === 0) { shoot(0); at.shift(); }
   while (!sim.result && at.length && sim.time < max) {
     sim.step(); if (pilot) pilot.step(); sim.events.length = 0;
+    if (fall && sim.time > 1 && !sim.retreated) sim.orderRetreat();
     if (sim.time >= at[0]) { shoot(at.shift()); }
   }
   if (sim.result) console.log('ended', sim.result);

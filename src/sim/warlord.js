@@ -49,7 +49,7 @@ export const warlordMethods = {
       main: -1, mainY: -1, breachSeg: -1,
       allIn: false, resOut: 0, huntT: -100, open: false,
       foot: [0, 0, 0, 0], footN: 0, footSec: -1, swungT: -100,
-      near: [0, 0, 0], atFoot: [0, 0, 0], quiet: [0, 0, 0], wallTop: [0, 0, 0], seen: [-1, -1, -1], heat: new Float32Array(4), peak: new Float32Array(4),
+      near: [0, 0, 0], lookT: [-1e9, -1e9, -1e9], atFoot: [0, 0, 0], quiet: [0, 0, 0], wallTop: [0, 0, 0], seen: [-1, -1, -1], heat: new Float32Array(4), peak: new Float32Array(4),
       exposed: 0, exCells: [], exAll: [], abandoned: false, emptyT: -1, notedRes: false, shieldNoteT: -100, backNoteT: -100,
       // the forming-up line: where a wave halts, out of reach of small arms, until it is all up; and when each wave stepped off from it
       formX: FORM_X, waveGo: [], waveLineT: [],
@@ -395,7 +395,7 @@ export const warlordMethods = {
     const wl = this.wl, foot = wl.foot, near = wl.near, top = wl.wallTop;
     const atFoot = wl.atFoot;
     foot[0] = foot[1] = foot[2] = foot[3] = 0; near[0] = near[1] = near[2] = 0; top[0] = top[1] = top[2] = 0; atFoot[0] = atFoot[1] = atFoot[2] = 0;
-    let ex = 0, exX = 0, exY = 0, allDef = 0, inKeep = 0;
+    let ex = 0, exX = 0, exY = 0, allDef = 0;
     const exCells = wl.exCells, exAll = wl.exAll; exCells.length = 0; exAll.length = 0;
     const S = this.sectors, obs2 = OBSERVE * OBSERVE, kr2 = (KEEP.r + 14) * (KEEP.r + 14);
     for (let i = 0, n = this.n; i < n; i++) {
@@ -409,7 +409,7 @@ export const warlordMethods = {
       } else {
         const d = UNITS[this.type[i]];
         if (d.cls === C.CACHE) continue;
-        if (d.cls === C.INF) { allDef++; const kx = x - KEEP.cx, ky = y - KEEP.cy; if (kx * kx + ky * ky < kr2) inKeep++; }
+        if (d.cls === C.INF) allDef++;
         if (this.el[i]) { if (d.cls === C.INF) { const k = this.sectorAt(x, y); if (k < 3) top[k] += 1; } continue; }
         // on the ground west of the wall and outside the Hornburg: in the open. Anything there is made for;
         // infantry there is also what the warg riders are loosed at.
@@ -432,9 +432,16 @@ export const warlordMethods = {
       for (const p of this.props) if (p.alive && p.kind === 'wire') cnt[Math.min(2, this.sectorAt(AP.abreast, p.y))]++;
       for (let k = 0; k < 3; k++) if (near[k] >= 5) wl.wireSeen[k] = cnt[k];
     }
-    // The Deeping Wall given up: next to nobody on it and most of the garrison shut in the Hornburg, for ten
-    // seconds running. Then there is nothing to be had by scaling an empty wall, and the host turns on the keep.
-    const empty = allDef > 0 && top[0] + top[1] + top[2] < 0.1 * allDef && inKeep > 0.6 * allDef;
+    // The Deeping Wall given up: what the horde has seen of it, two sectors or more looked at in the last 30 s and next
+    // to nobody on any of them, for ten seconds running. Then there is nothing to be had by scaling an empty wall, and
+    // the host turns on the keep. (A sector nobody has come close enough to look at is not known to be empty.)
+    let looked = 0, manned = false;
+    for (let k = 0; k < 3; k++) {
+      if (near[k] >= 5) wl.lookT[k] = this.time;
+      if (this.time - wl.lookT[k] > 30) continue;
+      looked++; if ((near[k] >= 5 ? top[k] : wl.seen[k]) >= Math.max(3, 0.04 * allDef)) manned = true;
+    }
+    const empty = allDef > 0 && looked >= 2 && !manned;
     if (!empty) wl.emptyT = -1; else if (wl.emptyT < 0) wl.emptyT = this.time;
     // ... and, once given up, taken back only when a quarter of the garrison's infantry has stood on it for 30 s: a token
     // party sent back onto the wall does not call off the assault on the Hornburg

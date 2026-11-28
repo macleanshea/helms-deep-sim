@@ -279,6 +279,9 @@ export const companyMethods = {
       if (this.gCapX[h] < 1e8 && this.gCapX[g] > 1e8) continue;
       const ox = this.gAx[h] - x, oy = this.gAy[h] - y, al = ox * Hx + oy * Hy;
       if (al < 2 || al > this.gDepth[h] + 14) continue;
+      // two companies converging, each seeing the other ahead of it: the one further ahead leads (else both crawl)
+      const alr = -(ox * this.gHx[h] + oy * this.gHy[h]);
+      if (alr >= 2 && (alr > al || (alr === al && g < h))) continue;
       const lat = Math.abs(-ox * Hy + oy * Hx);
       if (lat > (this.gHalfW[g] + this.gHalfW[h]) * 0.7) continue;
       if (this.gHx[h] * Hx + this.gHy[h] * Hy < 0.5) continue;

@@ -21,6 +21,7 @@ const EDGE = AP.edge;    // where they appear (m from the west edge)
 const WARN = 35;         // notice given before a wave steps off (s)
 const MIN_GAP = 90;      // least time between two releases (s)
 const EARLY = 60;        // how far ahead of schedule a wave may be sent in when the last is spent (s)
+const CALL_UP = 30;      // with the Deeping Wall seen given up, the warlord calls up a waiting wave this often (s)
 const SPENT = 0.25;      // a wave is spent when this fraction of it is still in the fight
 const APPROACH = 4.6;    // typical pace up the valley, for contact estimates (m/s)
 
@@ -81,7 +82,9 @@ export const directorMethods = {
     if (!next) return;
     const allIn = this.wl.allIn; // the final effort: everything still waiting comes on at once
     if (next.state === PENDING) {
-      const early = spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY);
+      // a wave is sent in early when the last is spent, or when the wall is seen given up: the warlord at the front
+      // sends runners back to his reserves (he knows nothing more of the garrison than what his men have seen)
+      const early = (spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY)) || (this.wl.abandoned && this.time >= (last.relT || 0) + CALL_UP);
       if (early || allIn || this.time >= next.rel - WARN) {
         next.state = FORMING;
         next.relT = allIn ? this.time + 3 : early ? this.time + WARN * 0.6 : next.rel;
