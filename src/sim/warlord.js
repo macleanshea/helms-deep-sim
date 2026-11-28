@@ -758,17 +758,20 @@ export const warlordMethods = {
       // and for those who can climb, every lashed ladder standing against the ring is a way in as good as a door
       if (k === F_POST) for (const L of this.lashed) if (this.alive[L] && ns < src.length) src[ns++] = this.map.cellOf(this.tx[L], this.ty[L]);
     } else if (k === F_RING) {
-      // the feet of the rock below the ring: where the ladders are carried, to be lashed together (those in the Deep
-      // only once the Deeping Wall has been breached: a ladder cannot be carried over it)
-      for (const f of this.ringFoot) if (f && (!f.deep || this.wl.open) && ns < src.length) src[ns++] = f.c;
+      // for the force sent up the ring: the heads of the lashed ladders standing against it, by their links from the
+      // foot; while none stands, the feet of the rock below it (those in the Deep only once the Deeping Wall has been
+      // breached: a ladder cannot be carried over it), where the ladders are being carried
+      if (this.lashed.length) { for (const L of this.lashed) if (this.alive[L] && ns < src.length) src[ns++] = this.map.cellOf(this.tx[L], this.ty[L]); }
+      else for (const f of this.ringFoot) if (f && (!f.deep || this.wl.open) && ns < src.length) src[ns++] = f.c;
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];
     if (!ok) { fl.ready = false; fl.t = this.time; return; }
     // (the ground path to the postern knows no ladders: it goes through a breach, the culvert first of all)
-    this.solver.solve(cost, src, ok, fl.dir, k === F_POSTG || k === F_RING ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null, jump: null })) : this.navOrc);
+    const ground = k === F_POSTG || (k === F_RING && !this.lashed.length);
+    this.solver.solve(cost, src, ok, fl.dir, ground ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null, jump: null })) : this.navOrc);
     // close to the postern the fight itself leads, straight in at the door
-    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT || k === F_RING ? 0 : k >= F_POST ? 40 : 150;
+    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT ? 0 : k >= F_POST ? 40 : 150;
     for (let c = 0; c < NC; c++) close[c] = dist[c] < lim ? 1 : 0;
     fl.ready = true; fl.t = this.time; fl.ver = this.structVersion;
   },

@@ -237,6 +237,7 @@ export class Sim {
     this.crewOf[i] = -1; this.crewAcc[i] = this.crewPts[i] = this.haveAcc[i] = this.crewHave[i] = 0; this.slotAcc[i] = this.slotMask[i] = 0;
     this.eHalt[i] = 0; this.eIdle[i] = 0; this.eEver[i] = 0; this.eNoDraft[i] = 0; this.stuck[i] = 0;
     this.rank[i] = 0; this.pose[i] = 0; this.ax[i] = x; this.ay[i] = y; this.seekT[i] = 0;
+    this._lashReset(i);
     const c = this.map.cellOf(x, y);
     this.el[i] = (d.team === DEF ? this.elevD[c] : this.elev[c]) ? 1 : 0;
     if (g < 0) g = this.miscGroup[d.team];
@@ -295,6 +296,7 @@ export class Sim {
   kill(i, w, silent) {
     if (!this.alive[i]) return;
     this.alive[i] = 0;
+    if (this.lashMate[i] >= 0) this._unpair(i); // (a pair of ladders to be lashed comes apart)
     const d = UNITS[this.type[i]], team = d.team, x = this.x[i], y = this.y[i];
     this.count[team] -= d.crew ? 0 : 1;
     if (w && w.key === 'rocket' && d.role === R.CATAPULT) this.catWary = true; // the rest learn to keep their distance
@@ -837,7 +839,9 @@ export class Sim {
       return;
     }
     if (u >= 1) {
-      this.x[i] = this.tx[i] + (this.rand() - 0.5); this.y[i] = this.ty[i] + (this.rand() - 0.5);
+      // (off a lashed ladder he steps exactly onto the walk: the ring's walk is narrow against its 4 m cells)
+      const j = long ? 0 : 1;
+      this.x[i] = this.tx[i] + (this.rand() - 0.5) * j; this.y[i] = this.ty[i] + (this.rand() - 0.5) * j;
       this.state[i] = S_MOVE; this.target2[i] = -1; this.el[i] = 1; this.target[i] = -1;
       return;
     }

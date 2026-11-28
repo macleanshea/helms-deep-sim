@@ -92,7 +92,7 @@ function play(setup, opts = {}) {
     const t = sim.time;
     P.shotLog.push(P.sectorShots.slice());
     // forces sent round to the postern while the Deeping Wall is still manned (there should be none)
-    if (!sim.wl.abandoned && sim.wl.forces.some((f) => f.sector === 4)) P.postWrong = (P.postWrong || 0) + 1;
+    if (!sim.wl.abandoned && sim.wl.forces.some((f) => f.sector === 4 || f.sector === 5)) P.postWrong = (P.postWrong || 0) + 1; // (or up the ring by lashed ladders)
     // --- engines and their crews
     for (const e of sim.engines) {
       if (!sim.alive[e]) continue;
