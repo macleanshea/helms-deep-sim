@@ -188,7 +188,12 @@ the challenge matrix:
 | Anti-Armor Gunner | With no troll or engine in reach, fires a high-explosive rocket (300 damage, 4.5 m) into a cell of 7+ attackers; 10 rockets instead of 8 | Never paid for itself: 0.05–0.41 threat stopped per point, wiped out in two thirds of its duels. After: 1.3–1.6 (measured with the full warhead, since reduced) |
 | Rifleman | Hit chance 0.6 close (was 0.55), 0.21 at full range (was 0.18) | The weakest infantry per point (about 1.1). After: 1.04–1.60 |
 | Marksman | 35 pts (was 25); reach 300 m (was 360); 35% at full range (was 75%) | The best value of all, and four of them killed 207 ladder carriers in one battle, out to 400 m at night |
-| Wire | A man on foot tears at it two ticks in five, and not at all while his company is pinned | Companies now meet wire on a frontage, many men at once: wire bought nothing |
+| Wire | A man on foot tears at it two ticks in five, and not at all while his company is pinned; 3 pts a section (was 5) | Companies now meet wire on a frontage, many men at once: wire bought nothing; still poor value in the first search |
+| Claymore | 10 pts (was 15) | Poor value in the garrison search |
+| Main Battle Tank | 340 pts (was 420) | Strong in the open, but behind the wall it cannot fire over it: the worst buy in both searches |
+| Commander | 80 pts (was 120) | His death shakes the garrison; at 120 pts the searches said leave him out |
+| Anti-Vehicle Obstacle | Attackers among them are 20–30% harder to hit (was 50%) | It handed the horde cover in the garrison's own killing zone |
+| Ladder throw-down | A ladder head held by defenders two to one can still be heaved off, more slowly | With companies arriving in mass, none was ever thrown (0 of 99) |
 | Ammo Cache | unchanged | It flips the marginal set from loss to win (+48 to +52 stopped): ammo is the garrison's real limit, and the challenges reward bringing it |
 
 The `marginal` set now uses 5,500 threat points (at 3,000 the base garrison always won, so every
@@ -197,43 +202,70 @@ addition read +0).
 ## 8. Challenges
 
 - The three laid-out challenges stay as the way in (First Night is the tutorial). First Night's horde is
-  4,200 (was 3,200): with the new movement the old one was won with no orders given.
+  4,200 (was 3,200): with the new movement the old one was won with no orders given. Their budgets are
+  still the cost of the garrison as issued, so they follow the new unit costs.
 - Three **Build** challenges are new: the garrison starts empty, the requisition budget is fixed, and the
   horde is known in full (the order of attack is listed wave by wave). Each has a suggested garrison
   (**Load suggested garrison**) that its difficulty was measured with.
-  - **The Escalade** (Medium): 6,500 with 30 ladders and many berserkers, no engines. 2,600 pts.
-  - **The Siege Train** (Hard): 8,000 with 4 towers, 2 rams, 14 trolls, 8 catapults, 8 sappers. 4,100 pts.
+  - **The Escalade** (Medium): 7,500 with 30 ladders and many berserkers, no engines. 2,700 pts.
+  - **The Siege Train** (Hard): 9,000 with 4 towers, 2 rams, 14 trolls, 8 catapults, 8 sappers. 3,800 pts.
   - **The Flood** (Hard): 11,500 in 4 waves, nearly all on foot, 60 ladders. 4,200 pts.
 - `tools/headless.js --garrison ref|rifles|empty` plays a Build challenge with its suggested garrison, the
   whole budget in riflemen, or nobody; `tools/matrix.js` runs all six challenges and passes `--garrison` on.
 
-### Challenge matrix (`node tools/matrix.js --seeds 3`)
+### Challenge matrix (`node tools/matrix.js --seeds 3`, in `docs/lab/matrix-final.txt`)
 
-| Challenge | No orders | Stand-in commander |
+| Challenge | No orders | Stand-in commander | Riflemen alone, stand-in |
+| --- | --- | --- | --- |
+| First Night (Easy) | won 1/3, 0% left | won 2/3, 88% left | |
+| The Hornburg Garrison (Medium) | lost 3/3 | won 2/3, 41% left | |
+| Three Hundred Rifles (Hard) | lost 3/3 | won 3/3, 38% left | |
+| The Escalade (Build · Medium) | lost 3/3 | won 3/3, 100% left | won 3/3, 41% left |
+| The Siege Train (Build · Hard) | won 1/3, 0% left | won 2/3, 10% left | won 1/3, 0% left |
+| The Flood (Build · Hard) | lost 3/3 | won 2/3, 33% left | lost 3/3 |
+
+A Build challenge is played with its suggested garrison, which is close to the best the garrison search
+found, so it is the answer key rather than the yardstick of difficulty; the better yardstick is the share of
+random garrisons that hold (section below: 19 of 30 for the Escalade, 12 of 30 for the Siege Train).
+Riflemen alone, the naive answer, do clearly worse on all three. First contact at the wall is back to
+0.30–0.65 of the night (it had slipped to 0.80–0.93 after the first pass).
+
+### Does the mix matter? The garrison search
+
+`node tools/lab.js --search escalade,siege-train --n 30 --seeds 2` draws 30 garrisons at random within each
+Build challenge's budget (how the points are shared between the kinds, how far along the wall the line
+runs, how many are kept in reserve, what is laid in front) and fights each on two seeds with the stand-in
+commander. `docs/lab/search1.md` and `search2.md` rank them and give, for each kind, the correlation of its
+share of the budget with the outcome.
+
+**First search** (`search1.md`): 25 of 30 garrisons held the Escalade and 19 of 30 the Siege Train, so both
+were too lenient; the hand-written suggested garrisons were worse than most random ones (they spent heavily
+on wire, a tank and claymores). Wire (−0.38, −0.51), claymores (−0.33) and the tank (−0.17, −0.27) paid
+least; machine guns (+0.38) and mortars (+0.29) most against the Escalade, grenadiers (+0.48) against
+the Siege Train. Changes: wire 3 pts a section (was 5), claymore 10 (was 15), tank 340 (was 420); the
+Escalade to 7,500 attackers (2,700 pts) and the Siege Train to 9,000 (3,800 pts); suggested garrisons
+rewritten along the lines of the strongest found.
+
+**Second search** (`search2.md`): 19 of 30 hold the Escalade (Medium) and 12 of 30 the Siege Train (Hard);
+in both, the best hold with nearly everyone alive and the worst are wiped out by the middle of the night.
+The kinds now counter different threats:
+
+| Kind | The Escalade (no engines) | The Siege Train (engines) |
 | --- | --- | --- |
-| First Night (Easy) | won 1/3, late; 0% left | won 3/3, 88% left |
-| The Hornburg Garrison (Medium) | lost 3/3 | won 2/3, 42% left |
-| Three Hundred Rifles (Hard) | lost 3/3 | won 2/3, 19% left |
-| The Escalade (Build · Medium) | lost 3/3 | won 3/3, 7% left |
-| The Siege Train (Build · Hard) | won 1/3, 0% left | won 2/3, 16% left |
-| The Flood (Build · Hard) | lost 3/3 | won 2/3, 6% left |
+| Machine gunner | **+0.43** | +0.15 |
+| Ammo cache | **+0.39** | +0.01 |
+| Mortar | +0.19 | **+0.36** |
+| Howitzer | −0.41 | **+0.42** |
+| Marksman | −0.05 | **+0.42** |
+| Anti-armor gunner | −0.23 | +0.17 |
+| Commander | −0.07 | −0.41 |
+| Anti-vehicle obstacle | −0.32 | −0.21 |
+| Wire | +0.02 | −0.53 |
 
-First contact at the wall is back to 0.30–0.65 of the night (it had slipped to 0.80–0.93).
-
-### Does the mix matter? (`--garrison rifles`, the stand-in commander, 2 seeds)
-
-| Challenge | Suggested garrison | The same budget in riflemen alone |
-| --- | --- | --- |
-| The Escalade | won 3/3, 7% left | won 1/2, 29% left |
-| The Siege Train | won 2/3, 16% left | won 1/2, 13% left |
-| The Flood | won 2/3, 6% left | lost 2/2 |
-
-Only the Flood clearly punishes a garrison of riflemen alone. On the Escalade and the Siege Train the
-suggested garrisons are no better than riflemen. Either the suggested garrisons are far from the best
-(likely: they were written by hand, and the Siege Train's spends 860 pts on a tank and two howitzers),
-or the rifle buff went too far, or both. The next step is to search for strong garrisons with the lab
-(many permutations per challenge) and set each challenge so that a good mix wins clearly and a naive
-one does not.
+Two kinds still read as traps, and were changed after this search: anti-vehicle obstacles gave the horde
+standing among them in the garrison's own killing zone half of the protection of a parapet (now 20–30%);
+the commander cost 120 pts and his death shakes everyone near him (now 80 pts). Wire on the Siege Train is
+still unexplained (30 garrisons is a small sample; 18 of them laid some).
 
 ### Performance
 
@@ -241,9 +273,27 @@ Like for like on the Medium battle's first 700 s, alone on one core: 2.25 ms a s
 (+17%), with the same worst step (52 ms). Profiled: movement, the path solves and the soldiers' own update
 dominate as before; the company layer (`_formStep`, `_walkLine`, `_companyThink`) is about 9%.
 
+### Behavior checks (`npm run checks`)
+
+23 of 25 pass after these fixes to the checks themselves: Build challenges are played with their suggested
+garrison (they start empty); the catapult share is judged only where the garrison lost twenty men or more;
+waiting on purpose (at the forming-up line, or a company's own step-off delay) is not counted as being stuck.
+And to the game: a ladder head held by defenders two to one can still be thrown down (with companies
+arriving in mass, a fresh climber always reached the top, and none was ever thrown: 0 of 99); firing lines
+claim their ground, so neighboring platoons no longer stand in each other's places (up to 9 men had stood
+in one 2 m cell).
+
+Still open:
+
+- **keep** (open before this work, and worse now): ordering everyone into the Hornburg in the first second
+  wins every challenge for the stand-in commander, with 30–96% left. Without support calls the horde does
+  break in (the Escalade: postern down at 377 s, garrison wiped out at 467 s), but air strikes and gunships
+  on the crowd at the postern hold it. The horde needs an answer: catapults on the crowded court, sappers
+  for the postern first, an assault on the gate and both back doors at once.
+
 ## 9. Still open
 
-- Golden hashes have to be re-recorded once the rules settle.
+- Wire's poor showing against the Siege Train (see the search above).
 - Crossbows halt at volley range but do not yet time their volleys to the ladders going up.
 - Feints and a visible reserve for the horde; answering a sally.
 - The `rifles` yardstick and the behavior checks are reported in the pull request.

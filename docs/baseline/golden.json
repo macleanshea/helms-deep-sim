@@ -5,11 +5,11 @@
   "map functions": "4d90e1ddfda9b0d4",
   "fortress mesh": "147090 c83bccd85d791b21",
   "fortress mesh, breached": "151596 168614bc5fdaf186",
-  "battle first-night, no orders, seed 1": "709f6788 loss at 577.5 s, 0/91 v 1393/3175",
-  "battle first-night, stand-in commander, seed 1": "7664f72f win at 600 s, 2/91 v 1284/3175",
-  "battle garrison, no orders, seed 1": "ad99851c loss at 876.5 s, 0/497 v 7364/18106",
-  "battle garrison, stand-in commander, seed 1": "f91a31f7 win at 1083 s, 333/497 v 1323/18106",
-  "battle three-hundred, no orders, seed 1": "e06384ef loss at 604.5 s, 0/309 v 5956/10098",
-  "battle three-hundred, stand-in commander, seed 2": "f825d591 win at 900 s, 21/309 v 3045/10098",
-  "battle benchmark, no orders, seed 1, first 400 s": "9dae4f52 unfinished at 400 s, 965/965 v 22144/30242"
+  "battle first-night, no orders, seed 1": "b2f58d1e loss at 589.5 s, 0/91 v 2373/4165",
+  "battle first-night, stand-in commander, seed 1": "4704a282 win at 600 s, 83/91 v 2143/4165",
+  "battle garrison, no orders, seed 1": "12f868e1 loss at 1065.5 s, 0/497 v 7189/18106",
+  "battle garrison, stand-in commander, seed 1": "a010ac12 loss at 1188.5 s, 0/497 v 4959/18106",
+  "battle three-hundred, no orders, seed 1": "583416a2 loss at 656.5 s, 0/309 v 6554/10098",
+  "battle three-hundred, stand-in commander, seed 2": "40136943 win at 900 s, 97/309 v 4710/10098",
+  "battle benchmark, no orders, seed 1, first 400 s": "c1a208ba unfinished at 400 s, 965/965 v 23027/30242"
 }

@@ -1,0 +1,15 @@
+.........
+preset         policy  seed result end         defenders   horde left   gate   ammo  score  cp            ladders     wall  foothold on wall tick ms
+escalade       auto    1    WIN    720 (1.00)  95/270      4633/7508    —      32%   606    30/33.4       23/30 -2    265   342      96      4.11 / 51.6 / 255.8
+escalade       auto    2    WIN    720 (1.00)  133/270     4197/7508    —      30%   748    34/34.8       16/30 -1    285   477      107     3.93 / 64 / 255.6
+escalade       auto    3    WIN    720 (1.00)  111/270     3989/7508    —      24%   723    34/36.2       19/30 -0    220   547      82      4.02 / 61.8 / 214.2
+siege-train    auto    1    WIN    900 (1.00)  118/380     4430/9140    —      21%   593    38/41.9       14/20 -0    275   320      150     4.74 / 53.6 / 239.5
+siege-train    auto    2    loss   395 (0.44)  0/380       7277/9140    —      12%   108    18/21.5       2/20 -0     290   316      99      3.98 / 60 / 236.4
+siege-train    auto    3    loss   676 (0.75)  0/380       5454/9140    —      5%    189    30/32.5       5/20 -2     265   595      211     4.5 / 52.4 / 205.8
+flood          auto    1    loss   791 (0.88)  0/420       6664/11574   —      12%   218    34/35.7       55/60 -2    235   465      326     4.67 / 54.7 / 344.6
+flood          auto    2    loss   704 (0.78)  0/420       7375/11574   —      14%   191    30/32.3       44/60 -0    270   486      244     4.09 / 60.4 / 230.4
+flood          auto    3    loss   780 (0.87)  0/420       6647/11574   —      0%    215    34/34.9       50/60 -1    265   459      416     5.47 / 59.3 / 203.6
+
+escalade       auto    wins 3/3   median end 720s (1.00 of dawn)   median survivors 41%   ladders raised 63%   first at the wall 0.37 of dawn
+siege-train    auto    wins 1/3   median end 676s (0.75 of dawn)   median survivors 0%   ladders raised 25%   first at the wall 0.31 of dawn
+flood          auto    wins 0/3   median end 780s (0.87 of dawn)   median survivors 0%   ladders raised 83%   first at the wall 0.29 of dawn

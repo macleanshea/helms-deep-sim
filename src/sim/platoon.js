@@ -221,19 +221,18 @@ export const platoonMethods = {
     const lat = (x, y) => x * rx + y * ry;
     slots.sort((a, b) => lat(pos[a * 2], pos[a * 2 + 1]) - lat(pos[b * 2], pos[b * 2 + 1]) || a - b);
     const men = live.slice().sort((a, b) => lat(this.x[a], this.y[a]) - lat(this.x[b], this.y[b]) || a - b);
-    const face = Math.atan2(ry, -rx) - Math.PI / 2; // (r is the line's right hand: the front is r turned a quarter back)
+    const face = Math.atan2(-rx, ry); // (r is the line's right hand, (-fy, fx): the front is (ry, -rx))
     for (let k = 0; k < n; k++) {
       const i = men[k], x = pos[slots[k] * 2], y = pos[slots[k] * 2 + 1];
       this.ax[i] = x; this.ay[i] = y;
       if (now) {
         this.x[i] = this.px[i] = this.bx[i] = x; this.y[i] = this.py[i] = this.by[i] = y;
-        this.rot[i] = this.trot[i] = Math.atan2(rx, -ry);
+        this.rot[i] = this.trot[i] = face;
       } else {
         this.tx[i] = x; this.ty[i] = y; this.state[i] = S_MOVE; this.ord[i] = fi === null ? -1 : fi; this.target[i] = -1;
         this.aux[i] = this.time + 30 + Math.hypot(x - this.x[i], y - this.y[i]) / (UNITS[this.type[i]].speed || 1) * 4;
       }
     }
-    void face;
   },
 
   /** Auto or manual, for the given defenders' platoons. */
@@ -344,7 +343,7 @@ export const platoonMethods = {
     }
     // --- the line faces the wrong way: attackers within reach have come round its flank
     const w = UNITS[this.type[ids[0]]].wdef;
-    if (w && this.gFaceX[g] !== -1 || this.gFaceY[g] !== 0) {
+    if (w) {
       const f = this._threatDir(ids);
       const near = this._orcMassNear(cx, cy, w ? w.range : 200);
       if (near && f[0] * this.gFaceX[g] + f[1] * this.gFaceY[g] < 0.5) { this._deploy(g, ids, f[0], f[1], null, null, false); this.gMoveT[g] = this.time; }

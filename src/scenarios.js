@@ -434,28 +434,29 @@ export const PRESETS = [
   // carries a suggested garrison (`ref`), the one its difficulty was measured with: it holds with a careful commander
   // most nights, while the same budget spent on riflemen alone does not (see docs/engine-redesign.md).
   {
-    key: 'escalade', name: 'The Escalade', level: 'Medium', design: true, budget: 2600,
-    blurb: 'Build the garrison: 6,500 attackers with 30 ladders and many berserkers, no engines',
+    key: 'escalade', name: 'The Escalade', level: 'Medium', design: true, budget: 2700,
+    blurb: 'Build the garrison: 7,500 attackers with 30 ladders and many berserkers, no engines',
     build: (map, sb) => ({
-      groups: horde(6500, { waves: sb ? 1 : 3, kinds: ['escalade', 'escalade', 'final'], uruk: 0.6, archer: 0.22, berserker: 0.12, warg: 0.06, ladders: 30, trolls: 0, rams: 0, sappers: 2, catapults: 0, towers: 0, chiefs: 6 }),
+      groups: horde(7500, { waves: sb ? 1 : 3, kinds: ['escalade', 'escalade', 'final'], uruk: 0.6, archer: 0.22, berserker: 0.12, warg: 0.06, ladders: 30, trolls: 0, rams: 0, sappers: 2, catapults: 0, towers: 0, chiefs: 6 }),
+      // (machine guns and mortars pay best against an escalade; obstacles least: see docs/lab/search1.md)
       ref: () => [
-        ...alongWall(map, 'rifle', 90, 0.12, 0.88), ...alongWall(map, 'mg', 8, 0.16, 0.84), ...alongWall(map, 'grenadier', 10, 0.2, 0.8), ...alongWall(map, 'marksman', 4, 0.3, 0.7),
-        makeGroup('mortar', 4, PO.mortarsEasy[0], PO.mortarsEasy[1], Math.PI / 2, 24), makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
-        makeGroup('rifle', 20, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30), ...alongWall(map, 'wire', 80, 0.2, 0.8, 55), ...alongWall(map, 'claymore', 6, 0.35, 0.65, 26),
+        ...alongWall(map, 'rifle', 100, 0.12, 0.88), ...alongWall(map, 'mg', 26, 0.14, 0.86), ...alongWall(map, 'grenadier', 10, 0.2, 0.8), ...alongWall(map, 'marksman', 6, 0.3, 0.7),
+        makeGroup('mortar', 3, PO.mortarsEasy[0], PO.mortarsEasy[1], Math.PI / 2, 24), makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
       ],
       options: { dawn: 720, cpStart: 8, cpRate: 2 / 60 },
     }),
   },
   {
-    key: 'siege-train', name: 'The Siege Train', level: 'Hard', design: true, budget: 4100,
-    blurb: 'Build the garrison: 8,000 attackers with siege towers, rams, trolls and catapults',
+    key: 'siege-train', name: 'The Siege Train', level: 'Hard', design: true, budget: 3800,
+    blurb: 'Build the garrison: 9,000 attackers with siege towers, rams, trolls and catapults',
     build: (map, sb) => ({
-      groups: horde(8000, { waves: sb ? 1 : 3, kinds: ['siege', 'siege', 'final'], towers: 4, rams: 2, trolls: 14, catapults: 8, sappers: 8, ladders: 20, chiefs: 8 }),
+      groups: horde(9000, { waves: sb ? 1 : 3, kinds: ['siege', 'siege', 'final'], towers: 4, rams: 2, trolls: 14, catapults: 8, sappers: 8, ladders: 20, chiefs: 8 }),
+      // (grenadiers and rocket teams for the engines and trolls, mortars and howitzers for the catapults: docs/lab/search1.md)
       ref: () => [
-        ...alongWall(map, 'rifle', 80, 0.1, 0.9), ...alongWall(map, 'mg', 6, 0.15, 0.85), ...alongWall(map, 'at', 12, 0.15, 0.85), ...alongWall(map, 'grenadier', 8, 0.2, 0.8), ...alongWall(map, 'marksman', 4, 0.3, 0.7),
-        ...alongRing('at', 2, 175, 205), makeGroup('mortar', 6, PO.mortarsHard[0], PO.mortarsHard[1], Math.PI / 2, 40), makeGroup('howitzer', 2, PO.deepHowitzers[0], PO.deepHowitzers[1], Math.PI / 2, 30),
-        makeGroup('tank', 1, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 20), makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y), makeGroup('cache', 1, map.wallAt(0.3).x + 26, map.wallAt(0.3).y), makeGroup('cache', 1, map.wallAt(0.7).x + 26, map.wallAt(0.7).y),
-        makeGroup('rifle', 20, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30), ...alongWall(map, 'hedgehog', 30, 0.15, 0.85, 40), ...alongWall(map, 'wire', 60, 0.3, 0.7, 60),
+        ...alongWall(map, 'rifle', 70, 0.1, 0.9), ...alongWall(map, 'grenadier', 20, 0.15, 0.85), ...alongWall(map, 'mg', 8, 0.15, 0.85), ...alongWall(map, 'at', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 6, 0.3, 0.7),
+        makeGroup('mortar', 8, PO.mortarsHard[0], PO.mortarsHard[1], Math.PI / 2, 40), makeGroup('howitzer', 2, PO.deepHowitzers[0], PO.deepHowitzers[1], Math.PI / 2, 30),
+        makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y), makeGroup('cache', 1, map.wallAt(0.3).x + 26, map.wallAt(0.3).y), makeGroup('cache', 1, map.wallAt(0.7).x + 26, map.wallAt(0.7).y),
+        makeGroup('rifle', 20, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30), ...alongWall(map, 'hedgehog', 30, 0.15, 0.85, 40), ...alongWall(map, 'claymore', 6, 0.35, 0.65, 26),
       ],
       options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
     }),

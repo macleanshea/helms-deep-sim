@@ -1482,7 +1482,8 @@ export class Sim {
       if (eg && this.deadG[tc] === eg) acc *= 0.3;
       if (td.sz === 0) {
         const c2 = (((yt - (dy / dist) * 4.5) / CELL) | 0) * GW + (((xt - (dx / dist) * 4.5) / CELL) | 0);
-        if (this.cover[c2] | this.dyn[c2] | this.cover[tc]) acc *= el ? 0.7 : 0.5;
+        if (this.dyn[c2]) acc *= el ? 0.7 : 0.5; // (behind a siege engine on the move)
+        else if (this.cover[c2] | this.cover[tc]) acc *= el ? 0.8 : 0.7; // (among steel obstacles: they hide a man only in part)
       }
     }
     if (w.sup) this.gSup[this.grp[t]] += this.gShield[this.grp[t]] ? w.sup * 0.5 : w.sup; // near misses keep heads down too (less so behind shields)

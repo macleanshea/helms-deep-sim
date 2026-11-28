@@ -50,8 +50,8 @@ Build challenge was measured with, to start from or to beat.
 | Easy | **First Night** | A company on the center of the wall against 4,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
 | Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
 | Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
-| Build · Medium | **The Escalade** | 6,500 in three waves with 30 ladders and many berserkers, and no engines. 2,600 pts. Twelve minutes. |
-| Build · Hard | **The Siege Train** | 8,000 with siege towers, rams, trolls, catapults and sappers. 4,100 pts. Fifteen minutes. |
+| Build · Medium | **The Escalade** | 7,500 in three waves with 30 ladders and many berserkers, and no engines. 2,700 pts. Twelve minutes. |
+| Build · Hard | **The Siege Train** | 9,000 with siege towers, rams, trolls, catapults and sappers. 3,800 pts. Fifteen minutes. |
 | Build · Hard | **The Flood** | 11,500 in four waves, nearly all on foot, with 60 ladders. 4,200 pts. Fifteen minutes. |
 
 In each the first wave is a real assault, not a probe, so the fight reaches the wall early. Difficulty
