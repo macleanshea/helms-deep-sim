@@ -15,7 +15,7 @@ import { engineMethods } from './engines.js';
 import { postMethods } from './posts.js';
 import { companyMethods } from './company.js';
 import { platoonMethods } from './platoon.js';
-import { lashedMethods, LASHED_GAP, LASHED_HANDS } from './lashed.js';
+import { lashedMethods, LASHED_GAP, LASHED_HANDS, FOOT_DEAD, LASHED_SLIP } from './lashed.js';
 import { LAYOUT } from '../layout.js';
 
 const AP = LAYOUT.approach, PO = LAYOUT.posts; // the horde's lines and the garrison's places on this map
@@ -137,7 +137,7 @@ export class Sim {
     this.count = [0, 0]; this.initial = [0, 0]; this.defCombat = 0;
     this.result = null; this.routing = false; this.routT = 0;
     this.stats = { kills: {}, lostDef: {}, lostOrc: {}, defLostBy: {}, shots: 0, startDef: {}, startOrc: {}, breaches: 0, fled: 0, routs: 0,
-      laddersUp: 0, towersUp: 0, thrown: 0, dropped: 0, recovered: 0, footholdT: -1, blocked: 0, pinnedDef: 0, rallied: 0, reposts: 0 };
+      laddersUp: 0, towersUp: 0, lashedUp: 0, lashThrown: 0, lashBroke: 0, lashClimbed: 0, lashArrived: 0, lashFell: 0, ringLodged: 0, thrown: 0, dropped: 0, recovered: 0, footholdT: -1, blocked: 0, pinnedDef: 0, rallied: 0, reposts: 0 };
     this.support = {};
     const sb = !!this.opt.sandbox;
     for (const k in SUPPORT) this.support[k] = { left: this.opt.support[k] ?? SUPPORT[k].def, max: this.opt.support[k] ?? SUPPORT[k].def, ready: 0, cd: sb ? SUPPORT[k].cd : SUPPORT[k].cpCd, cost: SUPPORT[k].cost };
@@ -819,6 +819,10 @@ export class Sim {
     this.linkT[L] = this.time + (tower ? 0.35 : this.isLashed[L] ? LASHED_GAP : 0.75);
     if (this.isLashed[L]) this._lashedLoad(L);
     this.state[i] = S_CLIMB; this.aux[i] = this.time; this.target2[i] = L; this.climbLong[i] = this.isLashed[L];
+    if (this.isLashed[L]) {
+      // up 24 m of lashed timber that flexes under him: now and then a man loses his footing (and where on the climb)
+      const r = this.rand(); this.slipU[i] = r < LASHED_SLIP ? r / LASHED_SLIP : 2; this.stats.lashClimbed++;
+    }
     this.bx[i] = this.x[L]; this.by[i] = this.y[L]; this.tx[i] = this.tx[L]; this.ty[i] = this.ty[L];
     this.vx[i] = this.vy[i] = 0; this.sepx[i] = this.sepy[i] = 0;
     this.rot[i] = Math.atan2(this.ty[L] - this.y[L], this.tx[L] - this.x[L]);
@@ -830,7 +834,9 @@ export class Sim {
     const ok = L >= 0 && this.alive[L] && this.state[L] === S_DONE && (this.type[L] === U.ladder || this.type[L] === U.tower);
     const long = this.climbLong[i];
     const u = (this.time - this.aux[i]) / (ok ? this._climbTime(L) : long ? LASHED_TIME : LADDER_TIME);
-    if (!ok) {
+    const slip = long && ok && u >= this.slipU[i] && u < 1; // (he loses his footing: see _startClimb)
+    if (slip) this.stats.lashFell++;
+    if (!ok || slip) {
       // the ladder went out from under them (from a lashed ladder up the Hornburg's rock, a fall of up to 21 m)
       this.state[i] = S_MOVE; this.target2[i] = -1; this.el[i] = 0;
       this.x[i] = this.bx[i] + (this.rand() - 0.5) * 3; this.y[i] = this.by[i] + (this.rand() - 0.5) * 3;
@@ -839,6 +845,7 @@ export class Sim {
       return;
     }
     if (u >= 1) {
+      if (long) this.stats.lashArrived++;
       // (off a lashed ladder he steps exactly onto the walk: the ring's walk is narrow against its 4 m cells)
       const j = long ? 0 : 1;
       this.x[i] = this.tx[i] + (this.rand() - 0.5) * j; this.y[i] = this.ty[i] + (this.rand() - 0.5) * j;
@@ -940,7 +947,8 @@ export class Sim {
         if (fm !== 1 && (this.tick + i) % 12 === 0) {
           const b = this.defBox, rg = w.range;
           if (x > b[0] - rg && x < b[2] + rg && y > b[1] - rg && y < b[3] + rg) {
-            t = this._findDefInRange(x, y, rg * 0.92, el);
+            t = this.gForm[g] === 3 ? this._headTarget(g, x, y, rg * 0.92) : -1;
+            if (t < 0) t = this._findDefInRange(x, y, rg * 0.92, el);
             if (t >= 0) { this.target[i] = t; return; }
           }
         }
@@ -974,6 +982,8 @@ export class Sim {
             if (d2 < (7 + tr) * (7 + tr)) { const l = Math.sqrt(d2); dirx = dx / l; diry = dy / l; direct = true; }
           }
         }
+        // at the foot of a lashed ladder standing against the ring: up it, if the way he is going lies up it
+        if (!el && !d.sz && !d.cav && this.footAt[c] >= 0 && !shut && (this.gField[g] === 0 || this.gField[g] >= 6) && this._footClimb(i, c)) return;
         if (fm && !direct && this.snagT[i] <= this.time) { this._formStep(i, d, g, x, y, speed); return; }
         if (!el && !d.sz && ((this.tick + i) & 63) === 0) {
           // a man who has got nowhere in six seconds, with nobody to fight, has lost the way: for a while
@@ -1069,7 +1079,8 @@ export class Sim {
           const fo = this.wl.forces[this.gForce[g]], fsec = fo ? this._wlSec(fo) : -1;
           if (!tower && this.wl.abandoned && (fsec === 5 || fsec === 3)) {
             // the Deeping Wall given up for the Hornburg: two ladders lashed together, up the ring from the valley floor
-            k = this._pickRingSeg(x, y, g); this.aux2[i] = k;
+            // (a stretch is claimed only once there are hands to carry the ladder there)
+            k = this.crewPts[i] >= d.crew.min ? this._pickRingSeg(x, y, g) : -1; this.aux2[i] = k;
             if (k >= 0) { this.segs[k].claimed++; this._findMate(i); }
           } else {
             // most crews of a wave make for the stretch of wall it has been aimed at
@@ -1511,6 +1522,7 @@ export class Sim {
     if (this.state[t] !== S_CLIMB) {
       const tc = ((yt / CELL) | 0) * GW + ((xt / CELL) | 0);
       if (eg && this.deadG[tc] === eg) acc *= 0.3;
+      else if (eg && this.footDead[tc]) acc *= FOOT_DEAD; // (at the foot of the Hornburg's rock: steep, though not overhung)
       if (td.sz === 0) {
         const c2 = (((yt - (dy / dist) * 4.5) / CELL) | 0) * GW + (((xt - (dx / dist) * 4.5) / CELL) | 0);
         if (this.dyn[c2]) acc *= el ? 0.7 : 0.5; // (behind a siege engine on the move)
@@ -1755,7 +1767,7 @@ export class Sim {
         // fragmentation is patchy: small targets are either caught or spared, big ones soak the blast
         const f = 1 - Math.sqrt(d2) / r;
         let dm;
-        if (this.rad[j] > 1) dm = dmg * (0.25 + 0.75 * f);
+        if (this.rad[j] > 1) { dm = dmg * (0.25 + 0.75 * f); if (this.isLashed[j] && this.state[j] === S_DONE && f < 0.65) dm *= 0.25; } // (a lashed ladder's heavy timber: only a near hit breaks it)
         else if (this.rand() < f * f * 1.15) { dm = dmg * (0.6 + 0.4 * f); if (lightHE && this.gShield[this.grp[j]] && this.team[j] === ORC && this.rand() < 0.25) continue; } // locked shields stop some of the splinters of a small burst
         else continue;
         // a wall between the burst and the target takes most of it

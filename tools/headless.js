@@ -92,6 +92,7 @@ export function runBattle(cfg = {}) {
       ladders: st.startOrc.ladder || 0, laddersUp: st.laddersUp, thrown: st.thrown, towers: st.startOrc.tower || 0, towersUp: st.towersUp,
       dropped: st.dropped, recovered: st.recovered, footholdT: round(st.footholdT, 0), firstWallT: round(firstWallT, 0), peakOnWall, peakCell,
       captains: `${captains}/${st.startOrc.chief || 0}`, blocked: st.blocked, rallied: st.rallied, fellAt,
+      lashed: { up: st.lashedUp, thrown: st.lashThrown, collapsed: st.lashBroke, climbed: st.lashClimbed, arrived: st.lashArrived, fell: st.lashFell, lodged: st.ringLodged },
     },
     stats: sim.stats,
   };

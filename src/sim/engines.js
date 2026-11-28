@@ -183,13 +183,14 @@ export const engineMethods = {
     const lashed = this.isLashed[L];
     // (someone is on it: the last man started up less than a climb ago)
     const loaded = this.time < this.linkT[L] - (lashed ? LASHED_GAP : 0.75) + (lashed ? LASHED_TIME : LADDER_TIME);
-    // three men, six seconds; far longer with climbers' weight on it. A lashed ladder, long and top-heavy, goes over at a push
-    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? (lashed ? 0.6 : 0.35) : 1) * (att ? 0.5 : 1) * (lashed ? 2 : 1);
+    // three men, six seconds; far longer with climbers' weight on it. A lashed ladder, 24 m of timber leaning at 60 degrees
+    // with its hooks over the parapet, cannot be pushed out past upright: it has to be levered off them sideways, slowly
+    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? (lashed ? 0.6 : 0.35) : 1) * (att ? 0.5 : 1) * (lashed ? 0.5 : 1);
     if (this.cd2[L] < 3) return;
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
     if (lashed) {
       // it comes down the rock and breaks apart: there is no raising it again
-      this.stats.thrown++; this.stats.lashThrown = (this.stats.lashThrown || 0) + 1;
+      this.stats.lashThrown++; // (counted apart from the ladders against the Deeping Wall)
       this.fx.dust(x, y, this.map.groundZ(x, y), 4); this.fx.sound('ladder', x, y, 0.8);
       this._alert('lashDown', 20, 'Lashed ladder thrown down · Hornburg', 'good', x, y);
       s.ladders--; this.aux2[L] = -1; this._unlink(L); this.kill(L, null, true);

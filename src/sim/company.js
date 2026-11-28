@@ -186,7 +186,7 @@ export const companyMethods = {
       } else if (f.sector === 3) { const s = this.segs[this.map.GATE]; ax = s.ox; ay = s.oy; }
       else if (f.sector === 5) {
         // up the ring by lashed ladders: a foot of the rock each, the crossbows halting closer to cover the climb
-        const q = this._ringAim(g) || this._ringMid(); ax = q.x; ay = q.y; stand = volley ? 60 : 0;
+        const q = this._ringAim(g) || this._ringMid(); ax = q.x; ay = q.y; stand = volley ? 80 : 0; // (inside a Hold to 75 m garrison's reserve)
       } else { const q = this._postFoot(); ax = q.x; ay = q.y; stand = 0; }
     }
     // troops standing in the open, seen ahead, are made for first

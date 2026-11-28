@@ -54,7 +54,7 @@ export const warlordMethods = {
       // the forming-up line: where a wave halts, out of reach of small arms, until it is all up; and when each wave stepped off from it
       formX: FORM_X, waveGo: [], waveLineT: [],
       // what has been hurting the horde beyond rifle range (bullets, blast), and how close in it now locks shields
-      lossFar: [0, 0], shieldAt: SHIELD_FAR, openNoted: false, wireSeen: [0, 0, 0],
+      lossFar: [0, 0], shieldAt: SHIELD_FAR, openNoted: false, wireSeen: [0, 0, 0], backT: -1, ringOn: 0, ringOnN: 0,
     };
     this.catWary = false;
     this.fields = [];
@@ -436,7 +436,15 @@ export const warlordMethods = {
     // seconds running. Then there is nothing to be had by scaling an empty wall, and the host turns on the keep.
     const empty = allDef > 0 && top[0] + top[1] + top[2] < 0.1 * allDef && inKeep > 0.6 * allDef;
     if (!empty) wl.emptyT = -1; else if (wl.emptyT < 0) wl.emptyT = this.time;
-    const gone = empty && this.time - wl.emptyT >= 10;
+    // ... and, once given up, taken back only when a quarter of the garrison's infantry has stood on it for 30 s: a token
+    // party sent back onto the wall does not call off the assault on the Hornburg
+    let gone;
+    if (!wl.abandoned) gone = empty && this.time - wl.emptyT >= 10;
+    else {
+      const back = allDef > 0 && top[0] + top[1] + top[2] > 0.25 * allDef;
+      if (!back) wl.backT = -1; else if (wl.backT < 0) wl.backT = this.time;
+      gone = !(back && this.time - wl.backT >= 30);
+    }
     if (gone !== wl.abandoned) {
       wl.abandoned = gone;
       if (gone) {
@@ -462,6 +470,10 @@ export const warlordMethods = {
     let fs = -1, fn = 11;
     for (let k = 0; k < 3; k++) if (foot[k] > fn) { fn = foot[k]; fs = k; }
     if (fs >= 0 && wl.footN > 11) { wl.footSec = fs; if (this.stats.footholdT < 0) this.stats.footholdT = this.time; } else if (fs < 0) wl.footSec = -1;
+    // a lodgement on the Hornburg's ring walk (off lashed ladders, or through a door): half a dozen, two looks running
+    if (foot[3] >= 6 && wl.ringOn >= 6) { if (!wl.ringOnN++) { this.stats.ringLodged++; this._alert('ringOn', 30, 'Attackers on the wall · Hornburg', 'bad', KEEP.cx, KEEP.cy, this.stats.ringLodged === 1); } }
+    else if (foot[3] < 3) wl.ringOnN = 0;
+    wl.ringOn = foot[3];
     wl.footN = fs >= 0 ? fn : 0;
     // a way in: any breach in the Deeping Wall, or the gate or postern down
     if (!wl.open) for (const s of this.segs) if (s.breached && (s.kind === 'wall' || s.kind === 'gate' || s.kind === 'postern' || s.kind === 'door')) { wl.open = true; break; }
@@ -680,7 +692,10 @@ export const warlordMethods = {
       const gs = this.segs[this.map.GATE];
       if (gs.breached || this.gateDir[c] === 255) return this.orcDir;
       const dx = (c % GW) * CELL + 2 - gs.ox, dy = ((c / GW) | 0) * CELL + 2 - gs.oy;
-      return dx * dx + dy * dy < 32400 ? this.orcDir : this.gateDir; // within 180 m the fight itself leads: the ram's own path does not suit men on foot round the causeway
+      // within 180 m the fight itself leads: the ram's own path does not suit men on foot round the causeway. But with the
+      // garrison shut in the Hornburg the fight leads away from the gate (to whoever is left on the walls), and the
+      // force sent for it would hang back: it keeps to the gate's path until 40 m out
+      return dx * dx + dy * dy < (this.wl.abandoned ? 1600 : 32400) ? this.orcDir : this.gateDir;
     }
     if (k === F_POST + 1) return this._posternField(c, heavy) || this.orcDir;
     const fl = this.fields[k - 1];
@@ -762,7 +777,10 @@ export const warlordMethods = {
       // foot; while none stands, the feet of the rock below it (those in the Deep only once the Deeping Wall has been
       // breached: a ladder cannot be carried over it), where the ladders are being carried
       if (this.lashed.length) { for (const L of this.lashed) if (this.alive[L] && ns < src.length) src[ns++] = this.map.cellOf(this.tx[L], this.ty[L]); }
-      else for (const f of this.ringFoot) if (f && (!f.deep || this.wl.open) && ns < src.length) src[ns++] = f.c;
+      else {
+        for (let q = 0; q < this.ringFoot.length; q++) { const f = this.ringFoot[q]; if (f && (!f.deep || this.wl.open) && this.segs[q].claimed + this.segs[q].ladders > 0 && ns < src.length) src[ns++] = f.c; }
+        if (!ns) for (const f of this.ringFoot) if (f && (!f.deep || this.wl.open) && ns < src.length) src[ns++] = f.c;
+      }
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];

@@ -563,6 +563,7 @@ export function buildUI(app, portraits) {
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Grenades and guns on the Hornburg can.'],
         ['The postern', 'The gate behind the Hornburg is weak. If the Deeping Wall falls, the horde reaches it through the Deep.'],
         ['The wall door', 'Where the wall joins the Hornburg, a door leads into the court. Attackers holding that end of the wall can break it down.'],
+        ['Lashed ladders', 'Once the wall is given up, attackers lash two ladders together to scale the Hornburg. Slow to raise and to climb, and they can collapse.'],
         ['Pinned ▼', 'Machine guns and shellfire pin companies: they slow down and stop shooting. Crossbows and catapults pin your platoons the same way.'],
         ['Shield wall ▣', 'Within small-arms range, Uruk-hai lock shields that stop most bullets from the front. Use explosives or flanking fire.'],
         ['Captains ★', 'Companies near a captain rarely rout, and nearby troops absorb shots aimed at the captain. Thin the escort, then use Focus Fire.'],

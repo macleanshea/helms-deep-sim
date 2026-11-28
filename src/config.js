@@ -137,7 +137,7 @@ export const UNITS = [
     note: 'Pushes siege towers, or attacks the wall section the catapults are hitting.', counter: 'Rockets and tank guns. A troll pushing a tower cannot fight.' },
   { key: 'ladder', team: ORC, name: 'Ladder Crew', role: R.LADDER, hp: 520, speed: 3.9, rad: 1.2, size: 13, spr: 21, spacing: 9, armor: A.FLESH, big: true, hvt: 1, pri: 1.2,
     crew: { need: 6, min: 2, troll: 0, hp: 900, box: [5.2, 0.4], slots: [[3.6, 0.7], [3.6, -0.7], [0, 0.7], [0, -0.7], [-3.6, 0.7], [-3.6, -0.7]] },
-    desc: 'Raises a ladder so infantry can scale the Deeping Wall.',
+    desc: 'Raises a ladder so infantry can scale the Deeping Wall. Two lashed together reach the Hornburg.',
     note: 'Six Uruk-hai carry each ladder. Bullets hurt only the carriers, and others replace them.', counter: 'Marksmen on the carriers, explosives on the ladder, and troops on the wall to throw it down.' },
   { key: 'ram', team: ORC, name: 'Battering Ram', role: R.RAM, hp: 1600, speed: 2.7, rad: 2.2, size: 12, spr: 23, sdmg: 230, spacing: 10, armor: A.WOOD, big: true, heavy: true, hvt: 2,
     crew: { need: 8, min: 3, troll: 0, roof: true, box: [3.0, 1.2], slots: [[1.9, 0.85], [1.9, -0.85], [0, 0.85], [0, -0.85], [-1.9, 0.85], [-1.9, -0.85], [-3.7, 0.6], [-3.7, -0.6]] },

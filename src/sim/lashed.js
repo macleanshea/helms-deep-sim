@@ -16,7 +16,7 @@
 // ladder's foot to the wall walk it leans on (src/sim/flow.js `jump`). Raising, climbing and throwing down share the
 // ladder code in sim.js and engines.js.
 
-import { GW, GH, T, OB } from '../config.js';
+import { GW, GH, T, OB, U, WORLD_W } from '../config.js';
 import { S_DONE, S_ACT } from './sim.js';
 
 const FOOT_MIN = 6, FOOT_MAX = 20;  // how far out from the wall's center line, beyond its half-thickness, a foot may stand (m)
@@ -38,6 +38,8 @@ export const lashedMethods = {
     this.lashMate = new Int32Array(N).fill(-1);  // the other ladder of a pair to be lashed together
     this.lashGen = new Uint16Array(N);           // ... and its generation, so a slot reused by some other unit is not taken for it
     this.lashT = new Float32Array(N);            // when a ladder last looked for a mate
+    this.slipU = new Float32Array(N).fill(2);    // how far up a climber on a lashed ladder loses his footing (2: he does not)
+    this.footDead = new Uint8Array(NC);          // the ground at the feet of the rock below the ring: steep rock above it, some cover from the walk
     this.jumpDirty = false;
     this.footField = [];                         // per stretch of the ring: the path to its own foot (solved when first wanted)
     // where each stretch of the ring can be laddered from: the first stretch of valley floor straight out from it
@@ -58,6 +60,7 @@ export const lashedMethods = {
       }
       return null;
     });
+    for (const f of this.ringFoot) if (f) for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { const c = f.c + oy * GW + ox; if (c >= 0 && c < NC) this.footDead[c] = 1; }
   },
 
   /**
@@ -76,7 +79,7 @@ export const lashedMethods = {
   },
 
   /** A unit slot is being given to a new unit: none of a lashed ladder's state may carry over to it. */
-  _lashReset(i) { this.isLashed[i] = 0; this.climbLong[i] = 0; this.lashMate[i] = -1; this.lashT[i] = 0; },
+  _lashReset(i) { this.isLashed[i] = 0; this.climbLong[i] = 0; this.lashMate[i] = -1; this.lashT[i] = 0; this.slipU[i] = 2; },
 
   /** Is j still the ladder that i was paired with (alive, a ladder, the same unit and not a later one in its slot)? */
   _mateOk(i, j) { return j >= 0 && this.alive[j] && this.type[j] === this.type[i] && this.gen[j] === this.lashGen[i] && this.lashMate[j] === i; },
@@ -103,19 +106,34 @@ export const lashedMethods = {
       const sc = Math.hypot(f.x - ox, f.y - oy) + this.rand() * 40;
       if (sc < bs) { bs = sc; best = k; }
     }
+    if (best >= 0) this.fields[F_RING].ver = -1; // (the force's path leads to the feet its ladders are bound for)
     return best;
+  },
+
+  /**
+   * A ladder bound for the ring that has had too few hands to carry it for 20 s gives up its pairing and its stretch,
+   * so that neither stands claimed by timber lying in the open: any crew may take it up again as an ordinary ladder.
+   * Returns true if it let go.
+   */
+  _ringRelease(i) {
+    const min = 2;
+    if (this.crewPts[i] >= min || !(this.eIdle[i] > 0) || this.time - this.eIdle[i] < 20) return false;
+    this._unpair(i);
+    const k = this.aux2[i];
+    if (k >= 0 && this.segs[k].group === 1) { this.segs[k].claimed--; this.aux2[i] = -1; this.fields[F_RING].ver = -1; }
+    return true;
   },
 
   /** Ladder L, bound for a stretch of the ring, looks for a second ladder with hands to carry it, to be lashed to it. */
   _findMate(L) {
     this.lashT[L] = this.time;
-    let best = -1, bd = 250 * 250;
+    let best = -1, bd = 90 * 90; // (close by: the two carried in together, not one waiting alone at the foot for the other)
     const min = 2; // (hands enough to carry it: a ladder crew's least)
     for (const e of this.engines) {
       if (e === L || this.type[e] !== this.type[L] || !this.alive[e] || this.lashMate[e] >= 0 || this.isLashed[e]) continue;
       const st = this.state[e];
       if (st !== 1 && st !== 5) continue;               // (on the move or waiting: one raised or being raised stays where it is)
-      if (this.crewHave[e] < min) continue;             // (one lying with nobody to carry it is no use)
+      if (this.crewPts[e] < min) continue;              // (one lying with nobody to carry it is no use)
       const k = this.aux2[e];
       // one still bound for the Deeping Wall is taken only if it is a long way from it; one bound for the ring with no
       // mate of its own, and still on its way, gives up its stretch and becomes this one's mate
@@ -139,7 +157,7 @@ export const lashedMethods = {
    */
   _mateStep(i, d, speed) {
     const L = this.lashMate[i];
-    if (!this._mateOk(i, L) || this.aux2[L] < 0 || !this.wl.abandoned) { this._unpair(i); return false; }
+    if (!this._mateOk(i, L) || this.aux2[L] < 0 || !this.wl.abandoned || this._ringRelease(i)) { this._unpair(i); return false; }
     const k = this.aux2[L], f = this.ringFoot[k];
     if (!f) { this._unpair(i); return false; }
     const x = this.x[i], y = this.y[i], dx = f.x - x, dy = f.y - y, l = Math.sqrt(dx * dx + dy * dy);
@@ -163,6 +181,7 @@ export const lashedMethods = {
     const f = this.ringFoot[k], x = this.x[i], y = this.y[i];
     // the garrison is back on the Deeping Wall: the ring is not the plan any more
     if (!this.wl.abandoned) { this.segs[k].claimed--; this.aux2[i] = -1; this._unpair(i); return; }
+    if (this._ringRelease(i)) return;
     const dx = f.x - x, dy = f.y - y, l = Math.sqrt(dx * dx + dy * dy);
     if (l < 130 && !this.ammo2[i]) { this.ammo2[i] = 1; this._alert('lashIn', 40, 'Ladder crews approaching · Hornburg', 'warn', x, y); }
     let m = this.lashMate[i];
@@ -176,6 +195,7 @@ export const lashedMethods = {
       // both ladders at the foot and hands to work them: lash them together and heave the long ladder up
       if (!near || (crewed && (speed <= 0 || this.crewPts[i] < LASHED_HANDS))) return;
       this.fx.dust(this.x[m], this.y[m], this.map.groundZ(this.x[m], this.y[m]), 2);
+      this.hp[i] = Math.min(1800, this.hp[i] + this.hp[m]); // (the timber of both)
       this._unpair(i); this.kill(m, null, true); // (its timber is now part of this one; its carriers go back to the fight)
       this.state[i] = S_ACT; this.aux[i] = this.time + LASHED_RAISE; this.rot[i] = Math.atan2(-this.segs[k].ny, -this.segs[k].nx);
       return;
@@ -194,10 +214,10 @@ export const lashedMethods = {
     const cw = this.map.cellOf(this.tx[L], this.ty[L]);
     this.ladderAt[cw] = L; this.lad[cw] = 1;
     this.lashed.push(L); this._rebuildJumps();
-    this.stats.lashedUp = (this.stats.lashedUp || 0) + 1;
+    this.stats.lashedUp++;
     this.fx.dust(f.x, f.y, this.map.groundZ(f.x, f.y), 4); this.fx.sound('ladder', f.x, f.y, 0.8);
-    if (this.stats.lashedUp === 1) this._alert(null, 0, 'Ladders lashed · Hornburg', 'bad', f.x, f.y, true);
-    else this._alert('lashUp', 25, 'Ladders lashed · Hornburg', 'bad', f.x, f.y);
+    if (this.stats.lashedUp === 1) this._alert(null, 0, 'Lashed ladders up · Hornburg', 'bad', f.x, f.y, true);
+    else this._alert('lashUp', 25, 'Lashed ladders up · Hornburg', 'bad', f.x, f.y);
   },
 
   /** Where a force sent up the ring by lashed ladders is bound: the valley-side foot nearest the middle of them all. */
@@ -212,10 +232,55 @@ export const lashedMethods = {
     return (this._ringMidP = best);
   },
 
-  /** A foot of the rock on the valley side of the ring for company g to make for (the companies of a force spread over them). */
+  /**
+   * A foot of the rock for company g to make for: the nearest of those its own force's ladders are bound for, being
+   * raised at, or standing at (men and ladders go in together); failing those, one of the valley-side feet, the
+   * companies of a force spread over them.
+   */
   _ringAim(g) {
+    const fo = this.gForce[g], ax = this.gAx[g], ay = this.gAy[g];
+    let best = null, bd = 1e12;
+    for (const e of this.engines) {
+      if (!this.alive[e] || !this.isLadder(e)) continue;
+      const k = this.aux2[e];
+      if (k < 0 || this.segs[k].group !== 1 || this.gForce[this.grp[e]] !== fo) continue;
+      const f = this.ringFoot[k]; if (!f) continue;
+      const d2 = (f.x - ax) ** 2 + (f.y - ay) ** 2;
+      if (d2 < bd) { bd = d2; best = f; }
+    }
+    if (best) return best;
     const list = this._valleyFeet || (this._valleyFeet = this.ringFoot.filter((f) => f && !f.deep));
     return list.length ? list[(g * 7) % list.length] : null;
+  },
+
+  /** Is unit e a scaling ladder (carried, being raised, or up)? */
+  isLadder(e) { return this.type[e] === U.ladder; },
+
+  /**
+   * For the crossbows of company g, halted to cover the climb: a defender within 10 m of the head of a lashed ladder
+   * of g's force that is being raised or is up, within `range` of (x, y). -1 if none.
+   */
+  _headTarget(g, x, y, range) {
+    const fo = this.gForce[g];
+    if (fo < 0 || !this.wl.abandoned) return -1;
+    let best = -1, bd = range * range;
+    for (const e of this.engines) {
+      if (!this.alive[e] || !this.isLadder(e) || this.gForce[this.grp[e]] !== fo) continue;
+      const k = this.aux2[e];
+      if (k < 0 || this.segs[k].group !== 1 || (this.state[e] !== S_ACT && this.state[e] !== S_DONE)) continue;
+      const f = this.ringFoot[k]; if (!f) continue;
+      const cx = (f.hx / 8) | 0, cy = (f.hy / 8) | 0, DW = WORLD_W / 8; // (the defender grid: 8 m cells)
+      for (let yy = cy - 2; yy <= cy + 2; yy++) for (let xx = cx - 2; xx <= cx + 2; xx++) {
+        if (xx < 0 || yy < 0 || xx >= DW) continue;
+        for (let j = this.dcHead[yy * DW + xx]; j >= 0; j = this.cnext[j]) {
+          if (!this.alive[j] || !this.el[j]) continue;
+          if ((this.x[j] - f.hx) ** 2 + (this.y[j] - f.hy) ** 2 > 100) continue;
+          const d2 = (this.x[j] - x) ** 2 + (this.y[j] - y) ** 2;
+          if (d2 < bd) { bd = d2; best = j; }
+        }
+      }
+    }
+    return best;
   },
 
   /**
@@ -253,14 +318,14 @@ export const lashedMethods = {
    * four or more on it at once there is a chance, with each that steps on, that the lashing gives way.
    */
   _lashedLoad(L) {
-    let on = 0;
+    let on = 1; // (the man stepping on)
     for (let i = 0; i < this.n; i++) if (this.alive[i] && this.target2[i] === L && this.state[i] === 6 /* S_CLIMB */) on++;
-    if (on >= 4 && this.rand() < 0.08 * (on - 3)) {
+    if (on >= 4 && this.rand() < 0.05 * (on - 3)) {
       const k = this.aux2[L], x = this.x[L], y = this.y[L];
-      this._alert('lashBreak', 20, 'Lashed ladder gave way · Hornburg', 'good', x, y);
+      this._alert('lashBreak', 20, 'Lashed ladder collapsed · Hornburg', 'good', x, y);
       this.fx.dust(x, y, this.map.groundZ(x, y), 4); this.fx.sound('ladder', x, y, 0.8);
       if (k >= 0) { this.segs[k].ladders--; this.aux2[L] = -1; }
-      this._unlink(L); this.kill(L, null, true); this.stats.lashBroke = (this.stats.lashBroke || 0) + 1;
+      this._unlink(L); this.kill(L, null, true); this.stats.lashBroke++;
       return true;
     }
     return false;
@@ -296,6 +361,12 @@ export const F_RING = 7, F_POSTG = 6;
 
 /** Hands needed to heave a lashed ladder up (a ladder's crew is six), and how long it takes (a ladder takes 4 s). */
 export const LASHED_HANDS = 5, LASHED_RAISE = 14;
+
+/** How much harder a man at the foot of the rock is to hit from the walk above (the steep rock hides him in part). */
+export const FOOT_DEAD = 0.5;
+
+/** The chance that a man climbing a lashed ladder loses his footing on the way up. */
+export const LASHED_SLIP = 0.03;
 
 /** Seconds between one man starting up a lashed ladder and the next: one at a time, or the lashing works loose. */
 export const LASHED_GAP = 2;
