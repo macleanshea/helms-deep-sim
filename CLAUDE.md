@@ -80,3 +80,20 @@ The place names in `src/map.js` are part of the golden hash.
 
 Run `npm run golden` and `npm run checks` (behavior must not move), then look at the text on
 screen: wrapping is the usual failure, and it only shows in the browser.
+
+## Working in sessions: keep the work recoverable
+
+A session can fail at any moment and take its uncommitted work with it. Work so that a new session
+can pick up exactly where the last one stopped.
+
+- **Open a pull request at the start of a session**, before doing the work (a draft is fine). If the
+  session continues earlier work, use that work's pull request instead of opening another.
+- **Commit and push to it very often**: after each working step, not at the end of the task. Nothing
+  of value should exist only in the container. A commit that leaves a check failing is fine if the
+  log says so.
+- **Keep a detailed log in the pull request**: `docs/worklog.md` on the branch (newest entry last),
+  with the pull request description kept in step with it. Each entry records what was done, what was
+  measured, what is broken, and the decisions made and why.
+- **Keep a "Next" list at the top of the log**: the exact next steps in order, with the commands to
+  run and the files involved, updated before each push. A new session reads `docs/worklog.md` first
+  and starts from that list.
