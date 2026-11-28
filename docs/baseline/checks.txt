@@ -1,0 +1,59 @@
+  playing first-night seed 1…
+  playing garrison seed 1…
+  playing three-hundred seed 1…
+  playing garrison seed 2…
+PASS  crews: engines at the edge: longest wait for a crew at the map edge 9 s (limit 45); 0 of 354 engines never crewed (limit 2%)
+      median share of an engine's life spent set down: 32%
+PASS  crews: stranded carriers: longest a carrier stood by an engine that could not move: 42 s (limit 120)
+      carriers who waited a minute or more: 0
+PASS  throw-down: 22 thrown down of 191 raised (12%; wanted more than none and under 60%); 0 within 5 s of going up (limit 10%)
+      median time a thrown ladder had stood: 6 s · first-night/1 0/5 · garrison/1 3/52 · three-hundred/1 4/51 · garrison/2 15/83
+PASS  rifles: rounds fired per rifleman: 153, 103, 117, 116 (each battle; wanted at least 25); 1% of rounds at shields beyond 120 m (limit 2%)
+      of 129751 rifle rounds: 80% at exposed targets, 19% at shields inside 120 m · rifle kills first-night/1 1224 · garrison/1 3961 · three-hundred/1 2613 · garrison/2 4350
+PASS  defenders pinned: share of defender-time pinned flat after first contact: 5%, 2%, 4%, 2% (limit 25%); longest any platoon stayed pinned: 46 s (limit 180)
+      
+PASS  catapults: share of defender losses to catapult rocks: 2%, 14%, 19%, 17% (limit 50%)
+      first-night/1 rocks 1, catapults lost 0/1 · garrison/1 rocks 71, catapults lost 5/12 · three-hundred/1 rocks 58, catapults lost 0/11 · garrison/2 rocks 85, catapults lost 3/12
+PASS  captains: can be hunted: a commander hunting them killed 12 of 23 (the stand-in, not hunting, 4); wanted at least 30% and more than the stand-in
+      killed by: {"heli_gun":1,"sniper":8,"mg":2,"bomb":1} · air strikes 1 · the hunter lost
+PASS  captains: spread out: eight captains placed in one heap: two minutes on, the median distance to the nearest other captain is 41 m (wanted 25 or more)
+      closest pair 21 m, of 8 still alive
+PASS  wargs: loosed with at least a minute of battle left in every challenge: yes; in a sandbox (no dawn): loosed at 246 s (final effort)
+      first-night/1: loosed at 361 s of 600 (final effort), held 62% of their time
+      garrison/1: loosed at 819 s of 1088 (a way in), held 68% of their time
+      three-hundred/1: loosed at 514 s of 873 (a way in), held 45% of their time
+      garrison/2: loosed at 779 s of 1162 (a way in), held 74% of their time
+PASS  yo-yo: most times any one force pulled back: 1 (limit 2)
+      19 pull-backs among 56 forces
+PASS  alerts: most banners in any one minute: 8 (limit 8); most repeats of one message in a battle: 23 (limit 25)
+      banners per battle: 7, 25, 23, 29 · most repeated: "Ladder crews are making for X"
+PASS  silence: 1 surges called; 0 at a sector still firing at over 40% of its peak in the next 15 s
+      each was followed by quiet
+PASS  intel: with the cliff end of the wall left unmanned, 92% of 12 main efforts went for it (wanted 60% or more)
+      sectors chosen (0 keep end, 1 centre, 2 cliff end): 2 2 2 2 2 2 2 2 0 2 2 2
+PASS  stuck: foot soldiers with a clear way and room to move who stood still a minute or more: 2 across the battles (limit 150); the longest 110 s (limit 120)
+      first-night/1 0 · garrison/1 1 · three-hundred/1 0 · garrison/2 1
+PASS  routs get through: routing troops moved at 93% of their running pace on average (wanted 60% or more)
+      229803 router-seconds sampled
+PASS  forward armour: four vehicles 200 m in front of the wall took 499 blows from the horde's blades and trolls (wanted 20 or more: they were attacked, not walked past)
+      2 of 4 destroyed (ifv at 215 s by melee, ifv at 186 s by xbow) · attacker-seconds spent beyond them while they lived: 25168
+PASS  lanes: no shot without a line: of 210761 direct shots by defenders on foot, 0 were fired with no line of fire and 0 along a wall (wanted none)
+      
+PASS  lanes: men find places: of defender-seconds with an enemy in reach (after the first half-minute of contact), 0% were spent with no line of fire (limit 15%)
+      
+PASS  lanes: no wandering or fidgeting: furthest anyone strayed from his post without an order: 6 m (limit 30); moves to a new firing place per man per minute: 0.01, 0.00, 0.00, 0.00 (limit 2)
+      
+PASS  lanes: room for everyone: most standing defenders in one 2 m cell: 4 (limit 5)
+      
+PASS  lanes: a packed wall: 300 rifles massed on 110 m of wall: 1% of their time in reach was spent with no line of fire (frontage for about 180 at the parapet, more as they spread along it), and none fired without one
+      most in one 2 m cell 4 · furthest from post 30 m · moves per man per minute 0.19
+OPEN  keep: falling back into the Hornburg in the first second: Easy: won 3 of 3 with 99% left · Medium: won 1 of 3 with 0% left · Hard: won 3 of 3 with 5% left (a win every time with over half the garrison left makes a scenario trivial)
+      the horde comes round through the Deep for the postern: most attackers in the Deep at once 21, 107, 20, 622, 809, 870, 504, 452, 326 · postern broken, broken, broken, broken, broken, broken, broken, broken, broken · gate 100%, 100%, 100%, down, down, down, 43%, down, down · door battered, broken, untouched, broken, broken, broken, broken, broken, broken
+PASS  deep: fall-back battles in which twenty or more attackers reached the Deep and went for the postern: 9 of 9; looks at the stock battles that found a force sent for the postern while the wall was manned: 0 (wanted none)
+      21 in the Deep, postern broken · 107 in the Deep, postern broken · 20 in the Deep, postern broken · 622 in the Deep, postern broken · 809 in the Deep, postern broken · 870 in the Deep, postern broken · 504 in the Deep, postern broken · 452 in the Deep, postern broken · 326 in the Deep, postern broken
+PASS  door: 200 Uruk-hai on the wall walk by the keep: the door first struck at 2 s, broken at 98 s; attackers seen in the arch before it broke: 0 (wanted none)
+      1 attackers left, 180 defenders
+PASS  layout: hordes of 500 to 40,000 drawn up by task force: all placed (limit 0.5% left out)
+      500: 0 left out, rear rank at x=179 · 2000: 0 left out, rear rank at x=127 · 8000: 0 left out, rear rank at x=97 · 20000: 5 left out, rear rank at x=31 · 30000: 18 left out, rear rank at x=30 · 40000: 32 left out, rear rank at x=5
+
+24 of 25 passed; known and open: keep

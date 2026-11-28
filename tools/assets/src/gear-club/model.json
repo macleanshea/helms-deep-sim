@@ -1,0 +1,55 @@
+{
+  "unit": "gear-club",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-club.jpg",
+    "prompt": "tools/assets/concepts/gear-club.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-0d43-7433-9552-c2cbf0ae5491",
+      "remesh": "01a21f57-b9fe-7741-b377-22c724d770f0"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 38604
+    },
+    "nrm": {
+      "offset": 154416,
+      "length": 38604
+    },
+    "uv": {
+      "offset": 308832,
+      "length": 25736
+    },
+    "joints": {
+      "offset": 411776,
+      "length": 51472
+    },
+    "weights": {
+      "offset": 463248,
+      "length": 51472
+    },
+    "index": {
+      "offset": 669136,
+      "length": 31035
+    },
+    "ibm": {
+      "offset": 793276,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

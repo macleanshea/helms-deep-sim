@@ -31,13 +31,14 @@ export const postMethods = {
     const x1 = x + ux * LANE, y1 = y + uy * LANE;
     const cx0 = Math.max(0, ((Math.min(x, x1) - 3) / FINE) | 0), cx1 = Math.min(FW - 1, ((Math.max(x, x1) + 3) / FINE) | 0);
     const cy0 = Math.max(0, ((Math.min(y, y1) - 3) / FINE) | 0), cy1 = Math.min(FH - 1, ((Math.max(y, y1) + 3) / FINE) | 0);
-    const { head, next, team, alive, el, type, state, rad } = this, X = this.x, Y = this.y;
+    const { head, next, team, alive, el, type, state, rad } = this, X = this.x, Y = this.y, tr = this.tier[this.map.cellOf(x, y)];
     let n = 0;
     for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) {
       for (let j = head[cy * FW + cx]; j >= 0; j = next[j]) {
         if (j === i || team[j] !== DEF || !alive[j] || el[j] !== lv) continue;
         const dx = X[j] - x, dy = Y[j] - y, along = dx * ux + dy * uy;
         if (along < 0.45) continue;
+        if (!lv && tr !== this.tier[this.map.cellOf(X[j], Y[j])]) continue; // (men in another court stand above or below the shot)
         const cls = UNITS[type[j]].cls;
         let lat = dx * uy - dy * ux; if (lat < 0) lat = -lat;
         if (cls === C.VEH || cls === C.GUN) { if (along < LANE + 2 && lat < rad[j] + 0.3) return 9; continue; }
@@ -120,7 +121,7 @@ export const postMethods = {
   /** A man with no line of fire looks for a place that has one. Returns true if he sets off for it. */
   _seek(i, d, x, y, eg, c) {
     this.seekT[i] = this.time + 3 + (i % 7) * 0.2;
-    const ax = this.ax[i], ay = this.ay[i], lv = eg ? 1 : 0;
+    const ax = this.ax[i], ay = this.ay[i], lv = eg ? 1 : 0, tr0 = this.tier[this.map.cellOf(x, y)];
     let bx = 0, by = 0, bd = 1e9;
     const tryAt = (px, py, extra) => {
       if (px < 3 || py < 3 || px > WORLD_W - 3 || py > WORLD_H - 3) return;
@@ -128,7 +129,7 @@ export const postMethods = {
       const dd = (px - x) * (px - x) + (py - y) * (py - y) + extra;
       if (dd >= bd) return;
       const pc = this.map.cellOf(px, py);
-      if (this.elevD[pc] !== eg || this.mtype[pc] === T.CLIFF || (!eg && this.mtype[pc] === T.STAIR)) return;
+      if (this.elevD[pc] !== eg || this.mtype[pc] === T.CLIFF || (!eg && (this.mtype[pc] === T.STAIR || this.tier[pc] !== tr0))) return;
       if (this.resT[((py / FINE) | 0) * FW + ((px / FINE) | 0)] > this.time || !this._spotFree(px, py, lv, i)) return;
       bd = dd; bx = px; by = py;
     };
@@ -161,7 +162,7 @@ export const postMethods = {
   /** A man standing in an over-full spot moves to the nearest ground on his level with room. */
   _settle(i, d, x, y, eg) {
     this.seekT[i] = this.time + 2 + (i % 5) * 0.3;
-    const fx = (x / FINE) | 0, fy = (y / FINE) | 0, lv = eg ? 1 : 0, ax = this.ax[i], ay = this.ay[i];
+    const fx = (x / FINE) | 0, fy = (y / FINE) | 0, lv = eg ? 1 : 0, ax = this.ax[i], ay = this.ay[i], tr0 = this.tier[this.map.cellOf(x, y)];
     const home = (x - ax) * (x - ax) + (y - ay) * (y - ay);
     for (let r = 1; r <= 4; r++) {
       let bx = -1, by = 0, bd = 1e9;
@@ -172,7 +173,7 @@ export const postMethods = {
         const f = cy * FW + cx;
         if (this.occ[f * 2 + lv] > 1 || this.resT[f] > this.time) continue;
         const px = cx * FINE + 1, py = cy * FINE + 1, pc = this.map.cellOf(px, py);
-        if (this.elevD[pc] !== eg || this.mtype[pc] === T.CLIFF || (!eg && this.mtype[pc] === T.STAIR)) continue;
+        if (this.elevD[pc] !== eg || this.mtype[pc] === T.CLIFF || (!eg && (this.mtype[pc] === T.STAIR || this.tier[pc] !== tr0))) continue;
         const da = (px - ax) * (px - ax) + (py - ay) * (py - ay);
         if (da > REACH2 && da > home) continue; // (a man who never reached his post may still shuffle, but not further from it)
         const dd = ox * ox + oy * oy + ((i + cx * 3 + cy) % 3) * 0.1;

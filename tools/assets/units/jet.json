@@ -1,0 +1,26 @@
+{
+  "length": 16,
+  "texture": 1024,
+  "lods": [
+    10000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/tank.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "-x",
+    "file": "assets-src/jet/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/jet.jpg",
+    "prompt": "tools/assets/concepts/jet.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f35-f703-7413-892d-c7b49ac2f031",
+      "remesh": "01a21f36-f197-7115-a969-3a605430100a"
+    }
+  }
+}

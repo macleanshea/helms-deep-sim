@@ -1,0 +1,120 @@
+{
+  "unit": "berserker",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/berserker.jpg",
+    "prompt": "tools/assets/concepts/berserker.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b5c-7495-b417-7b5e171cf520",
+      "remesh": "01a21b49-e964-759d-bf91-f4fa9ff207c7",
+      "rigging": "01a21b4b-7fc7-763e-a1f7-a35d682497f1",
+      "animations": {
+        "idle": "01a21b4c-1100-7049-9ee4-61f2d314ebf3",
+        "attack": "01a21b4c-15a5-769f-a41f-2c48bd8bcc83",
+        "die": "01a21b4c-1bd9-75c4-91ff-849d29a192e4",
+        "climb": "01a21b4c-1fd6-7576-8355-27be01d6be4b"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 58014
+    },
+    "nrm": {
+      "offset": 232056,
+      "length": 58014
+    },
+    "uv": {
+      "offset": 464112,
+      "length": 38676
+    },
+    "joints": {
+      "offset": 618816,
+      "length": 77352
+    },
+    "weights": {
+      "offset": 696168,
+      "length": 77352
+    },
+    "index": {
+      "offset": 1005576,
+      "length": 30405
+    },
+    "ibm": {
+      "offset": 1127196,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 50,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.82166,
+      "offset": 76800
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.95565,
+      "offset": 124416
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 67,
+      "stride": 0,
+      "offset": 153600
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 90,
+      "stride": 0,
+      "offset": 256512
+    },
+    {
+      "name": "climb",
+      "loop": true,
+      "frames": 48,
+      "stride": 0.22122,
+      "offset": 394752
+    }
+  ]
+}

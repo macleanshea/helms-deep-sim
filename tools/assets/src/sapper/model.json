@@ -1,0 +1,112 @@
+{
+  "unit": "sapper",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/sapper.jpg",
+    "prompt": "tools/assets/concepts/sapper.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b8d-73d9-b83e-c22a2b21810a",
+      "remesh": "01a21b49-ebe6-77aa-9e54-85826a5da42c",
+      "rigging": "01a21b4b-8178-772c-a719-6366208fb22f",
+      "animations": {
+        "idle": "01a21b4c-13d9-732c-b6c3-da3ec72d10ba",
+        "die": "01a21b4c-195b-76fc-bd43-b61f63a29673",
+        "carry": "01a21b4c-1d6b-7304-8f67-222619f77c2e"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 58764
+    },
+    "nrm": {
+      "offset": 235056,
+      "length": 58764
+    },
+    "uv": {
+      "offset": 470112,
+      "length": 39176
+    },
+    "joints": {
+      "offset": 626816,
+      "length": 78352
+    },
+    "weights": {
+      "offset": 705168,
+      "length": 78352
+    },
+    "index": {
+      "offset": 1018576,
+      "length": 29991
+    },
+    "ibm": {
+      "offset": 1138540,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 50,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.72148,
+      "offset": 76800
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.84273,
+      "offset": 124416
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 90,
+      "stride": 0,
+      "offset": 153600
+    },
+    {
+      "name": "carry",
+      "loop": true,
+      "frames": 195,
+      "stride": 2.16304,
+      "offset": 291840
+    }
+  ]
+}

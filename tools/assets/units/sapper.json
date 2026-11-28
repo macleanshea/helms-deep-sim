@@ -1,0 +1,60 @@
+{
+  "height": 1.95,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "idle": 89,
+    "die": 8,
+    "carry": 551
+  },
+  "gear": [],
+  "rig": "assets-src/sapper/rigged.glb",
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/sapper/idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/sapper/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/sapper/run.glb",
+      "loop": true
+    },
+    {
+      "name": "die",
+      "file": "assets-src/sapper/die.glb",
+      "loop": false
+    },
+    {
+      "name": "carry",
+      "file": "assets-src/sapper/carry.glb",
+      "loop": true
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/sapper.jpg",
+    "prompt": "tools/assets/concepts/sapper.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b8d-73d9-b83e-c22a2b21810a",
+      "remesh": "01a21b49-ebe6-77aa-9e54-85826a5da42c",
+      "rigging": "01a21b4b-8178-772c-a719-6366208fb22f",
+      "animations": {
+        "idle": "01a21b4c-13d9-732c-b6c3-da3ec72d10ba",
+        "die": "01a21b4c-195b-76fc-bd43-b61f63a29673",
+        "carry": "01a21b4c-1d6b-7304-8f67-222619f77c2e"
+      }
+    }
+  }
+}

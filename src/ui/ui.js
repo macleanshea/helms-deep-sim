@@ -73,7 +73,7 @@ export function buildUI(app, portraits) {
   let bestScores = {};
   /**
    * The scenario list for the current mode. A challenge offers the scenarios, each with the best medal
-   * and score won on it; the sandbox starts from a blank map and offers the scenarios to autofill it.
+   * and score won on it; the sandbox opens on the same scenario with both armies laid out, and offers the others (and a blank map) to autofill it.
    */
   ui.refreshPresetList = () => {
     const sb = app.isSandbox(), cur = preset.value;
@@ -81,16 +81,24 @@ export function buildUI(app, portraits) {
     const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank && !p.hidden);
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
-      const o = el('option', null, (p.level && !sb ? `${p.level} · ` : '') + p.name + (b ? `   ${b.medal ? '★ ' : ''}${b.score}` : ''));
+      // (the best score won on it is shown beside the list, labelled: tacked onto the name it read as part of the name)
+      const o = el('option', null, p.name + (p.level ? ` (${p.level})` : '') + (b && b.medal ? '  ★' : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
+    ui.showBest();
     preset.title = sb ? 'Autofill the map with a scenario\'s armies' : 'Choose the challenge';
     for (const b of modeSw.children) b.classList.toggle('active', app.modeChosen && (b.dataset.mode === 'sandbox') === sb);
   };
+  /** The best score on the chosen challenge, beside the list (nothing in the sandbox, or before one is won). */
+  ui.showBest = () => {
+    const b = !app.isSandbox() && bestScores[preset.value], out = $('presetBest');
+    out.textContent = b ? `Best ${b.score}${b.medal ? ' ★' : ''}` : '';
+    out.hidden = !b;
+  };
   ui.refreshPresets = (best) => { bestScores = best; ui.refreshPresetList(); };
-  preset.addEventListener('change', () => { ui.hideCoach(); app.loadPreset(preset.value); preset.blur(); });
-  ui.setPreset = (k) => { preset.value = k; };
+  preset.addEventListener('change', () => { ui.hideCoach(); app.loadPreset(preset.value); preset.blur(); ui.showBest(); });
+  ui.setPreset = (k) => { preset.value = k; ui.showBest(); };
   for (const b of modeSw.children) {
     const sb = b.dataset.mode === 'sandbox';
     b.addEventListener('click', () => { if (!app.modeChosen || sb !== app.isSandbox()) app.enterMode(b.dataset.mode); b.blur(); });
@@ -533,7 +541,7 @@ export function buildUI(app, portraits) {
         [`${k('Space')} ${k('−')} ${k('+')}`, 'Pause · slower · faster'],
         [k('Scroll'), 'Zoom toward the cursor'],
         [`${k('Right-drag')} ${k('W A S D')}`, 'Pan'],
-        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Rotate the view'],
+        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Turn the view. Dragging up or down (or <b>PgUp</b> <b>PgDn</b>) tips it'],
         [k('Home'), 'Reset the view'],
         [k('G'), 'Jump to the latest alert (again for the one before). Clicking an alert or the minimap looks there too'],
         [k('F2'), 'Performance overlay'],
@@ -606,7 +614,7 @@ export function buildUI(app, portraits) {
     if (coached.has(kind)) return;
     coached.add(kind);
     coachBody.innerHTML = kind === 'sandbox'
-      ? '<b>Start from a blank map — or autofill it</b><p>Pick a scenario here to fill the map with both its armies, then change anything. Or build each side yourself from the panel on the left.</p>'
+      ? '<b>Both armies are yours to change</b><p>The Hornburg Garrison and its horde are on the map: change anything from the panel on the left. Pick another scenario here to autofill the map, or <b>Blank Map</b> to build both sides from nothing.</p>'
       : '<b>The Hornburg Garrison is ready</b><p>The garrison is in place: press <b>Begin Battle</b> to take command. Pick another challenge here, or open <b>Advanced</b> on the right to rework the garrison.</p>';
     coach.hidden = false;
     placeCoach();
@@ -619,17 +627,19 @@ export function buildUI(app, portraits) {
 
   // --------------------------------------------------------------- settings
   const menu = $('settingsMenu'), btnSettings = $('btnSettings');
-  const DETAIL = [[0.5, 'Close up'], [0.375, 'Medium'], [0.3, 'Far (default)'], [0.225, 'Very far']];
+  const QUALITY = [['auto', 'Auto', 'Moves between the levels by itself to keep the frame rate smooth'], ['low', 'Low', 'Plainest: no anti-aliasing, glow or HDR; soldiers in full detail only close up'],
+    ['medium', 'Medium', 'Light anti-aliasing, glow and HDR; full detail at middle distance'], ['high', 'High', 'Full anti-aliasing and resolution; full detail from far off'], ['ultra', 'Ultra', 'As High, with soldiers in full detail from very far off']];
   const renderSettings = () => {
-    const cur = app.settings.heroScale;
+    const cur = app.settings.quality, now = app.gfx.level, fixed = !app.gfx.auto && cur === 'auto'; // (fixed: a test address is holding the quality)
     menu.innerHTML = '<h3>Settings</h3>';
-    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out units are drawn in full detail. Further looks better but costs frame rate.</span>');
+    const nowName = QUALITY.find((q) => q[0] === now)[1];
+    const r = el('div', 'set-row'), lab = el('div', null, `<b>Graphics quality</b><span>${cur === 'auto' && !fixed ? `Auto keeps the frame rate smooth by itself. It is on ${nowName} now.` : 'Higher levels are sharper and show soldiers in full detail from further out, and cost frame rate.'}</span>`);
     const seg = el('div', 'set-seg');
-    for (const [v, t] of DETAIL) {
-      const b = el('button', Math.abs(v - cur) < 1e-3 ? 'active' : '', t.replace(' (default)', ''));
-      const L = app.lodAt(v), f = (z) => z.toFixed(1);
-      b.title = `${t}: dots below ${f(L.dot)} px/m, boxes to ${f(L.box)}, stand-ins to ${f(L.hero)}, full models beyond`;
-      b.addEventListener('click', () => { app.setSetting('heroScale', v); renderSettings(); });
+    for (const [v, t, tip] of QUALITY) {
+      const b = el('button', v === cur ? 'active' : '', t);
+      if (v === 'auto') b.title = tip;
+      else { const L = app.lodAt(v), f = (z) => z.toFixed(1); b.title = `${tip} (dots below ${f(L.dot)} px/m, full models from ${f(L.hero)})`; }
+      b.addEventListener('click', () => { app.setSetting('quality', v); renderSettings(); });
       seg.append(b);
     }
     r.append(lab, seg); menu.append(r);
@@ -640,6 +650,8 @@ export function buildUI(app, portraits) {
     r2.append(el('div', null, '<b>Random seed</b><span>Sandbox battles: the same setup, seed and orders replay the same battle.</span>'), inp);
     menu.append(r2);
   };
+  /** Auto has moved to another level: show it, if the menu is open. */
+  ui.refreshSettings = () => { if (!menu.hidden) renderSettings(); };
   ui.toggleSettings = (on = menu.hidden) => {
     if (!on) { menu.hidden = true; btnSettings.classList.remove('open'); return; }
     renderSettings();

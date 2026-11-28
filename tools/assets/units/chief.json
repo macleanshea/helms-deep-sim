@@ -1,0 +1,80 @@
+{
+  "height": 2.35,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "idle": 89,
+    "attack": 97,
+    "die": 8,
+    "climb": 438
+  },
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "sword",
+      "length": 1
+    },
+    {
+      "bone": "LeftForeArm",
+      "kind": "shield",
+      "width": 0.36,
+      "height": 0.56
+    }
+  ],
+  "rig": "assets-src/chief/rigged.glb",
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/chief/idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/chief/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/chief/run.glb",
+      "loop": true
+    },
+    {
+      "name": "attack",
+      "file": "assets-src/chief/attack.glb",
+      "loop": false
+    },
+    {
+      "name": "die",
+      "file": "assets-src/chief/die.glb",
+      "loop": false
+    },
+    {
+      "name": "climb",
+      "file": "assets-src/chief/climb.glb",
+      "loop": true,
+      "gait": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/chief.jpg",
+    "prompt": "tools/assets/concepts/chief.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b98-77d9-ba3e-cdf6bb3701eb",
+      "remesh": "01a21b49-ec40-770d-be78-626ba50e84c2",
+      "rigging": "01a21b4b-80d9-7302-92bd-1c6a1b27e840",
+      "animations": {
+        "idle": "01a21b4c-194b-73cd-999b-5fb0016e60c7",
+        "attack": "01a21b4c-1d7b-720f-9f05-adc7c369e70a",
+        "die": "01a21b4c-21ff-7719-879f-87e09a09465e",
+        "climb": "01a21b4c-267e-7708-ade9-142d3391e143"
+      }
+    }
+  }
+}

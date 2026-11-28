@@ -1,0 +1,73 @@
+{
+  "height": 1.9,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "idle": 89,
+    "attack": 224,
+    "die": 8,
+    "climb": 438
+  },
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "crossbow"
+    }
+  ],
+  "rig": "assets-src/archer/rigged.glb",
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/archer/idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/archer/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/archer/run.glb",
+      "loop": true
+    },
+    {
+      "name": "attack",
+      "file": "assets-src/archer/attack.glb",
+      "loop": false
+    },
+    {
+      "name": "die",
+      "file": "assets-src/archer/die.glb",
+      "loop": false
+    },
+    {
+      "name": "climb",
+      "file": "assets-src/archer/climb.glb",
+      "loop": true,
+      "gait": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/archer.jpg",
+    "prompt": "tools/assets/concepts/archer.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b24-77c5-ba1a-5b73201bfca5",
+      "remesh": "01a21b4a-385d-7094-a8af-23eecd46d93d",
+      "rigging": "01a21b4c-1b10-71e7-ad89-13f99fb58c1f",
+      "animations": {
+        "idle": "01a21b4c-807c-7457-8f2c-dafb4f02e212",
+        "attack": "01a21b4c-84ad-7531-b7d3-7553a3fda44c",
+        "die": "01a21b4c-87ed-77b8-8b2e-4cfa0d5b368f",
+        "climb": "01a21b4c-8b6e-7312-a891-2c941e497b04"
+      }
+    }
+  }
+}

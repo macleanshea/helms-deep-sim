@@ -1,0 +1,172 @@
+{
+  "height": 1.8,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "walkfire": 234,
+    "kneel": 165,
+    "prone": 168,
+    "charge": 511,
+    "die": 183
+  },
+  "rig": "assets-src/rifle/rigged.glb",
+  "clips": [
+    {
+      "name": "walk",
+      "file": "assets-src/rifle/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/rifle/run.glb",
+      "loop": true
+    },
+    {
+      "name": "walkfire",
+      "file": "assets-src/rifle/walkfire.glb",
+      "loop": true
+    },
+    {
+      "name": "kneel",
+      "file": "assets-src/rifle/kneel.glb",
+      "loop": false
+    },
+    {
+      "name": "prone",
+      "file": "assets-src/rifle/prone.glb",
+      "loop": false
+    },
+    {
+      "name": "charge",
+      "file": "assets-src/rifle/charge.glb",
+      "loop": true
+    },
+    {
+      "name": "die",
+      "file": "assets-src/rifle/die.glb",
+      "loop": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/rifle.jpg",
+    "prompt": "tools/assets/concepts/rifle.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b6c-891f-70b6-98ea-dcff07315cbe",
+      "remesh": "01a21b6d-8c21-73d2-af9f-03720866d453",
+      "rigging": "01a21b6e-d11f-74dc-90c0-66641875b827",
+      "animations": {
+        "idle": "01a21b6f-3502-702e-806e-9122d9f79927",
+        "sideshot": "01a21b6f-387f-7276-bfa2-40cc32d09e73",
+        "walkfire": "01a21b6f-3c9b-7117-85d2-855f9bbc0c8e",
+        "kneel": "01a21b6f-4051-71e5-b43f-60c5d21fbcb3",
+        "prone": "01a21b6f-4446-75f7-b38c-caf9e1fb72d1",
+        "reload": "01a21b6f-47fa-73e0-989e-a8feb40c9c82",
+        "charge": "01a21b6f-4bb3-756b-a409-dd0a90fc2bee",
+        "die": "01a21b6f-4f8b-7299-baaa-62087c284133",
+        "die2": "01a21b6f-5309-7656-a82d-559a213cddcf",
+        "gunhold": "01a21b6f-569b-77f3-a8af-a1c907c5a3ba",
+        "kneelstand": "01a21b6f-5a6b-76e8-8612-a7a374aa6f80"
+      }
+    }
+  },
+  "loops": [
+    "idle",
+    "walk",
+    "run",
+    "charge",
+    "walkfire"
+  ],
+  "derive": [
+    {
+      "name": "aim",
+      "from": "walkfire",
+      "range": [
+        0.1328,
+        0.1328
+      ]
+    },
+    {
+      "name": "kneel",
+      "from": "kneel",
+      "range": [
+        0.2609,
+        0.2609
+      ]
+    },
+    {
+      "name": "prone",
+      "from": "prone",
+      "range": [
+        0.6322,
+        0.6322
+      ]
+    },
+    {
+      "name": "walk",
+      "from": "walkfire",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "run",
+      "from": "charge",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "drop": [
+    "walkfire",
+    "charge"
+  ],
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "rifle",
+      "align": {
+        "clip": "aim",
+        "at": 0
+      }
+    }
+  ],
+  "swatches": {
+    "iron": [
+      40,
+      42,
+      44
+    ],
+    "wood": [
+      70,
+      72,
+      60
+    ],
+    "leather": [
+      50,
+      48,
+      42
+    ],
+    "paint": [
+      80,
+      86,
+      60
+    ]
+  },
+  "tried": {
+    "note": "clips bought and looked over when choosing the set, not used (Meshy action ids)",
+    "idle": 0,
+    "sideshot": 104,
+    "reload": 170,
+    "die2": 184,
+    "gunhold": 95,
+    "kneelstand": 365
+  }
+}

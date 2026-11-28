@@ -1,0 +1,55 @@
+{
+  "unit": "jet",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/jet.jpg",
+    "prompt": "tools/assets/concepts/jet.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f35-f703-7413-892d-c7b49ac2f031",
+      "remesh": "01a21f36-f197-7115-a969-3a605430100a"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 50958
+    },
+    "nrm": {
+      "offset": 203832,
+      "length": 50958
+    },
+    "uv": {
+      "offset": 407664,
+      "length": 33972
+    },
+    "joints": {
+      "offset": 543552,
+      "length": 67944
+    },
+    "weights": {
+      "offset": 611496,
+      "length": 67944
+    },
+    "index": {
+      "offset": 883272,
+      "length": 29793
+    },
+    "ibm": {
+      "offset": 1002444,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

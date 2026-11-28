@@ -1,0 +1,157 @@
+{
+  "height": 1.86,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "walkfire": 234,
+    "kneel": 165,
+    "prone": 168,
+    "charge": 511,
+    "die": 183
+  },
+  "rig": "assets-src/mg/rigged.glb",
+  "clips": [
+    {
+      "name": "walk",
+      "file": "assets-src/mg/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/mg/run.glb",
+      "loop": true
+    },
+    {
+      "name": "walkfire",
+      "file": "assets-src/mg/walkfire.glb",
+      "loop": true
+    },
+    {
+      "name": "kneel",
+      "file": "assets-src/mg/kneel.glb",
+      "loop": false
+    },
+    {
+      "name": "prone",
+      "file": "assets-src/mg/prone.glb",
+      "loop": false
+    },
+    {
+      "name": "charge",
+      "file": "assets-src/mg/charge.glb",
+      "loop": true
+    },
+    {
+      "name": "die",
+      "file": "assets-src/mg/die.glb",
+      "loop": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/mg.jpg",
+    "prompt": "tools/assets/concepts/mg.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b71-45ba-7497-b285-8fd0a312d6c5",
+      "remesh": "01a21b72-9ae0-7161-8f8b-996e404857da",
+      "rigging": "01a21b73-defc-72b5-8d2e-e4bb843f84bf",
+      "animations": {
+        "walkfire": "01a21b79-dfbd-7676-b2c4-d1df38e5aa29",
+        "kneel": "01a21b79-e420-74d0-9b38-44b6702b177e",
+        "prone": "01a21b79-e872-75a1-9d82-9aa554d27786",
+        "charge": "01a21b79-ec60-774c-9f8c-da6c83daca49",
+        "die": "01a21b79-f08a-775b-b5d2-03531670dc53"
+      }
+    }
+  },
+  "loops": [
+    "idle",
+    "walk",
+    "run",
+    "charge",
+    "walkfire"
+  ],
+  "derive": [
+    {
+      "name": "aim",
+      "from": "walkfire",
+      "range": [
+        0.1328,
+        0.1328
+      ]
+    },
+    {
+      "name": "kneel",
+      "from": "kneel",
+      "range": [
+        0.2609,
+        0.2609
+      ]
+    },
+    {
+      "name": "prone",
+      "from": "prone",
+      "range": [
+        0.6322,
+        0.6322
+      ]
+    },
+    {
+      "name": "walk",
+      "from": "walkfire",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "run",
+      "from": "charge",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "drop": [
+    "walkfire",
+    "charge"
+  ],
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "mg",
+      "align": {
+        "clip": "aim",
+        "at": 0
+      }
+    }
+  ],
+  "swatches": {
+    "iron": [
+      40,
+      42,
+      44
+    ],
+    "wood": [
+      70,
+      72,
+      60
+    ],
+    "leather": [
+      50,
+      48,
+      42
+    ],
+    "paint": [
+      80,
+      86,
+      60
+    ]
+  }
+}

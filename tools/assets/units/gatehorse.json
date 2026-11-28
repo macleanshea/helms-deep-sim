@@ -1,0 +1,25 @@
+{
+  "height": 10,
+  "texture": 1024,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "tools/assets/concepts/ref-stone.png",
+  "prop": {
+    "centre": "box"
+  },
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gatehorse/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gatehorse.jpg",
+    "prompt": "tools/assets/concepts/gatehorse.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f70-8f77-708a-92c7-b870a19f24ce",
+      "remesh": "01a21f72-2aed-7058-b3b1-a5374c6b77b1"
+    }
+  }
+}

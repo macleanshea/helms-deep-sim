@@ -13,10 +13,12 @@
 import { CELL, GW, GH, DEF, ORC, T, OB, UNITS, U, C } from '../config.js';
 import { KEEP } from '../map.js';
 import { S_WAIT, S_DONE } from './sim.js';
+import { LAYOUT } from '../layout.js';
 
 const HOLD = 1, BACK = 2;        // company orders
-const RES_X = 330;               // where the reserve waits (m from the west edge): beyond every gun but the howitzers
-const RALLY_X = 430;             // where a force that has pulled back regroups
+const AP = LAYOUT.approach;
+const RES_X = AP.reserve;         // where the reserve waits (m from the west edge): beyond every gun but the howitzers
+const RALLY_X = AP.rally;         // where a force that has pulled back regroups
 const ALLIN = 240;               // the final effort begins this long before dawn (s)
 const NATURAL = [2, 1, 0];       // the sector each lane faces: low y is the cliff end
 const OBSERVE = 450;             // how far off the horde can count heads on a wall (m)
@@ -56,7 +58,7 @@ export const warlordMethods = {
   _wlAdd(gid, g) {
     const wl = this.wl, wave = g.phase || 0;
     const reserve = g.type === 'warg';
-    const lane = g.y < 344 ? 0 : g.y < 616 ? 1 : 2;
+    const lane = g.y < AP.split[0] ? 0 : g.y < AP.split[1] ? 1 : 2;
     const key = wave * 8 + (reserve ? 3 : lane);
     wl.gdef[gid] = { type: g.type, x: this.gCx[gid] || g.x, y: g.y, delay: g.delay || 0 };
     let f = wl.byKey.get(key);
@@ -196,7 +198,7 @@ export const warlordMethods = {
    * Returns a new list of formations; the head-count is unchanged.
    */
   _wlEscorts(groups) {
-    const lane = (g) => (g.y < 344 ? 0 : g.y < 616 ? 1 : 2);
+    const lane = (g) => (g.y < AP.split[0] ? 0 : g.y < AP.split[1] ? 1 : 2);
     const out = groups.map((g) => ({ ...g }));
     for (let l = 0; l < 3; l++) {
       let trollPts = 0; // (only the towers are a troll's work: rams and catapults are crewed by Uruk-hai)
@@ -289,7 +291,7 @@ export const warlordMethods = {
         for (let g = 0; g < this.ng; g++) if (this.gTeam[g] === ORC) this.gOrder[g] = 0;
         for (const f of wl.forces) f.state = 0;
         for (let i = 0; i < this.n; i++) if (this.alive[i] && this.team[i] === ORC && this.state[i] === S_WAIT) this.aux[i] = Math.min(this.aux[i], this.time + (i % 7));
-        this._alert(null, 0, dawn > 0 ? 'Dawn is near — the whole host comes on' : 'The host throws in everything it has left', 'bad', 40, 480, true, true);
+        this._alert(null, 0, dawn > 0 ? 'Dawn is near — the whole host attacks' : 'The host throws in everything', 'bad', AP.alertX, AP.centre, true, true);
       }
     }
 
@@ -299,7 +301,7 @@ export const warlordMethods = {
         wl.resOut = 1;
         let any = false;
         for (const f of wl.forces) if (f.reserve) for (const gid of f.groups) { this.gOrder[gid] = 0; this.gField[gid] = 0; if (this.gAlive[gid]) any = true; }
-        if (any) this._alert(null, 0, 'The way is open — the warg riders are loosed', 'bad', RES_X, 480, true);
+        if (any) this._alert(null, 0, 'Warg riders loosed', 'bad', RES_X, AP.centre, true);
       } else if (wl.resOut !== 1) {
         const hunt = wl.exposed >= 6;
         if (hunt) wl.huntT = this.time;
@@ -307,7 +309,7 @@ export const warlordMethods = {
           wl.resOut = 2;
           let any = false;
           for (const f of wl.forces) if (f.reserve) for (const gid of f.groups) { this.gOrder[gid] = 0; this.gField[gid] = F_HUNT + 1; if (this.gAlive[gid]) any = true; }
-          if (any) this._alert('wargHunt', 60, 'Warg riders are riding down your troops outside the walls', 'bad', wl.exX, wl.exY, true);
+          if (any) this._alert('wargHunt', 60, 'Wargs hunting troops outside the walls', 'bad', wl.exX, wl.exY, true);
         } else if (wl.resOut === 2 && this.time - wl.huntT > 12) {
           wl.resOut = 0;
           for (const f of wl.forces) if (f.reserve) for (const gid of f.groups) { this.gOrder[gid] = HOLD; this.gHoldX[gid] = RES_X; this.gField[gid] = 0; }
@@ -315,7 +317,7 @@ export const warlordMethods = {
         if (!wl.notedRes && this.time > 25) {
           wl.notedRes = true;
           const f = wl.forces.find((q) => q.reserve && q.n > 0);
-          if (f) this._alert(null, 0, 'Warg riders are holding back out of range — they are waiting for a breach', 'warn', f.cx || RES_X, f.cy || 480);
+          if (f) this._alert(null, 0, 'Wargs holding back for a breach', 'warn', f.cx || RES_X, f.cy || AP.centre);
         }
       }
     }
@@ -329,7 +331,7 @@ export const warlordMethods = {
         for (const gid of f.groups) this._wlField(gid, f);
       }
       wl.swungT = this.time;
-      if (any) { this._wlMain(wl.footSec); this._alert(null, 0, `The horde swings toward its foothold on ${this.sectors[wl.footSec].name}`, 'bad', this.sectors[wl.footSec].x, this.sectors[wl.footSec].y, true); }
+      if (any) { this._wlMain(wl.footSec); this._alert(null, 0, `Horde swings to its foothold — ${this.sectors[wl.footSec].short}`, 'bad', this.sectors[wl.footSec].x, this.sectors[wl.footSec].y, true); }
     }
 
     // --- pull back a force that is spent before it has closed; send it in again with the next
@@ -382,7 +384,7 @@ export const warlordMethods = {
           const gid = this.grp[best];
           hi.groups = hi.groups.filter((h) => h !== gid);
           lo.groups.push(gid); this.gForce[gid] = lo.id; this._wlField(gid, lo);
-          if (lc === 0 && lo.chiefT >= 0) this._alert('capOver', 60, 'A captain takes over the leaderless companies', 'warn', lo.cx, lo.cy);
+          if (lc === 0 && lo.chiefT >= 0) this._alert('capOver', 60, 'A captain rallies the leaderless', 'warn', lo.cx, lo.cy);
           lo.chiefT = -1; lo.hadChief = true;
         }
       }
@@ -404,7 +406,7 @@ export const warlordMethods = {
       const x = this.x[i], y = this.y[i];
       if (this.team[i] === ORC) {
         if (this.el[i]) { const s = this.mseg[((y / CELL) | 0) * GW + ((x / CELL) | 0)]; if (s >= 0 && this.state[i] !== S_DONE) foot[this.segSector(s)]++; continue; }
-        if (x < 500) continue;
+        if (x < AP.far) continue;
         // (at the foot: within 80 m of that sector's wall, where its rifles would be firing if they could)
         for (let k = 0; k < 3; k++) { const dx = S[k].x - x, dy = S[k].y - y, d2 = dx * dx + dy * dy; if (d2 < obs2) { near[k]++; if (dx < 80 && dy < 64 && dy > -64) atFoot[k]++; } }
       } else {
@@ -414,7 +416,7 @@ export const warlordMethods = {
         if (this.el[i]) { if (d.cls === C.INF) { const k = this.sectorAt(x, y); if (k < 3) top[k] += 1; } continue; }
         // on the ground west of the wall and outside the Hornburg: in the open. Anything there is made for;
         // infantry there is also what the warg riders are loosed at.
-        if (x < 945) {
+        if (x < AP.front) {
           const dx = x - KEEP.cx, dy = y - KEEP.cy;
           if (dx * dx + dy * dy > kr2) {
             const c = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
@@ -437,7 +439,7 @@ export const warlordMethods = {
         const ks = this._keepSecs();
         for (const f of wl.forces) { if (f.reserve || f.sector < 0 || f.sector >= 3) continue; f.sector = ks[f.lane]; any = true; for (const gid of f.groups) this._wlField(gid, f); }
         const round = ks[0] === 4, at = round ? this._postFoot() : { x: this.segs[this.map.GATE].ox, y: this.segs[this.map.GATE].oy };
-        if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, round ? 'The Deeping Wall stands empty — the host is coming round through the Deep for the postern' : 'The Deeping Wall stands empty — the host turns on the Hornburg', 'bad', at.x, at.y, true);
+        if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, round ? 'Wall abandoned — the host comes round by the Deep' : 'Wall abandoned — the host turns on the Hornburg', 'bad', at.x, at.y, true);
       } else {
         // men back on the wall: those coming round for the postern turn on the wall in front of them again
         for (const f of wl.forces) { if (f.sector !== 4) continue; f.sector = NATURAL[f.lane]; for (const gid of f.groups) this._wlField(gid, f); }
@@ -472,7 +474,7 @@ export const warlordMethods = {
       if (on && (this.ob[((this.gCy[g] / CELL) | 0) * GW + ((this.gCx[g] / CELL) | 0)] & OB.WIRE)) on = false;
       if (on && !this.gShield[g]) {
         this.gShield[g] = 1;
-        if (this.time - wl.shieldNoteT > 90 && this.gAlive[g] >= 20) { wl.shieldNoteT = this.time; this._alert(null, 0, `Shield wall forming opposite ${this.sectors[Math.min(2, this.sectorAt(990, this.gCy[g]))].name}`, 'warn', this.gCx[g], this.gCy[g]); }
+        if (this.time - wl.shieldNoteT > 90 && this.gAlive[g] >= 20) { wl.shieldNoteT = this.time; this._alert(null, 0, `Shield wall forming — ${this.sectors[Math.min(2, this.sectorAt(AP.abreast, this.gCy[g]))].short}`, 'warn', this.gCx[g], this.gCy[g]); }
       } else if (!on && this.gShield[g]) { this.gShield[g] = 0; this.gShieldT[g] = this.time + 2; }
     }
   },
@@ -492,7 +494,7 @@ export const warlordMethods = {
       plan.main = ws;
       for (const q of wl.forces) if (q.wave === f.wave && !q.reserve && q.sector === old && !q.swung) { q.sector = ws; for (const gid of q.groups) this._wlField(gid, q); }
       this._wlMain(ws);
-      this._alert(null, 0, `The host wheels toward ${this.sectors[ws].name}`, 'bad', f.cx, f.cy, true);
+      this._alert(null, 0, `Host wheels — ${this.sectors[ws].short}`, 'bad', f.cx, f.cy, true);
     }
     // exploit silence: a sector the horde is close to, whose fire has died away, has run dry
     if (this.time - wl.swungT > 90) {
@@ -507,7 +509,7 @@ export const warlordMethods = {
           for (const gid of f.groups) this._wlField(gid, f);
         }
         wl.swungT = this.time; wl.peak[k] *= 0.5;
-        if (any) { this._wlMain(k); this._alert(null, 0, `The fire from ${this.sectors[k].name} is slackening — the horde surges toward it`, 'bad', this.sectors[k].x, this.sectors[k].y, true); }
+        if (any) { this._wlMain(k); this._alert(null, 0, `Fire slackening — horde surges at the ${this.sectors[k].short}`, 'bad', this.sectors[k].x, this.sectors[k].y, true); }
         break;
       }
     }
@@ -530,7 +532,7 @@ export const warlordMethods = {
         st.startOrc.tower -= c; st.startOrc.ladder = (st.startOrc.ladder || 0) + c * 5; st.startOrc.uruk = (st.startOrc.uruk || 0) + c * (tp - 5 * lp);
         w.groups.splice(k, 1, { ...g, type: 'ladder', count: c * 5, w: 60 }, { ...g, type: 'uruk', count: c * (tp - 5 * lp), x: g.x - 14, w: 60 });
       }
-      note = ' — ladders this time: the towers did not get through';
+      note = ' · ladders this time';
     }
     // once there is a way in, the cavalry of every later wave comes up with this one
     if (this.wl.open) {
@@ -543,7 +545,7 @@ export const warlordMethods = {
         }
         q.groups = keep;
       }
-      if (moved) note += ' — with every warg rider the host has left';
+      if (moved) note += ' · with the wargs';
     }
     return note;
   },
@@ -588,7 +590,7 @@ export const warlordMethods = {
         mates++; if (ci < i) rank++;
       }
       if (mates > 1) ty += (rank - (mates - 1) / 2) * 44;
-      this.tx[i] = tx; this.ty[i] = Math.max(20, Math.min(940, ty));
+      this.tx[i] = tx; this.ty[i] = Math.max(AP.captainY[0], Math.min(AP.captainY[1], ty));
     }
     const dx = this.tx[i] - x, dy = this.ty[i] - y, l = Math.sqrt(dx * dx + dy * dy);
     if (l < 6) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return true; }
@@ -660,7 +662,7 @@ export const warlordMethods = {
       if (t === T.CLIFF || this.orcBlock[c]) { cost[c] = this.orcBlock[c] && t === T.DOOR ? 310 : 0; continue; } // (as in _nav)
       let v = t === T.GROUND ? 10 : t === T.WATER ? 13 : t === T.STAIR ? 14 : t === T.WALL ? (elev[c] ? 12 : 22) : 10;
       const o = ob[c];
-      if (o) v += (o & OB.WIRE ? 30 : 0) + (o & OB.AV ? 6 : 0);
+      if (o) v += (o & OB.WIRE ? 70 : 0) + (o & OB.AV ? 6 : 0);
       cost[c] = v;
     }
     const src = this.srcBuf;

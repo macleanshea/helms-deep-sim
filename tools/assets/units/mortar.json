@@ -1,0 +1,75 @@
+{
+  "use": "rifle",
+  "height": 1.8,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "derive": [
+    {
+      "name": "aim",
+      "from": "kneel",
+      "range": [
+        0.2609,
+        0.2609
+      ]
+    },
+    {
+      "name": "walk",
+      "from": "walkfire",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "run",
+      "from": "charge",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "drop": [
+    "walkfire",
+    "charge",
+    "kneel",
+    "prone"
+  ],
+  "gear": [
+    {
+      "bone": "Hips",
+      "kind": "mortar",
+      "align": {
+        "clip": "aim",
+        "at": 0
+      }
+    }
+  ],
+  "swatches": {
+    "iron": [
+      40,
+      42,
+      44
+    ],
+    "wood": [
+      70,
+      72,
+      60
+    ],
+    "leather": [
+      50,
+      48,
+      42
+    ],
+    "paint": [
+      62,
+      68,
+      50
+    ]
+  }
+}

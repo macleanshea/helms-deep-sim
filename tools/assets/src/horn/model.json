@@ -1,0 +1,55 @@
+{
+  "unit": "horn",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/horn.jpg",
+    "prompt": "tools/assets/concepts/horn.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21ec8-05f8-7648-8120-c0d83cd63dfb",
+      "remesh": "01a21ec9-0130-77bd-aab1-bfc4fc83bb29"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 56022
+    },
+    "nrm": {
+      "offset": 224088,
+      "length": 56022
+    },
+    "uv": {
+      "offset": 448176,
+      "length": 37348
+    },
+    "joints": {
+      "offset": 597568,
+      "length": 74696
+    },
+    "weights": {
+      "offset": 672264,
+      "length": 74696
+    },
+    "index": {
+      "offset": 971048,
+      "length": 29760
+    },
+    "ibm": {
+      "offset": 1090088,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

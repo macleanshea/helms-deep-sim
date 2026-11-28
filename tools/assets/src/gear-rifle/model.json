@@ -1,0 +1,54 @@
+{
+  "unit": "gear-rifle",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-rifle.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f59-f031-77bb-b2a7-2fd371e1d9c7",
+      "remesh": "01a21f5a-57e7-7104-8be4-5bcae11adfe3"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 53217
+    },
+    "nrm": {
+      "offset": 212868,
+      "length": 53217
+    },
+    "uv": {
+      "offset": 425736,
+      "length": 35478
+    },
+    "joints": {
+      "offset": 567648,
+      "length": 70956
+    },
+    "weights": {
+      "offset": 638604,
+      "length": 70956
+    },
+    "index": {
+      "offset": 922428,
+      "length": 29304
+    },
+    "ibm": {
+      "offset": 1039644,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

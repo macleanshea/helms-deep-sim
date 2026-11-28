@@ -1,0 +1,26 @@
+{
+  "length": 30,
+  "texture": 1024,
+  "lods": [
+    10000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/tank.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "-x",
+    "file": "assets-src/cargo/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/cargo.jpg",
+    "prompt": "tools/assets/concepts/cargo.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f35-cf56-70f8-847b-d23fad4111bf",
+      "remesh": "01a21f36-ca10-7013-9b0b-507a0f0043ce"
+    }
+  }
+}

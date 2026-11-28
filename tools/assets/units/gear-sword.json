@@ -1,0 +1,23 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/uruk.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-sword/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-sword.jpg",
+    "prompt": "tools/assets/concepts/gear-sword.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-09b7-7098-8d05-8f632ada2e73",
+      "remesh": "01a21f57-b8a5-71ff-9c8b-142b67f7e511"
+    }
+  }
+}

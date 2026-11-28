@@ -1,0 +1,128 @@
+{
+  "unit": "mg",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/mg.jpg",
+    "prompt": "tools/assets/concepts/mg.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b71-45ba-7497-b285-8fd0a312d6c5",
+      "remesh": "01a21b72-9ae0-7161-8f8b-996e404857da",
+      "rigging": "01a21b73-defc-72b5-8d2e-e4bb843f84bf",
+      "animations": {
+        "walkfire": "01a21b79-dfbd-7676-b2c4-d1df38e5aa29",
+        "kneel": "01a21b79-e420-74d0-9b38-44b6702b177e",
+        "prone": "01a21b79-e872-75a1-9d82-9aa554d27786",
+        "charge": "01a21b79-ec60-774c-9f8c-da6c83daca49",
+        "die": "01a21b79-f08a-775b-b5d2-03531670dc53"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 57759
+    },
+    "nrm": {
+      "offset": 231036,
+      "length": 57759
+    },
+    "uv": {
+      "offset": 462072,
+      "length": 38506
+    },
+    "joints": {
+      "offset": 616096,
+      "length": 77012
+    },
+    "weights": {
+      "offset": 693108,
+      "length": 77012
+    },
+    "index": {
+      "offset": 1001156,
+      "length": 31119
+    },
+    "ibm": {
+      "offset": 1125632,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.68067,
+      "offset": 0
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.80493,
+      "offset": 47616
+    },
+    {
+      "name": "walkfire",
+      "loop": true,
+      "frames": 98,
+      "stride": 1.15,
+      "offset": 76800
+    },
+    {
+      "name": "kneel",
+      "loop": false,
+      "frames": 207,
+      "stride": 0,
+      "offset": 227328
+    },
+    {
+      "name": "prone",
+      "loop": false,
+      "frames": 193,
+      "stride": 0,
+      "offset": 545280
+    },
+    {
+      "name": "charge",
+      "loop": true,
+      "frames": 15,
+      "stride": 3.36892,
+      "offset": 841728
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 106,
+      "stride": 0,
+      "offset": 864768
+    }
+  ]
+}

@@ -28,7 +28,7 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 
 ## Playing
 
-The battlefield is shown in an isometric 3D view modelled on the film's set: the Hornburg on
+The battlefield is shown in a 3D view modelled on the film's set: the Hornburg on
 its rock against the southern cliff (on your right as you look up the valley), its inner ward
 climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
 its culvert.
@@ -62,8 +62,8 @@ guessed: see *Headless runs and balance* below.
   requisition points left unspent — and the best score and medal per scenario are kept in the
   browser.
 
-The **sandbox** lifts every limit. It starts from a blank map; pick a scenario in the top bar to
-autofill both armies, then change anything. Every option can be edited, and support has a
+The **sandbox** lifts every limit. It opens on the Hornburg Garrison with both armies laid out; change anything,
+pick another scenario in the top bar to autofill the map, or choose Blank Map to build from nothing. Every option can be edited, and support has a
 fixed number of calls per kind (four of each to start) instead of Command Points; the random
 seed for sandbox battles is in **Settings**. There are no waves and no relief at
 dawn by default: the whole horde is on the field from the start, and the defenders win when the
@@ -93,14 +93,16 @@ not yet committed. Shortly before dawn everything left comes on at once.
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
 
-**Camera.** Scroll to zoom (from the whole valley down to a single squad), right-drag or `WASD`
-to pan, middle-drag or `Q`/`E` to rotate, `Home` to reset the view. `G` jumps to the latest
+**Camera.** Scroll to zoom, from the whole valley seen from high above down to a single squad seen
+from just over its shoulders: the view swings lower as it closes in. Right-drag or `WASD` to pan,
+middle-drag or `Q`/`E` to turn, middle-drag up and down or `PgUp`/`PgDn` to tip the view, `Home` to
+reset it. `G` jumps to the latest
 alert; clicking an alert in the feed or a point on the minimap looks there too.
 
 **Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left (each card shows the unit's
 range), set how many per placement, then click the map to drop a block or drag to draw a line;
 the dashed ring shows the weapon's reach from that spot, and a dotted one how far a commander
-or captain steadies the troops around them. Dragging along a wall top mans the battlements. Under **Field
+or captain steadies the troops around them. Point at a wall top and the men lock onto it: a click mans the parapet there, a drag mans it along the wall's curve however far the pointer strays, and they face outward (hold Alt to place freely instead). The Hornburg's bastions, gatehouse platforms and its inner and upper courts can all be manned; a block or line stays on the level it was started on. Under **Field
 works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
 move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle
@@ -138,8 +140,11 @@ Orders can be given while paused. The battle waits while a dialog is open.
 **Rules worth knowing.**
 
 - Units walk up and down stairs and climb ladders and siege towers; nobody floats over the wall.
-- The culvert, water, rubble, wire and obstacles all slow movement. Heavy engines can't
-  cross anti-vehicle obstacles.
+- The culvert, water and rubble slow movement. Barbed wire is laid as an unbroken belt and stops
+  the horde until a way is cut: the men held up at it tear it down section by section (a troll or
+  an engine far faster), and shellfire blows it apart. Anti-vehicle obstacles stop rams,
+  catapults and siege towers until their crews, or a troll, drag them aside. Damaged sections
+  show what is left of them.
 - Troops pressed against the foot of the wall are hard to hit from the battlements above.
 - Ammunition is the garrison's real limit. Shots at close range hit far more often than at long
   range, so holding fire (`H`) stretches it; an amber pip marks a soldier who is out.
@@ -194,12 +199,14 @@ Orders can be given while paused. The battle waits while a dialog is open.
 - A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
   through the gap. Aircraft climb over the mountains and the keep rather than through them.
 
-Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
-hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it. **Settings** (the
-gear next to Help) sets how far out units are drawn in more detail: Close up, Medium, Far (the
-default) or Very far. Each step moves the whole ladder of detail levels further out (see
-Performance below); further out costs frame rate in big battles. The choice is kept in the
-browser.
+**Settings** (the gear next to Help) has one **Graphics quality** setting: Auto, Low, Medium, High or
+Ultra. Each level sets both how the picture is drawn (its resolution, anti-aliasing, glow and HDR, rain
+in the scene) and how far out soldiers are drawn in full detail. **Auto**, the default, starts where it
+last settled and moves by the frame rate: one level down when a third of recent frames run under about
+50 fps (frames the battle's own arithmetic made long are not counted, and a 30 Hz screen is not taken
+for a slow machine), one level back up after twenty clean seconds. A level that fails is not tried
+again for a minute, and for twice as long each time it fails again. The choice is kept in the browser.
+Add `?q=low`, `?q=medium` or `?q=high` to the URL to hold the rendering quality for a test.
 
 ### Performance
 
@@ -207,25 +214,39 @@ Press `F2` (or add `?perf` to the URL) for an overlay showing frame time, CPU ti
 simulation and the renderer, GPU time per stage, triangles and draw calls. `?bench` fast-forwards
 the largest scenario to its final assault, when the field is fullest, then steps through a fixed
 set of views and lists the same figures for each: the quickest way to see how much headroom a
-machine has. GPU timings need a browser that exposes
+machine has. Each view also counts the frames that ran over 20 ms and over 33 ms, and a **Copy
+results** button puts the table on the clipboard together with the graphics card, browser and
+resolution it was measured on. GPU timings need a browser that exposes
 `EXT_disjoint_timer_query_webgl2` (desktop Chrome and Edge do).
 
-Units are drawn at one of four levels of detail chosen from the zoom: dots, then boxes, then
+Each unit is drawn at one of four levels of detail chosen from its size on screen (so the far
+ranks of a host cost little while the near ones are drawn in full): dots, then boxes, then
 blocky stand-ins of about seventy triangles, and the full models (about a thousand triangles for
-a soldier, several thousand for a vehicle). The **Detailed models** setting places the ladder:
-full models take over at a zoom proportional to it, dots give way at its square root (so the
-whole valley stays cheap), and boxes give way to stand-ins midway between the two on a log
-scale. On high quality, in screen pixels per metre:
+a soldier, several thousand for a vehicle). The **Graphics quality** level places the ladder:
+full models take over at a zoom proportional to its detail step, dots give way at that step's square
+root (so the whole valley stays cheap), and boxes give way to stand-ins midway between the two on a
+log scale. In screen pixels per metre:
 
-| Setting | Dots below | Boxes below | Stand-ins below (full models from) |
+| Level | Dots below | Boxes below | Stand-ins below (full models from) |
 | --- | --- | --- | --- |
-| Close up | 1.4 | 2.8 | 5.5 |
-| Medium | 1.2 | 2.2 | 4.1 |
-| Far (default) | 1.1 | 1.9 | 3.3 |
-| Very far | 0.9 | 1.5 | 2.5 |
+| Low | 1.4 | 3.6 | 9.0 |
+| Medium | 1.2 | 2.5 | 5.3 |
+| High | 1.1 | 1.9 | 3.3 |
+| Ultra | 0.9 | 1.5 | 2.5 |
 
-Balanced and performance quality bring the full models (and so the boxes' upper limit) in
-closer.
+The scale is measured where each unit stands, so in a low view the nearest
+ranks are full models while the far end of the same host is boxes and dots; and if a view would
+still spend more than 2.5 million triangles on units, every level is pulled in closer until it
+does not.
+
+### Unit models from files
+
+The Uruk-hai are drawn from a model made outside the game (a painted concept, turned into a rigged,
+animated mesh by Meshy) rather than built in code: `assets/game/` holds its pack (four levels of
+detail and its clips baked to bone matrices) and a small texture, loaded after start-up. Everything
+else still uses the built-in models, and so does the whole game with `?assets=0` or if a pack fails
+to load. `tools/assets/` is the pipeline that makes the packs (`import.js` from the generator's
+files, `build.js` to the game's), and `docs/roadmap.md` describes it.
 
 ## How it works
 
@@ -236,10 +257,11 @@ closer.
   other through uniform grids, and the horde navigates with a congestion-aware flow field that
   is re-solved as walls are laddered or breached. It advances in fixed 0.1 s steps and the
   renderer interpolates between them.
-- `src/render/` — a WebGL2 renderer: an orthographic isometric camera, a height-field terrain
+- `src/render/` — a WebGL2 renderer: a perspective camera whose pitch follows the zoom, a height-field terrain
   mesh, a static shadow map, 3D particles and short-lived lights, a persistent ground decal
-  layer, and bloom post-processing. Everything is generated in code; there are no image or
-  model files.
+  layer, and bloom post-processing. The terrain, the fortress, the materials and most
+  units are generated in code; unit models that come from files are described under Unit models
+  from files above (`assets.js` loads them, and the skinned path in `renderer.js` draws them).
   - `materials.js` generates the surface textures on the GPU at start-up: sixteen tiling
     materials (dressed stone, flagstones, rock, grass, mud, timber, slate, iron, painted steel,
     cloth, camouflage, hide and so on), each with colour detail, a normal map, roughness and
@@ -306,6 +328,15 @@ breaks the postern and the door from the wall, and pours into the court from two
 battles it loses Medium two nights in three and wins Hard with only a twentieth of the garrison
 left. Easy is still won with nearly everyone alive (its horde is too small to force the doors in
 time), so `npm run checks` still reports this as OPEN.
+
+**Guarding a change.** Three quicker tools say whether a change did what it meant to and nothing
+else: `npm run maplint` stands every preset's armies on the map and solves the paths the battle
+needs (a ram to the gate, the horde to the wall, the garrison between court, walls and the Deep),
+then prints the map's measurements; `npm run golden` hashes the map, the fortress mesh and whole
+battles against `docs/baseline/golden.json`, so a refactor can prove it changed nothing (a change
+meant to alter the map or the rules re-records them with `-- --update`); and `npm run shots` takes
+fixed-camera screenshots with Playwright on the software rasteriser and can compare them with an
+earlier set (`-- --compare docs/baseline/shots`). `docs/roadmap.md` is the plan these guard.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a
 pass or fail, with the numbers, for each way the siege rules could look wrong. Engines left

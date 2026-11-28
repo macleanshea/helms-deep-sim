@@ -1,0 +1,134 @@
+{
+  "unit": "rifle",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/rifle.jpg",
+    "prompt": "tools/assets/concepts/rifle.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b6c-891f-70b6-98ea-dcff07315cbe",
+      "remesh": "01a21b6d-8c21-73d2-af9f-03720866d453",
+      "rigging": "01a21b6e-d11f-74dc-90c0-66641875b827",
+      "animations": {
+        "idle": "01a21b6f-3502-702e-806e-9122d9f79927",
+        "sideshot": "01a21b6f-387f-7276-bfa2-40cc32d09e73",
+        "walkfire": "01a21b6f-3c9b-7117-85d2-855f9bbc0c8e",
+        "kneel": "01a21b6f-4051-71e5-b43f-60c5d21fbcb3",
+        "prone": "01a21b6f-4446-75f7-b38c-caf9e1fb72d1",
+        "reload": "01a21b6f-47fa-73e0-989e-a8feb40c9c82",
+        "charge": "01a21b6f-4bb3-756b-a409-dd0a90fc2bee",
+        "die": "01a21b6f-4f8b-7299-baaa-62087c284133",
+        "die2": "01a21b6f-5309-7656-a82d-559a213cddcf",
+        "gunhold": "01a21b6f-569b-77f3-a8af-a1c907c5a3ba",
+        "kneelstand": "01a21b6f-5a6b-76e8-8612-a7a374aa6f80"
+      }
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "Hips",
+    "Spine02",
+    "Spine01",
+    "Spine",
+    "neck",
+    "Head",
+    "head_end",
+    "headfront",
+    "LeftShoulder",
+    "LeftArm",
+    "LeftForeArm",
+    "LeftHand",
+    "RightShoulder",
+    "RightArm",
+    "RightForeArm",
+    "RightHand",
+    "LeftUpLeg",
+    "LeftLeg",
+    "LeftFoot",
+    "LeftToeBase",
+    "RightUpLeg",
+    "RightLeg",
+    "RightFoot",
+    "RightToeBase"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 51051
+    },
+    "nrm": {
+      "offset": 204204,
+      "length": 51051
+    },
+    "uv": {
+      "offset": 408408,
+      "length": 34034
+    },
+    "joints": {
+      "offset": 544544,
+      "length": 68068
+    },
+    "weights": {
+      "offset": 612612,
+      "length": 68068
+    },
+    "index": {
+      "offset": 884884,
+      "length": 31026
+    },
+    "ibm": {
+      "offset": 1008988,
+      "length": 384
+    }
+  },
+  "clips": [
+    {
+      "name": "walk",
+      "loop": true,
+      "frames": 31,
+      "stride": 1.63722,
+      "offset": 0
+    },
+    {
+      "name": "run",
+      "loop": true,
+      "frames": 19,
+      "stride": 1.75841,
+      "offset": 47616
+    },
+    {
+      "name": "walkfire",
+      "loop": true,
+      "frames": 98,
+      "stride": 1.12066,
+      "offset": 76800
+    },
+    {
+      "name": "kneel",
+      "loop": false,
+      "frames": 207,
+      "stride": 0,
+      "offset": 227328
+    },
+    {
+      "name": "prone",
+      "loop": false,
+      "frames": 193,
+      "stride": 0,
+      "offset": 545280
+    },
+    {
+      "name": "charge",
+      "loop": true,
+      "frames": 15,
+      "stride": 3.28182,
+      "offset": 841728
+    },
+    {
+      "name": "die",
+      "loop": false,
+      "frames": 106,
+      "stride": 0,
+      "offset": 864768
+    }
+  ]
+}

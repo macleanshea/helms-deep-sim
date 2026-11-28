@@ -1,0 +1,55 @@
+{
+  "unit": "howitzer",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/howitzer.jpg",
+    "prompt": "tools/assets/concepts/howitzer.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c87d-7501-a351-3c55d9eea5ee",
+      "remesh": "01a21b91-14fb-71bd-86d1-0b18d8ba4b19"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 66573
+    },
+    "nrm": {
+      "offset": 266292,
+      "length": 66573
+    },
+    "uv": {
+      "offset": 532584,
+      "length": 44382
+    },
+    "joints": {
+      "offset": 710112,
+      "length": 88764
+    },
+    "weights": {
+      "offset": 798876,
+      "length": 88764
+    },
+    "index": {
+      "offset": 1153932,
+      "length": 30759
+    },
+    "ibm": {
+      "offset": 1276968,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

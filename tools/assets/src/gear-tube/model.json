@@ -1,0 +1,54 @@
+{
+  "unit": "gear-tube",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-tube.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b740-711f-8c58-9204c4cf9615",
+      "remesh": "01a21f5b-1f6b-722a-8c4a-6021d060a410"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 41988
+    },
+    "nrm": {
+      "offset": 167952,
+      "length": 41988
+    },
+    "uv": {
+      "offset": 335904,
+      "length": 27992
+    },
+    "joints": {
+      "offset": 447872,
+      "length": 55984
+    },
+    "weights": {
+      "offset": 503856,
+      "length": 55984
+    },
+    "index": {
+      "offset": 727792,
+      "length": 29544
+    },
+    "ibm": {
+      "offset": 845968,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

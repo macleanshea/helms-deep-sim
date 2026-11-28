@@ -1,0 +1,63 @@
+{
+  "unit": "transport",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/transport.jpg",
+    "prompt": "tools/assets/concepts/transport.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f36-7ba1-7484-a1aa-a5c4b4640561",
+      "remesh": "01a21f37-27a6-70e3-8768-bd7cdea9e8bf"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "turret"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 54360
+    },
+    "nrm": {
+      "offset": 217440,
+      "length": 54360
+    },
+    "uv": {
+      "offset": 434880,
+      "length": 36240
+    },
+    "joints": {
+      "offset": 579840,
+      "length": 72480
+    },
+    "weights": {
+      "offset": 652320,
+      "length": 72480
+    },
+    "index": {
+      "offset": 942240,
+      "length": 28908
+    },
+    "ibm": {
+      "offset": 1057872,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "turret",
+      "loop": true,
+      "frames": 180,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

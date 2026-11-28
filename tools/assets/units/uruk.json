@@ -1,0 +1,89 @@
+{
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/uruk-a-pose.jpg",
+    "tasks": {
+      "image-to-3d": "01a21b14-0eb7-7406-8325-9812c922013c",
+      "remesh": "01a21b18-9cf5-77df-b4b3-8f27df80a01f",
+      "rigging": "01a21b1b-397d-7483-a855-0066d6d5331b",
+      "animations": {
+        "idle": "01a21b1f-c37c-76c3-92a4-db8419e3a3c8",
+        "attack": "01a21b1f-c729-73c0-a829-a08b65537de6",
+        "die": "01a21b1f-cb0d-72a7-8329-18b7550ebae2",
+        "climb": "01a21b1f-ce9e-707c-bc65-4f966acc6e10",
+        "carry": "01a21b1f-d25d-7598-81a5-8118dade3c6d",
+        "push": "01a21b1f-d5f5-7116-b915-f010a1b6fa85",
+        "shield": "01a21b1f-d95b-74bd-93e0-82b368c9bfe7"
+      }
+    },
+    "prompt": "tools/assets/concepts/uruk.prompt.txt"
+  },
+  "rig": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-rigged.glb",
+  "height": 1.9,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-run.glb",
+      "loop": true
+    },
+    {
+      "name": "shield",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-shield.glb",
+      "loop": true
+    },
+    {
+      "name": "carry",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-carry.glb",
+      "loop": true
+    },
+    {
+      "name": "push",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-push.glb",
+      "loop": true
+    },
+    {
+      "name": "climb",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-climb.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "attack",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-attack.glb",
+      "loop": false
+    },
+    {
+      "name": "die",
+      "file": "assets-src/meshy_output/20261127_033715_uruk-bakeoff_01a21b14/uruk-die.glb",
+      "loop": false
+    }
+  ],
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "sword"
+    },
+    {
+      "bone": "LeftForeArm",
+      "kind": "shield"
+    }
+  ]
+}

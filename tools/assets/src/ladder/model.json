@@ -1,0 +1,61 @@
+{
+  "unit": "ladder",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/ladder.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f6a-e023-71f9-833d-d3657e9c42fc",
+      "remesh": "01a21f6b-85a3-7211-9647-bb1d638af1ad"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 48270
+    },
+    "nrm": {
+      "offset": 193080,
+      "length": 48270
+    },
+    "uv": {
+      "offset": 386160,
+      "length": 32180
+    },
+    "joints": {
+      "offset": 514880,
+      "length": 64360
+    },
+    "weights": {
+      "offset": 579240,
+      "length": 64360
+    },
+    "index": {
+      "offset": 836680,
+      "length": 36000
+    },
+    "ibm": {
+      "offset": 980680,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "up",
+      "loop": false,
+      "frames": 1,
+      "stride": 0,
+      "offset": 64
+    }
+  ]
+}

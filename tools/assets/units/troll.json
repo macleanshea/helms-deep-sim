@@ -1,0 +1,65 @@
+{
+  "height": 4.2,
+  "texture": 1024,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "idle": 89,
+    "attack": 128,
+    "die": 8
+  },
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "club"
+    }
+  ],
+  "rig": "assets-src/troll/rigged.glb",
+  "clips": [
+    {
+      "name": "idle",
+      "file": "assets-src/troll/idle.glb",
+      "loop": true,
+      "gait": false
+    },
+    {
+      "name": "walk",
+      "file": "assets-src/troll/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/troll/run.glb",
+      "loop": true
+    },
+    {
+      "name": "attack",
+      "file": "assets-src/troll/attack.glb",
+      "loop": false
+    },
+    {
+      "name": "die",
+      "file": "assets-src/troll/die.glb",
+      "loop": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/troll.jpg",
+    "prompt": "tools/assets/concepts/troll.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b48-9b25-704a-852a-4244727566d0",
+      "remesh": "01a21b49-eae1-74d6-9987-239df48eb33d",
+      "rigging": "01a21b4b-3009-722b-8c9e-3e1990b549d3",
+      "animations": {
+        "idle": "01a21b4b-bef6-71cb-88ec-0d816322b874",
+        "attack": "01a21b4b-c334-74fe-926a-0e94f3198f98",
+        "die": "01a21b4b-c73e-7575-800b-b2bc97fe2482"
+      }
+    }
+  }
+}

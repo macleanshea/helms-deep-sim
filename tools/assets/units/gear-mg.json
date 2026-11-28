@@ -1,0 +1,23 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/mg.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-mg/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-mg.jpg",
+    "prompt": "tools/assets/concepts/gear-mg.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f58-b0a4-775c-b05e-33ca55f24f87",
+      "remesh": "01a21f59-ad9a-779e-958a-d09ad923f614"
+    }
+  }
+}

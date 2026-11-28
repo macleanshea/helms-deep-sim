@@ -1,0 +1,27 @@
+{
+  "length": 13,
+  "texture": 512,
+  "lods": [
+    6000,
+    2500,
+    800,
+    200
+  ],
+  "rigid": {
+    "nose": "+x",
+    "lean": {
+      "carry": 0.113,
+      "angle": 75.3
+    },
+    "file": "assets-src/ladder/model.glb",
+    "repeat": 5
+  },
+  "source": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/ladder.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f6a-e023-71f9-833d-d3657e9c42fc",
+      "remesh": "01a21f6b-85a3-7211-9647-bb1d638af1ad"
+    }
+  }
+}

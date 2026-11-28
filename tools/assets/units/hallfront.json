@@ -1,0 +1,25 @@
+{
+  "height": 10,
+  "texture": 1024,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "tools/assets/concepts/ref-stone.png",
+  "prop": {
+    "centre": "box"
+  },
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/hallfront/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/hallfront.jpg",
+    "prompt": "tools/assets/concepts/hallfront.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f70-94d3-77e1-8610-a830f99e9c5e",
+      "remesh": "01a21f71-ddf0-7125-b3d4-d5fb4582ba65"
+    }
+  }
+}

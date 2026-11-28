@@ -1,8 +1,12 @@
 // Formation layout and preset orders of battle.
 
-import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS } from './config.js';
+import { WORLD_W, WORLD_H, T, UNITS, U, DEF, ORC, C, DEFAULT_OPTIONS, WAY_STEP } from './config.js';
 import { KEEP, N_WALL, WALL_HALF } from './map.js';
+import { LAYOUT } from './layout.js';
 import { mulberry } from './rng.js';
+
+// where things stand on this map: the horde's lanes and lines, and the garrison's posts (see src/layout.js)
+const AP = LAYOUT.approach, PO = LAYOUT.posts;
 
 let nextId = 1;
 export function makeGroup(type, count, x, y, ang = Math.PI / 2, w = 0, extra = {}) {
@@ -17,7 +21,8 @@ export function canPlace(map, def, x, y, onWall = null) {
   const wall = map.seg[c] >= 0;
   if (def.team === ORC) return !wall && t !== T.COURT;
   if (def.cls === C.OBST) return !wall && t !== T.COURT;
-  if (def.cls !== C.INF) return !wall;
+  // (nothing on wheels or tracks climbs the stairs to the inner courts; an ammunition cache is carried up and can stand there)
+  if (def.cls !== C.INF) return !wall && (!map.tier[c] || def.key === 'cache');
   return onWall === null ? true : wall === onWall;
 }
 
@@ -29,7 +34,7 @@ function walkable(map) {
   if (map._walkable) return map._walkable;
   const gw = WORLD_W / 4, gh = WORLD_H / 4, ok = new Uint8Array(gw * gh), q = new Int32Array(gw * gh);
   let h = 0, t = 0;
-  const start = map.cellOf(300, 480);
+  const start = map.cellOf(AP.open[0], AP.open[1]);
   ok[start] = 1; q[t++] = start;
   while (h < t) {
     const c = q[h++], cx = c % gw, cy = (c / gw) | 0;
@@ -37,11 +42,63 @@ function walkable(map) {
       const x = cx + dx, y = cy + dy;
       if ((!dx && !dy) || x < 0 || y < 0 || x >= gw || y >= gh) continue;
       const n = y * gw + x;
-      if (ok[n] || map.type[n] === T.CLIFF || map.seg[n] >= 0 || Math.abs(map.cz[n] - map.cz[c]) > 3.3) continue;
+      const dz = Math.abs(map.cz[n] - map.cz[c]);
+      if (ok[n] || map.type[n] === T.CLIFF || map.seg[n] >= 0 || dz > 3.3 || ((map.type[n] === T.ROAD) !== (map.type[c] === T.ROAD) && dz > WAY_STEP)) continue;
       ok[n] = 1; q[t++] = n;
     }
   }
   return (map._walkable = ok);
+}
+
+/**
+ * A point on the middle line of a wall walk: `wall` 0 is the Deeping Wall and `u` runs 0..1 along it; `wall` 1 is the
+ * Hornburg's ring and `u` is a bearing in degrees. Returns { x, y, nx, ny } with (nx, ny) pointing outward.
+ */
+export function wallPoint(map, wall, u) {
+  if (wall === 1) { const a = (u * Math.PI) / 180, nx = Math.cos(a), ny = Math.sin(a); return { x: KEEP.cx + KEEP.r * nx, y: KEEP.cy + KEEP.r * ny, nx, ny }; }
+  const p = map.wallAt(Math.max(0, Math.min(1, u)));
+  let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
+  return { x: p.x, y: p.y, nx, ny };
+}
+/** How long a stretch of wall walk is, in metres, between two values of `u` (see wallPoint). */
+export const wallRunLength = (map, wall, a, b) => (wall === 1 ? (Math.abs(b - a) * Math.PI / 180) * KEEP.r : Math.abs(b - a) * map.wallLen);
+
+/**
+ * Where the front rank stands, measured out from a wall walk's centre line at (x, y) along its outward normal: a pace
+ * inside the parapet, and where a bastion swells out from the Hornburg's wall there, a pace inside the bastion's own
+ * parapet. Men line the battlements as built, not the line the wall would take without its bastions.
+ */
+export function parapetAt(map, wall, x, y, nx, ny, half) {
+  let o = half - 1.0;
+  if (wall === 1) for (const b of map.bastions) {
+    // the far crossing of the line (x, y) + o n with the bastion's circle
+    const dx = x - b.x, dy = y - b.y, r = b.r - 1.1, B = dx * nx + dy * ny, C = dx * dx + dy * dy - r * r, D = B * B - C;
+    if (D > 0) { const far = -B + Math.sqrt(D); if (far > o) o = far; }
+  }
+  return o;
+}
+
+/**
+ * Places along a stretch of wall walk (`g.run = { wall, a, b }`), following its curve: the front rank at the parapet,
+ * spread over the whole stretch, then the ranks behind it as far as the walk is wide.
+ */
+function runPositions(map, def, g) {
+  const { wall, a, b } = g.run, half = wall === 1 ? KEEP.half : WALL_HALF, len = wallRunLength(map, wall, a, b), out = [];
+  const st = Math.min(def.spacing * (g.spread || 1), 1.5), cap = Math.max(1, Math.floor(len / st) + 1);
+  let left = g.count;
+  for (let rank = 0; rank < 14 && left > 0; rank++) {
+    const n = Math.min(left, cap);
+    let any = false;
+    for (let k = 0; k < n; k++) {
+      // (a rank that is not full is spread over the whole stretch, not bunched at one end)
+      const f = n > 1 ? k / (n - 1) : 0.5, p = wallPoint(map, wall, a + (b - a) * f), o = parapetAt(map, wall, p.x, p.y, p.nx, p.ny, half) - rank * 1.6;
+      if (o <= -half + 0.8) continue;
+      const x = p.x + p.nx * o, y = p.y + p.ny * o;
+      if (canPlace(map, def, x, y, true)) { out.push(x, y); left--; any = true; }
+    }
+    if (!any) break;
+  }
+  return out;
 }
 
 const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Math.max(1, Math.ceil(Math.sqrt(g.count * 1.8))));
@@ -50,11 +107,41 @@ const colsFor = (g, sp) => (g.w > 0 ? Math.max(1, Math.floor(g.w / sp) + 1) : Ma
  * Positions for every unit of a group: rows of `spacing` laid along the group's line.
  * `strict`: attackers are not stood on ground they could never walk off.
  */
+/**
+ * A belt of wire, or a row of anti-vehicle obstacles: one piece in every 4 m cell the drawn line passes through, and where
+ * the line steps across a corner between two cells, one in a cell beside the corner too. Nothing on foot or on wheels
+ * can slip between two pieces. (With a width it fills the whole width; without, `count` pieces in a row.)
+ */
+function obstacleRow(map, def, g) {
+  const ux = Math.cos(g.ang), uy = Math.sin(g.ang), L = g.w > 0 ? g.w : Math.max(0, (g.count - 1) * 4);
+  const ax = g.x - (ux * L) / 2, ay = g.y - (uy * L) / 2, out = [], seen = new Set();
+  const off = (gx, gy) => Math.abs((gx * 4 + 2 - ax) * uy - (gy * 4 + 2 - ay) * ux);
+  const put = (gx, gy) => {
+    const k = gy * 4096 + gx; if (seen.has(k) || out.length >= g.count * 2) return; seen.add(k);
+    // the piece lies on the drawn line where the line crosses its cell, or as near the line as its cell allows
+    const cx = gx * 4 + 2, cy = gy * 4 + 2, t = Math.max(0, Math.min(L, (cx - ax) * ux + (cy - ay) * uy));
+    const x = Math.max(cx - 1.7, Math.min(cx + 1.7, ax + ux * t)), y = Math.max(cy - 1.7, Math.min(cy + 1.7, ay + uy * t));
+    if (canPlace(map, def, x, y, false)) out.push(x, y);
+  };
+  let pgx = null, pgy = null;
+  for (let t = 0; t <= L + 1e-6; t += 0.5) {
+    const gx = Math.floor((ax + ux * t) / 4), gy = Math.floor((ay + uy * t) / 4);
+    if (pgx !== null && gx !== pgx && gy !== pgy) { if (off(pgx, gy) < off(gx, pgy)) put(pgx, gy); else put(gx, pgy); }
+    put(gx, gy); pgx = gx; pgy = gy;
+  }
+  return out;
+}
+
 export function groupPositions(map, g, strict = false) {
   const def = UNITS[U[g.type]];
+  if (def.cls === C.OBST && (def.ob === 'wire' || def.ob === 'av')) return obstacleRow(map, def, g);
+  if (g.run && def.team === DEF && def.cls === C.INF) return runPositions(map, def, g);
   const sp = def.spacing * (g.spread || 1);
   const out = [];
-  const onWall = def.team === DEF && def.cls === C.INF ? map.seg[map.cellOf(g.x, g.y)] >= 0 : null;
+  // (`g.lv`, when the player has put the group down by hand: the level that was pointed at, { wall, tier })
+  const onWall = def.team === DEF && def.cls === C.INF ? (g.lv ? !!g.lv.wall : map.seg[map.cellOf(g.x, g.y)] >= 0) : null;
+  // a group stands in one court of the Hornburg: the one it was put in (it does not spill up or down a tier)
+  const tier = g.lv ? g.lv.tier : map.tier[map.cellOf(g.x, g.y)], inTier = (x, y) => def.team !== DEF || map.seg[map.cellOf(x, y)] >= 0 || map.tier[map.cellOf(x, y)] === tier;
   const ux = Math.cos(g.ang), uy = Math.sin(g.ang);
   const px = -uy, py = ux;
   const cols = colsFor(g, sp);
@@ -65,12 +152,17 @@ export function groupPositions(map, g, strict = false) {
   if (g.parapet && onWall) {
     // along a wall walk, front to back: the first rank kneels at the parapet, the second stands behind it
     const { s, half } = g.parapet, st = Math.min(sp, 1.5), nc = g.w > 0 ? Math.max(1, Math.floor(g.w / st) + 1) : g.count;
-    for (let o = half - 1.0; o > -half + 0.8 && out.length < g.count * 2; o -= 1.6) {
+    const ring = Math.abs(Math.hypot(g.x - KEEP.cx, g.y - KEEP.cy) - KEEP.r) < KEEP.half + 1 ? 1 : 0;
+    for (let rk = 0; rk < 14 && out.length < g.count * 2; rk++) {
+      let any = false;
       for (let c = 0; c < nc && out.length < g.count * 2; c++) {
-        const a = (c - (nc - 1) / 2) * st + (r() - 0.5) * 0.2;
-        const x = g.x + ux * a + px * o * s, y = g.y + uy * a + py * o * s;
-        if (canPlace(map, def, x, y, true)) out.push(x, y);
+        const a = (c - (nc - 1) / 2) * st + (r() - 0.5) * 0.2, bx = g.x + ux * a, by = g.y + uy * a;
+        const o = parapetAt(map, ring, bx, by, px * s, py * s, half) - rk * 1.6;
+        if (o <= -half + 0.8) continue;
+        const x = bx + px * o * s, y = by + py * o * s;
+        if (canPlace(map, def, x, y, true)) { out.push(x, y); any = true; }
       }
+      if (!any) break;
     }
     if (out.length >= g.count * 2) return out;
   }
@@ -80,7 +172,7 @@ export function groupPositions(map, g, strict = false) {
       const a = (c - (cols - 1) / 2) * sp;
       const x = g.x + ux * a + px * off * sp + (r() - 0.5) * sp * jit;
       const y = g.y + uy * a + py * off * sp + (r() - 0.5) * sp * jit;
-      if (canPlace(map, def, x, y, onWall) && !(open && !open[map.cellOf(x, y)])) out.push(x, y);
+      if (canPlace(map, def, x, y, onWall) && inTier(x, y) && !(open && !open[map.cellOf(x, y)])) out.push(x, y);
     }
   }
   return out;
@@ -159,8 +251,8 @@ export function horde(total, mix = {}) {
   const kinds = mix.kinds && mix.kinds.length === W ? mix.kinds : waveKinds(W);
   const g = [];
   const V = Math.PI / 2;
-  const lanes = [140, 276, 412, 548, 684, 820];
-  const Wd = 116;
+  const lanes = AP.lanes;
+  const Wd = AP.laneWidth;
   const n = {
     uruk: Math.round(total * m.uruk), archer: Math.round(total * m.archer), berserker: Math.round(total * m.berserker), warg: Math.round(total * m.warg),
     ladder: mix.ladders ?? Math.max(4, Math.round(total / 170)), troll: mix.trolls ?? Math.round(total / 420), ram: mix.rams ?? Math.max(1, Math.round(total / 3000)),
@@ -216,13 +308,13 @@ export function horde(total, mix = {}) {
       const order = [2, 3, 1, 4, 0, 5];
       next(Math.max(column('catapult', mid, 60), singles('chief', (k) => [lanes[order[k % 6]] + ((k / 6) | 0) * 38 - 19 * ((k / 6) | 0 ? 1 : 0), 6 + (k % 3) * 16])));
       next(Math.max(column('archer'), 0));
-      next(Math.max(column('berserker'), singles('sapper', (k) => [443 + (k & 1 ? -1 : 1) * 46 * Math.ceil(k / 2), 6 + (k % 2) * 12])));
+      next(Math.max(column('berserker'), singles('sapper', (k) => [AP.sapper + (k & 1 ? -1 : 1) * 46 * Math.ceil(k / 2), 6 + (k % 2) * 12])));
       next(column('warg', [lanes[0], lanes[5]], 90));
     }
     if (w === 0) {
       // the vanguard stands on the field with its rear rank just inside the valley mouth
       // (drawn up by task force, the front rank stands back out of reach of the mortars in the Deep)
-      const shift = Math.min(440, Math.max(300, 24 - x));
+      const shift = Math.min(AP.vanguard[1], Math.max(AP.vanguard[0], 24 - x));
       for (let k = first; k < g.length; k++) g[k].x += shift;
     }
   }
@@ -249,7 +341,9 @@ export function waveSummary(groups, crews = false) {
 /** A belt of field works in front of the Deeping Wall. */
 function fieldWorks(map, scale = 1) {
   const g = [];
-  g.push(...alongWall(map, 'wire', Math.round(110 * scale), 0.12, 0.9, 62));
+  // (a belt of wire fills whatever stretch it is given, so a thinner garrison's belt is a shorter one: the middle of the wall, its ends open)
+  const span = Math.min(0.39, 0.39 * scale);
+  g.push(...alongWall(map, 'wire', Math.round(110 * scale), 0.51 - span, 0.51 + span, 62));
   g.push(...alongWall(map, 'mine', Math.round(90 * scale), 0.25, 0.8, 92));
   g.push(...alongWall(map, 'claymore', Math.round(10 * scale), 0.38, 0.62, 30));
   g.push(...alongWall(map, 'hedgehog', Math.round(34 * scale), 0.62, 0.9, 40));
@@ -274,16 +368,16 @@ function garrison(map, scale = 1) {
   g.push(...alongRing('at', s(8), 165, 230));
   g.push(...alongRing('grenadier', s(14), 170, 260));
   g.push(...alongRing('marksman', s(8), 160, 240));
-  g.push(makeGroup('cmd', 1, KEEP.cx - KEEP.r + 1, KEEP.cy - 6));
+  g.push(makeGroup('cmd', 1, PO.captain[0], PO.captain[1]));
   // courtyard
-  g.push(makeGroup('mortar', s(8), KEEP.cx - 24, KEEP.cy - 40, 0, 40));
-  g.push(makeGroup('cache', 1, KEEP.cx - 44, KEEP.cy - 22));
-  g.push(makeGroup('rifle', s(60), KEEP.cx - 46, KEEP.cy - 10, V, 40));
+  g.push(makeGroup('mortar', s(8), PO.courtMortars[0], PO.courtMortars[1], 0, 40));
+  g.push(makeGroup('cache', 1, PO.courtCache[0], PO.courtCache[1]));
+  g.push(makeGroup('rifle', s(60), PO.courtRifles[0], PO.courtRifles[1], V, 40));
   // the Deep, behind the wall
-  g.push(makeGroup('mortar', s(16), 1090, 480, V, 110));
-  g.push(makeGroup('howitzer', s(4), 1220, 490, V, 70));
+  g.push(makeGroup('mortar', s(16), PO.deepMortars[0], PO.deepMortars[1], V, 110));
+  g.push(makeGroup('howitzer', s(4), PO.deepHowitzers[0], PO.deepHowitzers[1], V, 70));
   for (const t of [0.22, 0.5, 0.78]) { const p = map.wallAt(t); g.push(makeGroup('cache', 1, p.x + 26, p.y)); }
-  g.push(makeGroup('rifle', s(90), 1030, 460, V, 130));
+  g.push(makeGroup('rifle', s(90), PO.deepRifles[0], PO.deepRifles[1], V, 130));
   return g;
 }
 
@@ -302,10 +396,10 @@ export const PRESETS = [
       groups: [
         ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
         ...alongRing('rifle', 10, 175, 215), ...alongRing('at', 3, 175, 205),
-        makeGroup('mortar', 3, 1070, 460, Math.PI / 2, 16), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('mortar', 3, PO.mortarsEasy[0], PO.mortarsEasy[1], Math.PI / 2, 16), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
         makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
         // a platoon kept below the wall: the enemy cannot count it, and it can be sent up wherever the ladders land
-        makeGroup('rifle', 16, 1030, 450, Math.PI / 2, 30),
+        makeGroup('rifle', 16, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30),
         ...alongWall(map, 'wire', 44, 0.28, 0.72, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
         ...horde(3200, { waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
       ],
@@ -316,7 +410,7 @@ export const PRESETS = [
     key: 'garrison', name: 'The Hornburg Garrison', level: 'Medium',
     blurb: 'Five hundred behind wire and mines, against eighteen thousand Uruk-hai in four waves with towers, trolls and catapults.',
     build: (map, sb) => ({
-      groups: [...garrison(map, 0.6), makeGroup('tank', 1, 1080, 540, Math.PI / 2, 30), makeGroup('ifv', 2, 1100, 400, Math.PI / 2, 50), ...fieldWorks(map),
+      groups: [...garrison(map, 0.6), makeGroup('tank', 1, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 30), makeGroup('ifv', 2, PO.ifvDeep[0], PO.ifvDeep[1], Math.PI / 2, 50), ...fieldWorks(map),
         ...horde(18000, { waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
       options: { dawn: 1200, cpRate: 2 / 60 },
     }),
@@ -328,8 +422,8 @@ export const PRESETS = [
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
         ...alongRing('rifle', 60, 160, 260), ...alongRing('mg', 6, 170, 250), ...alongRing('at', 6, 170, 220),
-        makeGroup('mortar', 6, 1080, 490, Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
-        makeGroup('rifle', 20, KEEP.cx - 46, KEEP.cy - 12, Math.PI / 2, 24), makeGroup('rifle', 24, 1030, 450, Math.PI / 2, 40),
+        makeGroup('mortar', 6, PO.mortarsHard[0], PO.mortarsHard[1], Math.PI / 2, 50), makeGroup('cache', 1, map.wallAt(0.5).x + 26, map.wallAt(0.5).y),
+        makeGroup('rifle', 20, PO.courtPlatoon[0], PO.courtPlatoon[1], Math.PI / 2, 24), makeGroup('rifle', 24, PO.reserve[0], PO.reserve[1], Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(10000, { waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
       ],
@@ -343,9 +437,9 @@ export const PRESETS = [
     build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),
-        makeGroup('tank', 4, 850, 400, Math.PI / 2, 110), makeGroup('ifv', 6, 870, 270, Math.PI / 2, 90),
-        makeGroup('tank', 2, 1080, 540, Math.PI / 2, 30), makeGroup('howitzer', 4, 1270, 490, Math.PI / 2, 60),
-        makeGroup('mortar', 12, 1130, 440, Math.PI / 2, 90), makeGroup('cache', 1, 1060, 440),
+        makeGroup('tank', 4, PO.tanksForward[0], PO.tanksForward[1], Math.PI / 2, 110), makeGroup('ifv', 6, PO.ifvsForward[0], PO.ifvsForward[1], Math.PI / 2, 90),
+        makeGroup('tank', 2, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 30), makeGroup('howitzer', 4, PO.howitzersBench[0], PO.howitzersBench[1], Math.PI / 2, 60),
+        makeGroup('mortar', 12, PO.mortarsBench[0], PO.mortarsBench[1], Math.PI / 2, 90), makeGroup('cache', 1, PO.cacheBench[0], PO.cacheBench[1]),
         ...fieldWorks(map, 1.3), ...horde(30000, { waves: sb ? 1 : 6 }),
       ],
       options: { dawn: 1200, cpStart: 10, cpRate: 3 / 60 },
@@ -374,6 +468,8 @@ export function buildPreset(map, key, sandbox = false) {
   twoDeep = !p.hidden;
   const s = p.build(map, sandbox);
   twoDeep = false;
+  // (a belt of wire or a row of obstacles is as many pieces as the cells its line crosses: counted here, so it is paid for as laid)
+  for (const g of s.groups) { const d = UNITS[U[g.type]]; if (d.cls === C.OBST && (d.ob === 'wire' || d.ob === 'av') && g.w > 0) { g.count = 1e4; g.count = groupPositions(map, g).length / 2; } }
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
   if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);
   return { groups: s.groups, options, budget: forceCost(s.groups) };

@@ -1,0 +1,149 @@
+{
+  "units": {
+    "uruk": {
+      "pack": "uruk.b92d622a1a.bin",
+      "texture": "uruk.e80b78afb3.webp",
+      "bytes": 1127112
+    },
+    "archer": {
+      "pack": "archer.124aae48d9.bin",
+      "texture": "archer.aadee76364.webp",
+      "bytes": 681660
+    },
+    "berserker": {
+      "pack": "berserker.b86a37c9c3.bin",
+      "texture": "berserker.f1e1fb6506.webp",
+      "bytes": 550940
+    },
+    "chief": {
+      "pack": "chief.fe0ccf81dd.bin",
+      "texture": "chief.6117ccc1a3.webp",
+      "bytes": 602916
+    },
+    "sapper": {
+      "pack": "sapper.8ab583ffba.bin",
+      "texture": "sapper.87618b74d5.webp",
+      "bytes": 658604
+    },
+    "troll": {
+      "pack": "troll.643a631e28.bin",
+      "texture": "troll.0e622a862a.webp",
+      "bytes": 491424
+    },
+    "rifle": {
+      "pack": "rifle.1844bcb9be.bin",
+      "texture": "rifle.f2e24b2986.webp",
+      "bytes": 450852
+    },
+    "mg": {
+      "pack": "mg.96aa01e7e1.bin",
+      "texture": "mg.0f42075734.webp",
+      "bytes": 453188
+    },
+    "marksman": {
+      "pack": "marksman.2a6071e829.bin",
+      "texture": "marksman.955dae15b4.webp",
+      "bytes": 492220
+    },
+    "grenadier": {
+      "pack": "grenadier.0dfb237983.bin",
+      "texture": "grenadier.875f57c237.webp",
+      "bytes": 453916
+    },
+    "at": {
+      "pack": "at.7368b4ec89.bin",
+      "texture": "at.4c6881480b.webp",
+      "bytes": 450944
+    },
+    "cmd": {
+      "pack": "cmd.f82de1bd24.bin",
+      "texture": "cmd.04c17e689f.webp",
+      "bytes": 443292
+    },
+    "mortar": {
+      "pack": "mortar.11b0e4f537.bin",
+      "texture": "mortar.d9b3b006d1.webp",
+      "bytes": 452912
+    },
+    "warg": {
+      "pack": "warg.eabfd4a682.bin",
+      "texture": "warg.2db7b5285d.webp",
+      "bytes": 312516
+    },
+    "tank": {
+      "pack": "tank.a40d727666.bin",
+      "texture": "tank.a35195e0f6.webp",
+      "bytes": 549032
+    },
+    "ifv": {
+      "pack": "ifv.ae058b1b4d.bin",
+      "texture": "ifv.185482d989.webp",
+      "bytes": 522324
+    },
+    "howitzer": {
+      "pack": "howitzer.891f605fe9.bin",
+      "texture": "howitzer.734f18d991.webp",
+      "bytes": 567248
+    },
+    "catapult": {
+      "pack": "catapult.1965ae298d.bin",
+      "texture": "catapult.185702f4fc.webp",
+      "bytes": 515536
+    },
+    "ram": {
+      "pack": "ram.e5dc1a1743.bin",
+      "texture": "ram.279af1b84f.webp",
+      "bytes": 553720
+    },
+    "tower": {
+      "pack": "tower.b316ab7c10.bin",
+      "texture": "tower.5004424a30.webp",
+      "bytes": 963120
+    },
+    "jet": {
+      "pack": "jet.f54abc7b36.bin",
+      "texture": "jet.2596dc2bd1.webp",
+      "bytes": 430912
+    },
+    "cargo": {
+      "pack": "cargo.aba4084c5e.bin",
+      "texture": "cargo.2955ad56c5.webp",
+      "bytes": 374692
+    },
+    "helo": {
+      "pack": "helo.ff12a650a1.bin",
+      "texture": "helo.3f19ccac2f.webp",
+      "bytes": 471052
+    },
+    "transport": {
+      "pack": "transport.9efe06f07f.bin",
+      "texture": "transport.24fac8f65f.webp",
+      "bytes": 459368
+    },
+    "ladder": {
+      "pack": "ladder.ebce044ca3.bin",
+      "texture": "ladder.78310e1689.webp",
+      "bytes": 454672
+    }
+  },
+  "props": {
+    "horn": {
+      "file": "horn-prop.2114dc0cab.bin",
+      "bytes": 108504
+    },
+    "hallfront": {
+      "file": "hallfront-prop.6d8c88527b.bin",
+      "bytes": 103866
+    },
+    "gatehorse": {
+      "file": "gatehorse-prop.b8c6ad7564.bin",
+      "bytes": 113774
+    }
+  },
+  "textures": {
+    "patina": {
+      "file": "patina.10c7066e40.webp",
+      "bytes": 54494
+    }
+  }
+}

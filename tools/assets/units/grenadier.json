@@ -1,0 +1,157 @@
+{
+  "height": 1.78,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "order": {
+    "walkfire": 234,
+    "kneel": 165,
+    "prone": 168,
+    "charge": 511,
+    "die": 183
+  },
+  "rig": "assets-src/grenadier/rigged.glb",
+  "clips": [
+    {
+      "name": "walk",
+      "file": "assets-src/grenadier/walk.glb",
+      "loop": true
+    },
+    {
+      "name": "run",
+      "file": "assets-src/grenadier/run.glb",
+      "loop": true
+    },
+    {
+      "name": "walkfire",
+      "file": "assets-src/grenadier/walkfire.glb",
+      "loop": true
+    },
+    {
+      "name": "kneel",
+      "file": "assets-src/grenadier/kneel.glb",
+      "loop": false
+    },
+    {
+      "name": "prone",
+      "file": "assets-src/grenadier/prone.glb",
+      "loop": false
+    },
+    {
+      "name": "charge",
+      "file": "assets-src/grenadier/charge.glb",
+      "loop": true
+    },
+    {
+      "name": "die",
+      "file": "assets-src/grenadier/die.glb",
+      "loop": false
+    }
+  ],
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/grenadier.jpg",
+    "prompt": "tools/assets/concepts/grenadier.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b71-450b-733a-a1a1-245fe137d70c",
+      "remesh": "01a21b72-996c-7579-b51c-2c3907f01aa3",
+      "rigging": "01a21b74-2cf5-74f8-9c52-d9ceb1d76e06",
+      "animations": {
+        "walkfire": "01a21b79-dff4-7738-a3d2-d3c38619ca14",
+        "kneel": "01a21b79-e544-73e9-9170-bd942f30404a",
+        "prone": "01a21b79-ea6e-74f5-aab8-f1c10b555097",
+        "charge": "01a21b79-ee16-77c2-90f4-6d1080c72aa8",
+        "die": "01a21b79-f1e9-7480-89e2-9799365aa8a5"
+      }
+    }
+  },
+  "loops": [
+    "idle",
+    "walk",
+    "run",
+    "charge",
+    "walkfire"
+  ],
+  "derive": [
+    {
+      "name": "aim",
+      "from": "walkfire",
+      "range": [
+        0.1328,
+        0.1328
+      ]
+    },
+    {
+      "name": "kneel",
+      "from": "kneel",
+      "range": [
+        0.2609,
+        0.2609
+      ]
+    },
+    {
+      "name": "prone",
+      "from": "prone",
+      "range": [
+        0.6322,
+        0.6322
+      ]
+    },
+    {
+      "name": "walk",
+      "from": "walkfire",
+      "range": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "run",
+      "from": "charge",
+      "range": [
+        0,
+        1
+      ]
+    }
+  ],
+  "drop": [
+    "walkfire",
+    "charge"
+  ],
+  "gear": [
+    {
+      "bone": "RightHand",
+      "kind": "launcher",
+      "align": {
+        "clip": "aim",
+        "at": 0
+      }
+    }
+  ],
+  "swatches": {
+    "iron": [
+      40,
+      42,
+      44
+    ],
+    "wood": [
+      70,
+      72,
+      60
+    ],
+    "leather": [
+      50,
+      48,
+      42
+    ],
+    "paint": [
+      80,
+      86,
+      60
+    ]
+  }
+}

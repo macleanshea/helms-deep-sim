@@ -57,29 +57,42 @@ float weave(vec2 uv, float n){ return 0.5 + 0.5*sin(uv.x*TAU*n)*sin(uv.y*TAU*n);
 // one generator per layer, so each program compiles only the material it draws
 const FN = {
   1: `M matOf(vec2 uv){
-  // dressed blocks 2 m by 0.8 m in running bond, each a little different, with recessed mortar joints
-  vec2 g = uv*vec2(4.,8.); float row = floor(g.y);
-  g.x += 0.5*mod(row,2.) + (h21(vec2(row,7.))-.5)*0.3;
-  vec2 id = vec2(mod(floor(g.x),4.), row), f = fract(g);
-  float d = min(min(f.x,1.-f.x)*2.0, min(f.y,1.-f.y)*0.8);
-  d += (pfbm(uv, 16., 3)-.5)*0.05;
-  float face = smoothstep(0.012, 0.06, d), hb = h21(id+3.), grain = pfbm(uv, 24., 5);
-  float pit = smoothstep(0.62, 0.8, pfbm(uv+.37, 40., 3));
-  M m; m.h = face*(0.72 + 0.2*hb) + grain*0.16 - pit*0.12*face;
-  vec3 c = vec3(0.5)*(0.80 + 0.40*hb) * mix(vec3(1.04,1.0,0.94), vec3(0.96,1.0,1.04), h21(id+9.));
-  c *= mix(0.5, 1., face) * (0.86 + 0.28*grain) * (1. - 0.25*pit);
-  c = mix(c, vec3(0.40,0.45,0.30), smoothstep(.6,.8,pfbm(uv+.3, 6., 3))*0.22*face);     // lichen
-  m.alb = c; m.rough = mix(0.96, 0.82, face); m.spec = 0.22;
+  // coursed ashlar as masons lay it: courses half a metre high, the blocks of each course a length of their own
+  // (five to eight to the tile), joints tight and a little ragged, the odd stone replaced in a darker or paler
+  // rock, arrises chipped, the whole face weathered in broad stains that ignore the blocks
+  float rows = 16., row = floor(uv.y*rows), nb = 5. + floor(h21(vec2(row, 3.))*3.99);
+  float gx = uv.x*nb + h21(vec2(row, 7.));
+  vec2 id = vec2(mod(floor(gx), nb), row), f = vec2(fract(gx), fract(uv.y*rows));
+  float rag = (pfbm(uv, 32., 3)-.5)*0.035;
+  float dx = min(f.x, 1.-f.x)*(8./nb), dy = min(f.y, 1.-f.y)*0.5;          // metres to the nearest joint
+  float d = min(dx, dy) + rag;
+  float chip = smoothstep(0.10, 0.0, dx + dy*0.9 + (pfbm(uv+.21, 48., 2)-.5)*0.12)*step(0.55, h21(id+1.7));   // a knocked corner
+  float face = smoothstep(0.006, 0.03, d)*(1.-chip*0.8), hb = h21(id+3.), grain = pfbm(uv, 28., 5);
+  float pit = smoothstep(0.64, 0.82, pfbm(uv+.37, 44., 3));
+  float odd = step(0.93, h21(id+5.3));                                     // one stone in fifteen is a later repair
+  float tone = 0.93 + 0.14*hb + odd*(h21(id+8.1) > 0.5 ? 0.16 : -0.2);
+  M m; m.h = face*(0.74 + 0.16*hb) + grain*0.14 - pit*0.10*face;
+  vec3 c = vec3(0.5)*tone * mix(vec3(1.035,1.0,0.955), vec3(0.965,1.0,1.03), h21(id+9.));
+  c *= mix(0.42, 1., face) * (0.88 + 0.24*grain) * (1. - 0.22*pit);
+  float stain = pfbm(uv+.6, 3., 4);
+  c *= 0.84 + 0.32*stain;                                                  // broad weathering across many blocks
+  c = mix(c, vec3(0.38,0.43,0.30), smoothstep(.58,.8,pfbm(uv+.3, 7., 3))*0.20*face);     // lichen
+  c = mix(c, vec3(0.30,0.34,0.24), (1.-face)*0.35);                        // moss and dirt in the joints
+  m.alb = c; m.rough = mix(0.97, 0.84, face); m.spec = 0.2;
   return m;
 }
 `,
   2: `M matOf(vec2 uv){
-  vec3 v = pvoro(uv*7., vec2(7.));
-  float face = smoothstep(0.015, 0.07, v.x + (pfbm(uv,20.,3)-.5)*0.03), grain = pfbm(uv, 28., 5);
-  M m; m.h = face*(0.74 + 0.22*v.y) + grain*0.12;
-  m.alb = vec3(0.5)*(0.9+0.2*v.y)*mix(0.66,1.,face)*(0.88+0.24*grain)*mix(vec3(1.02,1.,0.97), vec3(0.98,1.,1.02), fract(v.y*7.3));
-  m.alb = mix(m.alb, vec3(0.40,0.43,0.33), (1.-face)*0.3);                               // moss in the joints
-  m.rough = mix(0.95, 0.7, face); m.spec = 0.3;
+  // flagstones: worn rectangular slabs laid in courses, their joints packed with dirt and moss
+  float rows = 9., row = floor(uv.y*rows), nb = 6. + floor(h21(vec2(row, 13.))*3.99);
+  float gx = uv.x*nb + h21(vec2(row, 17.));
+  vec2 id = vec2(mod(floor(gx), nb), row), f = vec2(fract(gx), fract(uv.y*rows));
+  float d = min(min(f.x, 1.-f.x)*(6./nb), min(f.y, 1.-f.y)*(6./rows)) + (pfbm(uv, 26., 3)-.5)*0.05;
+  float face = smoothstep(0.008, 0.05, d), hb = h21(id+2.), grain = pfbm(uv, 30., 5), wear = pfbm(uv+.4, 5., 3);
+  M m; m.h = face*(0.7 + 0.14*hb) + grain*0.12 - smoothstep(0.55, 0.8, wear)*0.06;
+  m.alb = vec3(0.5)*(0.92 + 0.14*hb)*mix(0.5, 1., face)*(0.88 + 0.24*grain)*(0.86 + 0.28*wear)*mix(vec3(1.03,1.,0.96), vec3(0.97,1.,1.03), h21(id+6.));
+  m.alb = mix(m.alb, vec3(0.34,0.38,0.27), (1.-face)*0.45);                               // moss in the joints
+  m.rough = mix(0.95, 0.74, face); m.spec = 0.26;
   return m;
 }
 `,

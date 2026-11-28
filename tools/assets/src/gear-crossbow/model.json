@@ -1,0 +1,54 @@
+{
+  "unit": "gear-crossbow",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-crossbow.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b748-7270-b221-232510829608",
+      "remesh": "01a21f5b-1f91-733b-9b1a-90c064981402"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 43773
+    },
+    "nrm": {
+      "offset": 175092,
+      "length": 43773
+    },
+    "uv": {
+      "offset": 350184,
+      "length": 29182
+    },
+    "joints": {
+      "offset": 466912,
+      "length": 58364
+    },
+    "weights": {
+      "offset": 525276,
+      "length": 58364
+    },
+    "index": {
+      "offset": 758732,
+      "length": 29811
+    },
+    "ibm": {
+      "offset": 877976,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

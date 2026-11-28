@@ -3,11 +3,14 @@
 //
 // Movement rules encoded here (and mirrored by Sim.canEnter):
 //  - ground to ground: only if the walking heights differ by at most `step`
+//  - onto or off a built roadway (`way`): only where it is level with the ground beside it (WAY_STEP)
 //  - along a wall walk: free within the same fortification group
 //  - ground <-> wall walk: only through a stair head or door (`portal` bits),
 //    or up a raised ladder / docked siege tower (`ladder` cells, attackers only)
 //  - with `virt`, a closed wall can still be "entered" at a huge cost so that a field
 //    leads attackers to press against the stretch of wall nearest the defenders.
+
+import { WAY_STEP } from '../config.js';
 
 export const DX = [1, 1, 0, -1, -1, -1, 0, 1];
 export const DY = [0, 1, 1, 1, 0, -1, -1, -1];
@@ -29,14 +32,15 @@ export class FlowSolver {
    * @param cost    Uint16Array, 0 = impassable, otherwise cost of entering the cell
    * @param sources Int32Array of source cells
    * @param dirOut  Uint8Array receiving direction index 0..7 (255 = none)
-   * @param nav     { cz, elev, portal, step, ladder?, virt? }
+   * @param nav     { cz, elev, portal, step, ladder?, virt?, way? }
    *                cz Float32 walking height, elev Uint8 (0 ground, else wall group + 1),
    *                portal Uint8 link bits, ladder Uint8 cells with a way up,
-   *                virt Uint16 per cell: cost of "pressing" into a closed wall (0 = never)
+   *                virt Uint16 per cell: cost of "pressing" into a closed wall (0 = never),
+   *                way Uint8: 1 on a built roadway, whose sides are walled (see WAY_STEP)
    */
   solve(cost, sources, nsrc, dirOut, nav) {
     const { gw, gh, dist, bhead, enode, edist, enext } = this;
-    const { cz, elev, portal, step, ladder, virt } = nav;
+    const { cz, elev, portal, step, ladder, virt, way } = nav;
     dist.fill(0x7fffffff);
     dirOut.fill(255);
     bhead.fill(-1);
@@ -65,7 +69,11 @@ export class FlowSolver {
           let st = (k & 1) ? cd : cu;
           const en = elev[n];
           if (en === eu) {
-            if (!eu) { const dz = cz[n] - zu; if (dz > step || dz < -step) continue; }
+            if (!eu) {
+              const dz = cz[n] - zu;
+              if (dz > step || dz < -step) continue;
+              if (way && way[n] !== way[u] && (dz > WAY_STEP || dz < -WAY_STEP)) continue; // a roadway's walled side
+            }
           } else if (!((portal[n] >> k) & 1)) {
             if (en) continue;                            // no jumping off a wall
             if (ladder && ladder[u]) st += 45;           // climb

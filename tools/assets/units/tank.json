@@ -1,0 +1,27 @@
+{
+  "length": 9.6,
+  "texture": 1024,
+  "lods": [
+    12000,
+    2500,
+    600,
+    120
+  ],
+  "conceptSize": "1536x1024",
+  "rigid": {
+    "turret": {
+      "above": 0.46
+    },
+    "file": "assets-src/tank/model.glb",
+    "nose": "-x"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/tank.jpg",
+    "prompt": "tools/assets/concepts/tank.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21b8f-c87d-7289-b96b-9b5cb2899fb3",
+      "remesh": "01a21b91-b2bb-761d-b861-e222b1ff0293"
+    }
+  }
+}

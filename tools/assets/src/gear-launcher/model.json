@@ -1,0 +1,54 @@
+{
+  "unit": "gear-launcher",
+  "note": {
+    "generator": "meshy",
+    "prompt": "tools/assets/concepts/gear-launcher.text.txt",
+    "tasks": {
+      "text-to-3d": "01a21f5a-b57a-720a-ada6-2fbbee4defe7",
+      "remesh": "01a21f5b-1d53-754b-9aaa-6453c623a32b"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 50562
+    },
+    "nrm": {
+      "offset": 202248,
+      "length": 50562
+    },
+    "uv": {
+      "offset": 404496,
+      "length": 33708
+    },
+    "joints": {
+      "offset": 539328,
+      "length": 67416
+    },
+    "weights": {
+      "offset": 606744,
+      "length": 67416
+    },
+    "index": {
+      "offset": 876408,
+      "length": 28746
+    },
+    "ibm": {
+      "offset": 991392,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

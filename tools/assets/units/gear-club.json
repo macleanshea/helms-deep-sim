@@ -1,0 +1,23 @@
+{
+  "height": 1,
+  "texture": 512,
+  "lods": [
+    10000
+  ],
+  "conceptSize": "1536x1024",
+  "portrait": "assets/units/troll.webp",
+  "prop": true,
+  "rigid": {
+    "nose": "+z",
+    "file": "assets-src/gear-club/model.glb"
+  },
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gear-club.jpg",
+    "prompt": "tools/assets/concepts/gear-club.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f57-0d43-7433-9552-c2cbf0ae5491",
+      "remesh": "01a21f57-b9fe-7741-b377-22c724d770f0"
+    }
+  }
+}

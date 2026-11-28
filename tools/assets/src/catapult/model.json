@@ -1,0 +1,63 @@
+{
+  "unit": "catapult",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/catapult.jpg",
+    "prompt": "tools/assets/concepts/catapult.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21e9d-4736-7689-bd87-17584a921383",
+      "remesh": "01a21e9e-965c-7654-be5b-e2ce38a63754"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull",
+    "arm"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 57507
+    },
+    "nrm": {
+      "offset": 230028,
+      "length": 57507
+    },
+    "uv": {
+      "offset": 460056,
+      "length": 38338
+    },
+    "joints": {
+      "offset": 613408,
+      "length": 76676
+    },
+    "weights": {
+      "offset": 690084,
+      "length": 76676
+    },
+    "index": {
+      "offset": 996788,
+      "length": 30234
+    },
+    "ibm": {
+      "offset": 1117724,
+      "length": 32
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    },
+    {
+      "name": "attack",
+      "loop": false,
+      "frames": 27,
+      "stride": 0,
+      "offset": 128
+    }
+  ]
+}

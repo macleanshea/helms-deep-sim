@@ -1,0 +1,28 @@
+{
+  "source": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/warg-side.jpg",
+    "tasks": {
+      "image-to-3d": "01a21b15-7c5a-722b-a58c-097bcb332e2a",
+      "remesh": "01a21b18-9fd1-70de-8ff8-6c99c5b92414"
+    },
+    "rig": "made by tools/assets/quadruped.js: Meshy rigs only two-legged figures"
+  },
+  "quadruped": {
+    "file": "assets-src/meshy_output/20261127_033844_warg-bakeoff_01a21b15/warg-10k.glb",
+    "nose": "+z"
+  },
+  "height": 1.7,
+  "texture": 512,
+  "lods": [
+    4000,
+    900,
+    250,
+    64
+  ],
+  "rider": {
+    "unit": "uruk",
+    "height": 1.8,
+    "seat": 0.42
+  }
+}

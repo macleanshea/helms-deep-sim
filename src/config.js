@@ -18,9 +18,14 @@ export const WALL_H = 12;     // Deeping Wall walkway
 export const PLATEAU_Z = 12;  // Hornburg rock and courtyard
 export const RING_TOP = 21;   // Hornburg curtain wall walkway
 export const STEP = 3.3;      // largest height change a unit can walk between neighbouring cells
+export const WAY_STEP = 0.9;  // and the largest between a built roadway (the causeway, the rear ramp) and the ground beside it: they have
+                              // walled sides, and are got onto and off at their ends
 
 // obstacle flags per nav cell
 export const OB = { WIRE: 1, AV: 2 };
+// What a 4 m section of wire, or one anti-vehicle obstacle, takes to clear. A man held up at the wire cuts 1 a tick (ten
+// ticks a second), a troll 14, an engine's crew 40; at an obstacle a troll among it wrenches 30 a tick loose and an engine's crew 6.
+export const WIRE_HP = 1000, AV_HP = 1500;
 
 // armour classes
 export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5, ENGINE: 6 };
@@ -100,10 +105,10 @@ export const UNITS = [
     desc: 'Re-arms nearby troops until its stock runs out.' },
   { key: 'cmd', cost: 120, team: DEF, name: 'Commander', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
     desc: 'Steadies platoons within 110 m. If killed, the garrison is shaken.' },
-  { key: 'wire', cost: 2, team: DEF, name: 'Barbed Wire', cls: C.OBST, ob: 'wire', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 14, spacing: 3,
-    desc: 'Slows infantry to a crawl until trampled flat or blown apart.' },
-  { key: 'hedgehog', cost: 3, team: DEF, name: 'Anti-Vehicle Obstacle', cls: C.OBST, ob: 'av', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 15, spacing: 3,
-    desc: 'Stops rams, catapults and siege towers. Gives cover behind it.' },
+  { key: 'wire', cost: 5, team: DEF, name: 'Barbed Wire', cls: C.OBST, ob: 'wire', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 14, spacing: 4,
+    desc: 'An unbroken belt. Stops attackers until they cut a way through or it is blown apart.' },
+  { key: 'hedgehog', cost: 3, team: DEF, name: 'Anti-Vehicle Obstacle', cls: C.OBST, ob: 'av', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 15, spacing: 4,
+    desc: 'Stops rams, catapults and siege towers until their crews or a troll drag it aside. Gives cover behind it.' },
   { key: 'mine', cost: 4, team: DEF, name: 'Anti-Personnel Mine', cls: C.OBST, ob: 'mine', hp: 1, speed: 0, rad: 0.5, size: 2.4, spr: 27, spacing: 3,
     desc: 'Buried and hidden from the enemy. Explodes once, 5 m radius.' },
   { key: 'claymore', cost: 15, team: DEF, name: 'Claymore', cls: C.OBST, ob: 'claymore', hp: 1, speed: 0, rad: 0.5, size: 2.6, spr: 28, spacing: 7,
@@ -157,7 +162,7 @@ UNITS.forEach((u, i) => {
   u.wdef = u.w ? WEAPONS[u.w] : null;
   u.w2def = u.w2 ? WEAPONS[u.w2] : null;
   if (u.team === DEF) u.armor = u.cls === C.INF ? A.INF : u.cls === C.VEH ? A.VEH : A.GUN;
-  u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (no stairs or ladders), 2 heavy (also stopped by obstacles)
+  u.sz = u.heavy ? 2 : u.big ? 1 : 0; // 0 foot, 1 big (stairs but no ladders), 2 heavy (also stopped by obstacles)
 });
 
 // Player-called support. In a challenge battle every call is paid for from one shared pool of
