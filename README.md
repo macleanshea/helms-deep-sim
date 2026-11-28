@@ -199,12 +199,14 @@ Orders can be given while paused. The battle waits while a dialog is open.
 - A forced gate and a fallen stretch of wall are marked on the map, and both sides can move
   through the gap. Aircraft climb over the mountains and the keep rather than through them.
 
-Rendering quality steps down automatically (high, then medium, then low) on machines that cannot
-hold 30 fps; add `?q=low`, `?q=medium` or `?q=high` to the URL to force it. **Settings** (the
-gear next to Help) sets how far out units are drawn in more detail: Close up, Medium, Far (the
-default) or Very far. Each step moves the whole ladder of detail levels further out (see
-Performance below); further out costs frame rate in big battles. The choice is kept in the
-browser.
+**Settings** (the gear next to Help) has one **Graphics quality** setting: Auto, Low, Medium, High or
+Ultra. Each level sets both how the picture is drawn (its resolution, anti-aliasing, glow and HDR, rain
+in the scene) and how far out soldiers are drawn in full detail. **Auto**, the default, starts where it
+last settled and moves by the frame rate: one level down when a third of recent frames run under about
+50 fps (frames the battle's own arithmetic made long are not counted, and a 30 Hz screen is not taken
+for a slow machine), one level back up after twenty clean seconds. A level that fails is not tried
+again for a minute, and for twice as long each time it fails again. The choice is kept in the browser.
+Add `?q=low`, `?q=medium` or `?q=high` to the URL to hold the rendering quality for a test.
 
 ### Performance
 
@@ -220,20 +222,19 @@ resolution it was measured on. GPU timings need a browser that exposes
 Each unit is drawn at one of four levels of detail chosen from its size on screen (so the far
 ranks of a host cost little while the near ones are drawn in full): dots, then boxes, then
 blocky stand-ins of about seventy triangles, and the full models (about a thousand triangles for
-a soldier, several thousand for a vehicle). The **Detailed models** setting places the ladder:
-full models take over at a zoom proportional to it, dots give way at its square root (so the
-whole valley stays cheap), and boxes give way to stand-ins midway between the two on a log
-scale. On high quality, in screen pixels per metre:
+a soldier, several thousand for a vehicle). The **Graphics quality** level places the ladder:
+full models take over at a zoom proportional to its detail step, dots give way at that step's square
+root (so the whole valley stays cheap), and boxes give way to stand-ins midway between the two on a
+log scale. In screen pixels per metre:
 
-| Setting | Dots below | Boxes below | Stand-ins below (full models from) |
+| Level | Dots below | Boxes below | Stand-ins below (full models from) |
 | --- | --- | --- | --- |
-| Close up | 1.4 | 2.8 | 5.5 |
-| Medium | 1.2 | 2.2 | 4.1 |
-| Far (default) | 1.1 | 1.9 | 3.3 |
-| Very far | 0.9 | 1.5 | 2.5 |
+| Low | 1.4 | 3.6 | 9.0 |
+| Medium | 1.2 | 2.5 | 5.3 |
+| High | 1.1 | 1.9 | 3.3 |
+| Ultra | 0.9 | 1.5 | 2.5 |
 
-Balanced and performance quality bring the full models (and so the boxes' upper limit) in
-closer. The scale is measured where each unit stands, so in a low view the nearest
+The scale is measured where each unit stands, so in a low view the nearest
 ranks are full models while the far end of the same host is boxes and dots; and if a view would
 still spend more than 2.5 million triangles on units, every level is pulled in closer until it
 does not.

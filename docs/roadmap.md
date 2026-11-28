@@ -328,6 +328,12 @@ where float buffers are missing or refuse; `?hdr=0` turns it off; Low quality ne
 lights by direction. Unmeasured for frame rate here (half-float multisampled buffers cost fill rate): the
 owner's `?bench` with and without `?hdr=0` decides whether Medium keeps it.
 
+**One quality setting, with Auto.** There were two: the "Detailed models" step in the settings menu, and a
+rendering quality (high, medium, low) that could only be set from the address bar and otherwise only ever
+stepped down. They are one **Graphics quality** setting now (Auto, Low, Medium, High, Ultra: each a rendering
+quality and a detail step), shown in the menu. Auto moves both ways by the frame rate, with a growing wait
+before it tries again a level that failed (`main.js`, the loop; `app.gfx`).
+
 ### 9. Asset pipeline and unit production
 
 **The pipeline, done.** How a unit gets from an idea into the game:

@@ -1268,7 +1268,7 @@ function drawMinimap() {
 }
 
 // -------------------------------------------------------------------- loop
-let last = performance.now(), hudT = 0, slowFrames = 0, fastFrames = 0;
+let last = performance.now(), hudT = 0;
 const lerp3 = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
 function frame(now) {
   requestAnimationFrame(frame);
@@ -1276,12 +1276,30 @@ function frame(now) {
   last = now;
   app.clock += rdt;
 
-  // step down a quality level whenever this machine cannot hold 30 fps at the current one
-  if (!params.has('q') && !params.has('bench') && renderer.quality !== 'low') {
-    if (rdt > 0.036) slowFrames++; else fastFrames++;
-    if (slowFrames + fastFrames >= 90) {
-      if (slowFrames > 55) { renderer.setQuality(renderer.quality === 'high' ? 'medium' : 'low'); resize(); ui.toast(renderer.quality === 'medium' ? 'Switched to balanced rendering to keep the frame rate up.' : 'Switched to performance rendering to keep the frame rate up.'); }
-      slowFrames = fastFrames = 0;
+  // Graphics quality on Auto: one level down when this machine is not holding the frame rate at the present one, one
+  // level back up after it has run clean for a while. A level that failed is not tried again at once, and waits longer
+  // each time it fails.
+  const g = app.gfx;
+  if (g.auto && !document.hidden && rdt < 0.25) {
+    // (what a frame costs on this screen at best: a 30 Hz screen is not "slow" at 33 ms)
+    g.best = Math.min(rdt, g.best + rdt * 0.0005);
+    if (now < g.holdUntil) { g.n = g.slow = 0; g.w0 = now; } else {
+      g.n++;
+      // (a frame the battle's own arithmetic made long is not one that drawing less would mend)
+      if (rdt > Math.max(0.0205, g.best * 1.4) && app.simMs < 9) g.slow++;
+      if (g.n >= 90 || (now - g.w0 > 2500 && g.n >= 6)) { // (a second and a half of good frames, or two and a half seconds of whatever came)
+        const at = GFX_ORDER.indexOf(g.level);
+        if (g.slow > g.n / 3 && at > 0) {
+          if (now - g.raisedAt < 12000) g.backoff = Math.min(600000, g.backoff * 2); // (it was the step up that did it)
+          g.retryAt = now + g.backoff; g.calm = 0;
+          app.applyQuality(GFX_ORDER[at - 1]); g.holdUntil = now + 2500;
+        } else if (g.slow <= g.n / 40) {
+          g.calm += now - g.w0;
+          if (now - g.raisedAt > 45000) g.backoff = 60000; // (the last step up has held: start afresh)
+          if (g.calm >= 20000 && at < GFX_ORDER.length - 1 && now >= g.retryAt) { /* twenty clean seconds */ g.calm = 0; g.raisedAt = now; app.applyQuality(GFX_ORDER[at + 1]); g.holdUntil = now + 2500; }
+        } else g.calm = 0;
+        g.n = g.slow = 0; g.w0 = now;
+      }
     }
   }
 
@@ -1327,7 +1345,7 @@ function frame(now) {
       }
       fx.now = sim.time;
       app.fxq.replay(fx);
-      simMs = performance.now() - t0;
+      simMs = performance.now() - t0; app.simMs = simMs;
       if (app.acc > DT * 2) app.acc = DT; // can't keep up: drop the backlog rather than spiral
       alpha = Math.min(1, app.acc / DT);
       const fdt = Math.min(0.25, rdt * app.speed * scale);
@@ -1397,26 +1415,49 @@ function frame(now) {
 }
 
 // ---------------------------------------------------------------- settings
-const SETTINGS_KEY = 'hd-settings-v2';
-app.settings = { heroScale: HERO_SCALE_DEFAULT, seed: 1 };
+// Graphics quality is one setting. Each level is a rendering quality (the picture's resolution, its anti-aliasing, glow
+// and HDR, rain in the scene) and how far out soldiers are drawn in full detail. Auto moves between them by the frame
+// rate (see the loop). ?q=low|medium|high in the address fixes the rendering quality for a test, whatever is stored.
+const GFX = { low: ['low', 0.5], medium: ['medium', 0.375], high: ['high', HERO_SCALE_DEFAULT], ultra: ['high', 0.225] }, GFX_ORDER = ['low', 'medium', 'high', 'ultra'];
+const SETTINGS_KEY = 'hd-settings-v3';
+app.settings = { quality: 'auto', autoLevel: 'high', seed: 1 };
 try {
   const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-  // v1 stored the detail step before every step's distance was doubled: keep the same step
-  const v1 = !saved && JSON.parse(localStorage.getItem('hd-settings-v1'));
-  Object.assign(app.settings, saved || (v1 ? { ...v1, heroScale: v1.heroScale / 2 } : {}));
+  // (earlier versions kept only the model-detail step and the seed: the seed is carried over)
+  const old = !saved && (JSON.parse(localStorage.getItem('hd-settings-v2')) || JSON.parse(localStorage.getItem('hd-settings-v1')));
+  Object.assign(app.settings, saved || (old && old.seed ? { seed: old.seed } : {}));
 } catch { /* private mode */ }
+if (!GFX[app.settings.quality] && app.settings.quality !== 'auto') app.settings.quality = 'auto';
+if (!GFX[app.settings.autoLevel]) app.settings.autoLevel = 'high';
+const store = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(app.settings)); } catch { /* private mode */ } };
+app.gfx = { level: 'high', auto: false, n: 0, slow: 0, calm: 0, w0: 0, best: 0.02, holdUntil: 0, retryAt: 0, raisedAt: -1e9, backoff: 60000 };
+app.simMs = 0;
+/** Put a level of graphics quality into effect (Auto calls this as it moves, and remembers where it got to). */
+app.applyQuality = (level) => {
+  const [q, detail] = GFX[level];
+  app.gfx.level = level;
+  renderer.heroScale = detail;
+  if (renderer.quality !== q) { renderer.setQuality(q); resize(); }
+  if (app.gfx.auto && app.settings.autoLevel !== level) { app.settings.autoLevel = level; store(); }
+  if (ui && ui.refreshSettings) ui.refreshSettings();
+};
 /** Change a setting, apply it and remember it on this browser. */
 app.setSetting = (k, v) => {
   app.settings[k] = v;
-  if (k === 'heroScale') renderer.heroScale = v;
-  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(app.settings)); } catch { /* private mode */ }
+  if (k === 'quality') {
+    const fixed = params.has('q') || params.has('bench');
+    app.gfx.auto = v === 'auto' && !fixed;
+    Object.assign(app.gfx, { n: 0, slow: 0, calm: 0, holdUntil: performance.now() + 3000, retryAt: 0, backoff: 60000 });
+    if (!fixed) app.applyQuality(v === 'auto' ? app.settings.autoLevel : v);
+  }
+  store();
 };
-renderer.heroScale = +app.settings.heroScale || HERO_SCALE_DEFAULT;
-/** The level-of-detail ladder a detail setting gives at the current rendering quality. */
-app.lodAt = (scale) => { const keep = renderer.heroScale; renderer.heroScale = scale; const L = renderer.lod(); renderer.heroScale = keep; return L; };
+/** The level-of-detail ladder a level of graphics quality gives. */
+app.lodAt = (level) => { const [q, scale] = GFX[level], keep = renderer.heroScale; renderer.heroScale = scale; const L = renderer.lod(q); renderer.heroScale = keep; return L; };
 
 // -------------------------------------------------------------------- boot
-if (params.has('q')) renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high');
+if (params.has('q')) { renderer.setQuality(['low', 'medium', 'high'].includes(params.get('q')) ? params.get('q') : 'high'); renderer.heroScale = HERO_SCALE_DEFAULT; }
+else app.setSetting('quality', app.settings.quality);
 // unit models built from files arrive after the game is up: until then (or with ?assets=0) the built-in ones stand in
 renderer.fx = fx;
 if (params.get('assets') !== '0') {

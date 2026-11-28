@@ -627,17 +627,19 @@ export function buildUI(app, portraits) {
 
   // --------------------------------------------------------------- settings
   const menu = $('settingsMenu'), btnSettings = $('btnSettings');
-  const DETAIL = [[0.5, 'Close up'], [0.375, 'Medium'], [0.3, 'Far (default)'], [0.225, 'Very far']];
+  const QUALITY = [['auto', 'Auto', 'Moves between the levels by itself to keep the frame rate smooth'], ['low', 'Low', 'Plainest: no anti-aliasing, glow or HDR; soldiers in full detail only close up'],
+    ['medium', 'Medium', 'Light anti-aliasing, glow and HDR; full detail at middle distance'], ['high', 'High', 'Full anti-aliasing and resolution; full detail from far off'], ['ultra', 'Ultra', 'As High, with soldiers in full detail from very far off']];
   const renderSettings = () => {
-    const cur = app.settings.heroScale;
+    const cur = app.settings.quality, now = app.gfx.level, fixed = !app.gfx.auto && cur === 'auto'; // (fixed: a test address is holding the quality)
     menu.innerHTML = '<h3>Settings</h3>';
-    const r = el('div', 'set-row'), lab = el('div', null, '<b>Detailed models</b><span>How far out units are drawn in full detail. Further looks better but costs frame rate.</span>');
+    const nowName = QUALITY.find((q) => q[0] === now)[1];
+    const r = el('div', 'set-row'), lab = el('div', null, `<b>Graphics quality</b><span>${cur === 'auto' && !fixed ? `Auto keeps the frame rate smooth by itself. It is on ${nowName} now.` : 'Higher levels are sharper and show soldiers in full detail from further out, and cost frame rate.'}</span>`);
     const seg = el('div', 'set-seg');
-    for (const [v, t] of DETAIL) {
-      const b = el('button', Math.abs(v - cur) < 1e-3 ? 'active' : '', t.replace(' (default)', ''));
-      const L = app.lodAt(v), f = (z) => z.toFixed(1);
-      b.title = `${t}: dots below ${f(L.dot)} px/m, boxes to ${f(L.box)}, stand-ins to ${f(L.hero)}, full models beyond`;
-      b.addEventListener('click', () => { app.setSetting('heroScale', v); renderSettings(); });
+    for (const [v, t, tip] of QUALITY) {
+      const b = el('button', v === cur ? 'active' : '', t);
+      if (v === 'auto') b.title = tip;
+      else { const L = app.lodAt(v), f = (z) => z.toFixed(1); b.title = `${tip} (dots below ${f(L.dot)} px/m, full models from ${f(L.hero)})`; }
+      b.addEventListener('click', () => { app.setSetting('quality', v); renderSettings(); });
       seg.append(b);
     }
     r.append(lab, seg); menu.append(r);
@@ -648,6 +650,8 @@ export function buildUI(app, portraits) {
     r2.append(el('div', null, '<b>Random seed</b><span>Sandbox battles: the same setup, seed and orders replay the same battle.</span>'), inp);
     menu.append(r2);
   };
+  /** Auto has moved to another level: show it, if the menu is open. */
+  ui.refreshSettings = () => { if (!menu.hidden) renderSettings(); };
   ui.toggleSettings = (on = menu.hidden) => {
     if (!on) { menu.hidden = true; btnSettings.classList.remove('open'); return; }
     renderSettings();
