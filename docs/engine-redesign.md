@@ -291,7 +291,55 @@ Still open:
   on the crowd at the postern hold it. The horde needs an answer: catapults on the crowded court, sappers
   for the postern first, an assault on the gate and both back doors at once.
 
-## 9. Still open
+## 9. The Hornburg shut: lashed ladders and three ways in
+
+The problem: ordering the whole garrison into the Hornburg in the first second won every challenge for the
+stand-in commander. The owner's proposal: let the horde lash two ladders together to scale the ring wall.
+
+**What was found first.** The fall-back is a free win only where it beats holding the Deeping Wall. On the
+Escalade it does not (the same garrison and commander win holding the wall with everyone alive). On the
+Siege Train it did, by far (about 90% alive against 10%), and on Medium a little. Probes (everyone ordered in at
+1 s, with and without the stand-in's support calls) showed why:
+
+- the horde spent most of the night on the empty Deeping Wall: siege towers docked against it, trolls and
+  catapults battered it, and the postern was reached only in the last quarter of the night;
+- the Hornburg is a superb firing platform: its walk is 21 m up on the rock, its men see over everything,
+  every man of the garrison has a parapet, and resupply drops into the court re-arm all of them at once. With
+  the stand-in's support calls, about 2,800 of the Escalade's dead fell 100-200 m out, to machine guns and rifles
+  on the ring walk; without them the garrison ran dry and the horde broke in;
+- the ring wall could not be climbed at all: only the gate, the postern and the door from the wall led in.
+
+**What was built.**
+
+- *Lashed ladders* (`src/sim/lashed.js`, new). The ring stands on the rock: a band of steep rock 7-14 m wide
+  lies between its foot and the valley floor, so a ladder must stand 13.5-18 m out and reach 21 m up: 24-26 m,
+  two ladders' length. 19 of the ring's sections can be laddered from the valley floor (12 on the valley side;
+  7 in the Deep, reached only once the Deeping Wall is breached, since a ladder cannot be carried over it).
+  A ladder crew sent for the ring takes a section near its force's objective and calls a second ladder crew to
+  the same foot; the two are lashed (the second ladder's timber goes into the first, its carriers back to the
+  fight) and heaved up: 14 s and five hands, against 4 s for a ladder. Men climb it one at a time, a man every
+  2 s, 10 s up (4 s on a ladder). With four or more on it, each man who steps on risks the lashing giving way
+  (8% for each man past three); a fall from it can kill. Defenders heave it off twice as fast as a ladder, and
+  it breaks apart: it is not raised again.
+- *Path links between cells that are not neighbors* (`src/sim/flow.js` `jump`): the foot of a lashed ladder,
+  on the valley floor, leads to the wall walk it leans on, across the rock. Only the horde's climbing path
+  fields carry them. A man at the foot whom the rock stops starts up the ladder.
+- *Three ways in at once* (`_keepSecs` in `src/sim/warlord.js`): when the Deeping Wall is given up, the
+  northern force goes over the empty wall and through the Deep for the postern and the door from the wall, the
+  middle force goes up the valley side of the ring with lashed ladders (a new objective; its companies escort the
+  ladders to the feet of the rock and its crossbows halt 60 m short to cover them), the southern force goes for
+  the gate with the ram. Lashed ladders standing against the ring are a way in for every force bound for the
+  back doors.
+- *No more battering an empty wall*: with the Deeping Wall given up, trolls go with their forces for the
+  Hornburg's doors, and the catapults' battering mission is the postern, then the gate.
+- *The keep check asks the right question* (`tools/checks.js keep`): falling back is a free win where, on the
+  same seeds, it wins every night, at least as often as holding the wall, and with a quarter or more of the
+  garrison more left.
+
+**Measured so far** (to be completed): without support calls the horde takes the Hornburg with lashed
+ladders up; with the stand-in's support calls the ladder crews are cut down crossing the open valley.
+
+## 10. Still open
 
 - Wire's poor showing against the Siege Train (see the search above).
 - Crossbows halt at volley range but do not yet time their volleys to the ladders going up.

@@ -272,12 +272,26 @@ export function randomGarrison(key, budget, seed) {
   for (let k = 0; k < count.cache; k++) { const p = map.wallAt(0.25 + (0.5 * (k + 0.5)) / count.cache); groups.push(makeGroup('cache', 1, p.x + 26, p.y)); }
   for (let k = 0; k < count.cmd; k++) { const p = map.wallAt(0.3 + (0.4 * (k + 0.5)) / count.cmd); groups.push(makeGroup('cmd', 1, p.x, p.y)); }
   const front = (t, n, off) => { if (n <= 0) return; const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } groups.push(makeGroup(t, n, p.x + nx * off, p.y + ny * off, p.ang, 0, {})); };
-  if (count.wire) { const g = makeGroup('wire', 1e4, 0, 0, 0, 0); const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } Object.assign(g, { x: p.x + nx * 60, y: p.y + ny * 60, ang: p.ang, w: Math.min(360, count.wire * 4) }); g.count = groupPositions(map, g).length / 2; groups.push(g); }
-  if (count.hedgehog) { const g = makeGroup('hedgehog', 1e4, 0, 0, 0, 0); const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } Object.assign(g, { x: p.x + nx * 40, y: p.y + ny * 40, ang: p.ang, w: Math.min(360, count.hedgehog * 4) }); g.count = groupPositions(map, g).length / 2; groups.push(g); }
+  // belts of wire (60 m out, then 100 m, then 140 m) and rows of steel obstacles (40 m, then 80 m): as many as the
+  // points bought, so the share given to them is laid, not thrown away (a single belt cannot be longer than 360 m)
+  const belts = (t, n, offs) => {
+    let left = n;
+    for (const off of offs) {
+      if (left <= 0) break;
+      const g = makeGroup(t, 1e4, 0, 0, 0, 0), p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
+      Object.assign(g, { x: p.x + nx * off, y: p.y + ny * off, ang: p.ang, w: Math.min(360, left * 4) });
+      g.count = groupPositions(map, g).length / 2;
+      if (g.count > 0) { groups.push(g); left -= g.count; }
+    }
+  };
+  belts('wire', count.wire, [60, 100, 140]); belts('hedgehog', count.hedgehog, [40, 80]);
   front('mine', count.mine, 92); front('claymore', count.claymore, 28);
-  // obstacle lines are paid for as laid: trim riflemen if that ran over
+  // obstacle lines are paid for as laid: trim riflemen if that ran over, and spend what is left on riflemen along the
+  // wall (left unspent, points read as a weaker garrison and blur what the search measures)
   let over = forceCost(groups) - budget;
   for (const g of groups) { if (over <= 0) break; if (g.type !== 'rifle') continue; const cut = Math.min(g.count - 1, Math.ceil(over / 10)); g.count -= cut; over -= cut * 10; }
+  const spare = Math.floor((budget - forceCost(groups)) / UNITS[U.rifle].cost);
+  if (spare > 0) run('rifle', spare, 0.5 - spread, 0.5 + spread);
   const spent = forceCost(groups), shares = {};
   for (const g of groups) shares[g.type] = (shares[g.type] || 0) + (UNITS[U[g.type]].cost * g.count) / spent;
   return { shares, groups, spread, reserve };

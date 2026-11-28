@@ -100,7 +100,8 @@ export const lashedMethods = {
     const dx = f.x - x, dy = f.y - y, l = Math.sqrt(dx * dx + dy * dy);
     if (l < 7 || speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return true; }
     let mx = dx / l, my = dy / l;
-    if (l > 50) { const fl = this._ringField(this.map.cellOf(x, y)); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
+    // (by the path all the way in: the feet lie among the causeway's walled sides and the rock)
+    if (l > 12) { const fl = this._ringField(this.map.cellOf(x, y)); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } } // (the field leads to the nearest foot: the last few meters straight to its own)
     this._move(i, mx, my, speed, d.sz, 0);
     return true;
   },
@@ -127,7 +128,7 @@ export const lashedMethods = {
     }
     if (crewed && speed <= 0) { this.vx[i] *= 0.4; this.vy[i] *= 0.4; return; }
     let mx = dx / l, my = dy / l;
-    if (l > 50) { const fl = this._ringField(this.map.cellOf(x, y)); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } }
+    if (l > 12) { const fl = this._ringField(this.map.cellOf(x, y)); if (fl && this._flow(x, y, fl)) { mx = this.fdx; my = this.fdy; } } // (the field leads to the nearest foot: the last few meters straight to its own)
     this._move(i, mx, my, speed, d.sz, 0);
     void g;
   },

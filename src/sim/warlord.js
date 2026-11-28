@@ -768,7 +768,7 @@ export const warlordMethods = {
     // (the ground path to the postern knows no ladders: it goes through a breach, the culvert first of all)
     this.solver.solve(cost, src, ok, fl.dir, k === F_POSTG || k === F_RING ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null, jump: null })) : this.navOrc);
     // close to the postern the fight itself leads, straight in at the door
-    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT ? 0 : k >= F_POST ? 40 : 150;
+    const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT || k === F_RING ? 0 : k >= F_POST ? 40 : 150;
     for (let c = 0; c < NC; c++) close[c] = dist[c] < lim ? 1 : 0;
     fl.ready = true; fl.t = this.time; fl.ver = this.structVersion;
   },
