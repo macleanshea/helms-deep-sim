@@ -1,0 +1,55 @@
+{
+  "unit": "hallfront",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/hallfront.jpg",
+    "prompt": "tools/assets/concepts/hallfront.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f70-94d3-77e1-8610-a830f99e9c5e",
+      "remesh": "01a21f71-ddf0-7125-b3d4-d5fb4582ba65"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 53544
+    },
+    "nrm": {
+      "offset": 214176,
+      "length": 53544
+    },
+    "uv": {
+      "offset": 428352,
+      "length": 35696
+    },
+    "joints": {
+      "offset": 571136,
+      "length": 71392
+    },
+    "weights": {
+      "offset": 642528,
+      "length": 71392
+    },
+    "index": {
+      "offset": 928096,
+      "length": 28341
+    },
+    "ibm": {
+      "offset": 1041460,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

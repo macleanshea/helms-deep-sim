@@ -1,0 +1,55 @@
+{
+  "unit": "gatehorse",
+  "note": {
+    "generator": "meshy",
+    "concept": "tools/assets/concepts/gatehorse.jpg",
+    "prompt": "tools/assets/concepts/gatehorse.prompt.txt",
+    "tasks": {
+      "image-to-3d": "01a21f70-8f77-708a-92c7-b870a19f24ce",
+      "remesh": "01a21f72-2aed-7058-b3b1-a5374c6b77b1"
+    }
+  },
+  "fps": 30,
+  "bones": [
+    "hull"
+  ],
+  "parts": {
+    "pos": {
+      "offset": 0,
+      "length": 41874
+    },
+    "nrm": {
+      "offset": 167496,
+      "length": 41874
+    },
+    "uv": {
+      "offset": 334992,
+      "length": 27916
+    },
+    "joints": {
+      "offset": 446656,
+      "length": 55832
+    },
+    "weights": {
+      "offset": 502488,
+      "length": 55832
+    },
+    "index": {
+      "offset": 725816,
+      "length": 30927
+    },
+    "ibm": {
+      "offset": 849524,
+      "length": 16
+    }
+  },
+  "clips": [
+    {
+      "name": "idle",
+      "loop": true,
+      "frames": 1,
+      "stride": 0,
+      "offset": 0
+    }
+  ]
+}

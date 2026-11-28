@@ -277,9 +277,14 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   then, and if it fails to load, the built-in tower stands. The rules are unchanged: the footprint was already
   solid. The same path will take the hall front and the gatehouse.
 
-**Still to do toward the references:** painted stone textures, the square gatehouse's hoarding and deep arch and
-the two-tier hall front as sculpted pieces by the same path, rock outcrops under the walls, more dressing
-(barrels, carts), an HDR pipeline, rain as particles. Lightning already lights by
+- **The hall front and the gatehouse's horses, sculpted.** The hall's front is a generated shell (five tall arches
+  under a gallery of ten windows, a slate roof, a horse's head at each end of the ridge), set across the width
+  the built front had and laid in the fortress's stone; a glowing wall inside it is the firelit room seen through
+  its arches. Everything else of the gatehouse is working stone (leaves that break, a walk men stand on, flanks
+  they fight from), so it stays built, and takes its character from a great carved horse's head springing from
+  each flank over the causeway. `structures.js sculptedAt()` sets any such piece by a frame. 70 credits.
+
+**Still to do toward the references:** rock outcrops under the walls, more dressing (barrels, carts). Lightning already lights by
 direction (it raises the moon's light and the sky's, and shadows fall with it). A moon in the sky was tried and
 taken out: the game's camera never lifts far enough to show sky.
 

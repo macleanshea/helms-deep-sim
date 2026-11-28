@@ -128,8 +128,16 @@
   },
   "props": {
     "horn": {
-      "file": "horn-prop.c9d79b0d13.bin",
-      "bytes": 108468
+      "file": "horn-prop.2114dc0cab.bin",
+      "bytes": 108504
+    },
+    "hallfront": {
+      "file": "hallfront-prop.6d8c88527b.bin",
+      "bytes": 103866
+    },
+    "gatehorse": {
+      "file": "gatehorse-prop.b8c6ad7564.bin",
+      "bytes": 113774
     }
   }
 }

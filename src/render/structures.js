@@ -422,7 +422,7 @@ function innerWard(m, map, props) {
   court(t2, 2, PLATEAU_Z - 1, 48);
   if (props && props.horn) sculpted(m, props.horn, tw.x, tw.y, PLATEAU_Z - 1, tw.top - (PLATEAU_Z - 1), tw.r + tw.foot);
   else hornTower(m, tw.x, tw.y, tw.r, PLATEAU_Z - 1, tw.top);
-  hallArcade(m, map, t2);
+  hallArcade(m, map, t2, props && props.hallfront);
 }
 
 /**
@@ -431,20 +431,43 @@ function innerWard(m, map, props) {
  * place a little lighter or darker as the sculptor shaded it (windows, joints, hollows).
  */
 function sculpted(m, prop, x, y, z0, height, foot) {
-  const { pos, nrm, shade, index } = prop, kxy = prop.xy * (foot / prop.foot), kz = height / 32767, sx = foot / prop.foot;
-  const P = (p) => [x + pos[p * 3] * kxy, y + pos[p * 3 + 1] * kxy, z0 + pos[p * 3 + 2] * kz];
-  const N = (p) => { const a = nrm[p * 3] / sx, b = nrm[p * 3 + 1] / sx, c = nrm[p * 3 + 2] / height, l = Math.hypot(a, b, c) || 1; return [a / l, b / l, c / l]; };
+  const k = prop.xy * (foot / prop.foot);
+  sculptedAt(m, prop, [x, y, z0], [1, 0], [0, 1], k, k, height);
+}
+
+/**
+ * The same, set by a frame: `o` the point its axis stands on, `X` and `Y` the directions on the ground its own depth
+ * and breadth run in, `sx`, `sy` metres to one of its stored units along them, `sz` its height in metres. `glow`, if
+ * given, is asked of every triangle (its middle in the piece's own metres [depth, breadth, height], and how dark the
+ * sculptor painted it, 1 = average): a colour back makes that triangle a lit opening instead of stone.
+ */
+function sculptedAt(m, prop, o, X, Y, sx, sy, sz, glow = null) {
+  const { pos, nrm, shade, index } = prop, kz = sz / 32767, flip = X[0] * Y[1] - X[1] * Y[0] < 0;
+  const L = (p) => [pos[p * 3] * sx, pos[p * 3 + 1] * sy, pos[p * 3 + 2] * kz];
+  const P = (q) => [o[0] + X[0] * q[0] + Y[0] * q[1], o[1] + X[1] * q[0] + Y[1] * q[1], o[2] + q[2]];
+  const N = (p) => { const a = (nrm[p * 3] * prop.xy) / sx, b = (nrm[p * 3 + 1] * prop.xy) / sy, c = nrm[p * 3 + 2] / sz, nx = X[0] * a + Y[0] * b, ny = X[1] * a + Y[1] * b, l = Math.hypot(nx, ny, c) || 1; return [nx / l, ny / l, c / l]; };
   const C = (p) => { const k = Math.max(0.42, Math.min(1.22, 0.35 + 0.65 * (shade[p] / 128))); return [STONE[0] * k, STONE[1] * k, STONE[2] * k]; };
   for (let t = 0; t < index.length; t += 3) {
-    const ia = index[t], ib = index[t + 1], ic = index[t + 2], a = P(ia), b = P(ib), c = P(ic);
+    const ia = index[t], ib = flip ? index[t + 2] : index[t + 1], ic = flip ? index[t + 1] : index[t + 2], la = L(ia), lb = L(ib), lc = L(ic), a = P(la), b = P(lb), c = P(lc);
     const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
     let fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx; const l = Math.hypot(fx, fy, fz);
     if (l < 1e-9) continue;
     fx /= l; fy /= l; fz /= l;
+    if (glow) {
+      const g = glow([(la[0] + lb[0] + lc[0]) / 3, (la[1] + lb[1] + lc[1]) / 3, (la[2] + lb[2] + lc[2]) / 3], (shade[ia] + shade[ib] + shade[ic]) / 384);
+      if (g) { m.withMat(MAT.EMIT, () => m._tri(a, b, c, null, null, null, g, g, g, 0)); continue; }
+    }
     // rounded where the sculpt is round, a hard edge where it turns sharply: a corner takes the face's own normal past about 35 degrees
     const f = [fx, fy, fz], pick = (n) => (n[0] * fx + n[1] * fy + n[2] * fz > 0.82 ? n : f);
     m._tri(a, b, c, pick(N(ia)), pick(N(ib)), pick(N(ic)), C(ia), C(ib), C(ic), 0);
   }
+}
+
+/** Which way a sculpted piece's top leans along one of its ground axes (0 its depth, 1 its breadth): +1 or -1. */
+function topLeans(prop, axis) {
+  let s = 0, n = 0, lo = 1e9, hi = -1e9;
+  for (let p = 0; p < prop.places; p++) { const v = prop.pos[p * 3 + axis]; if (v < lo) lo = v; if (v > hi) hi = v; if (prop.pos[p * 3 + 2] > 32767 * 0.86) { s += v; n++; } }
+  return n && s / n < (lo + hi) / 2 ? -1 : 1;
 }
 
 /**
@@ -487,7 +510,7 @@ function hornTower(m, x, y, r, z0, zt) {
  * The great hall: its front is an arcade of tall arches standing against the cliff at the back of the middle ward,
  * the hall itself cut into the rock behind. Laid along the stretch of the ward's rim that the mountain covers.
  */
-function hallArcade(m, map, t) {
+function hallArcade(m, map, t, front = null) {
   // find the buried arc of the rim, and stand the front across its middle
   let best = [0, 0], run = null;
   for (let k = 0; k <= 720; k++) {
@@ -505,6 +528,24 @@ function hallArcade(m, map, t) {
   // a frame standing on the ward at the middle of the front: +x out of the cliff (toward the ward), +y along the front
   m.frame([t.x + Math.cos(am) * d, t.y + Math.sin(am) * d, t.z], [-Math.cos(am), -Math.sin(am)], [Math.sin(am), -Math.cos(am)], () => {
     const H2 = 7.5, HR0 = H + H2, D = 1.6;
+    if (front) {
+      // The sculpted front (tools/assets/prop.js): set across the same width, its face a little proud of where the built
+      // one stood, its rooms and roof running back into the rock. Whatever of it lies well behind the face and was painted
+      // dark is an opening: those glow from the fires inside, brightest low down.
+      // (which of its two long sides is the front: the one with the arches and windows, where the sculptor put most of the work)
+      let fore = 0; for (let p = 0; p < front.places; p++) fore += front.pos[p * 3] > 0 ? 1 : -1;
+      const s = fore >= 0 ? 1 : -1, kxy = (L + 3) / (front.box[3] - front.box[2]), sxy = kxy * front.xy, tall = HR0 + 1.5;
+      const face = (s > 0 ? front.box[1] : -front.box[0]) * kxy, deep = (front.box[1] - front.box[0]) * kxy;
+      m.box(0.4 - deep - 17, 0, HR0 / 2, 34, L + 3, HR0, STONE_DK); // (the body behind it, into the mountain)
+      sculptedAt(m, front, [0.6 - face, 0, 0], [s, 0], [0, 1], sxy, sxy, tall);
+      // it is a shell with open arches: the firelit room seen through them is a glowing wall a little way inside, brightest
+      // along the floor where the fires are and dying away to the roof
+      const W2 = (L + 3) / 2 - 1.2, xi = 0.6 - Math.min(2.2, deep * 0.3), warm = [0.98, 0.56, 0.2];
+      m.withMat(MAT.EMIT, () => {
+        for (const [z0, z1, k0, k1] of [[0.2, tall * 0.2, 1, 0.55], [tall * 0.2, tall * 0.42, 0.55, 0.16], [tall * 0.42, tall * 0.7, 0.5, 0.2]])
+          m.quadC([xi, -W2, z0], [xi, W2, z0], [xi, W2, z1], [xi, -W2, z1], [xi - 5, 0, (z0 + z1) / 2], dim(warm, k0), dim(warm, k0), dim(warm, k1), dim(warm, k1));
+      });
+    } else {
     // the hall's body lies behind the front and runs back into the mountain: nothing of it stands free
     m.box(-D - 17, 0, HR0 / 2, 34, L + 3, HR0, STONE_DK);
     m.box(0.25, 0, 0.5, 0.9, L + 3.4, 1.0, STONE_DK);                        // plinth
@@ -535,6 +576,7 @@ function hallArcade(m, map, t) {
     for (let k = 0; k < nb2; k++) opening((k + 0.5 - nb2 / 2) * bw2, bw2 * 0.52, bw2, H + 0.6, 3.0, HR0, true);
     m.box(0.3, 0, HR0 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                  // cornice
     for (const sd of [-1, 1]) m.box(0.2, sd * (L / 2 + 0.75), HR0 / 2, 1.6, 1.5, HR0 + 1.5, STONE_LT);     // end piers
+    }
     const HR = H + H2;
     // the mountain closes round it: shoulders of rock either side of the front and over its roof, so only the face shows
     m.withMat(MAT.ROCK, () => {
@@ -549,8 +591,8 @@ function hallArcade(m, map, t) {
       for (const sd of [-1, 1]) for (let k = 0; k < 9; k++) lump(-1 - rnd() * 8 - k * 0.3, sd * (L / 2 + 3.5 + rnd() * 7 + (k % 3) * 2), (k * (HR0 + 8)) / 9 + rnd() * 3, 5 + rnd() * 4);
       for (let k = 0; k < 8; k++) lump(-5 - rnd() * 9, (k / 7 - 0.5) * (L + 12), HR0 + 5 + rnd() * 6, 5.5 + rnd() * 4.5);
     });
-    // the roof: a slate pent climbing back until the mountain takes it
-    m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, HR + 0.5], [0.9, L / 2 + 1.7, HR + 0.5], [-34, L / 2 + 1.7, HR + 14], [-34, -L / 2 - 1.7, HR + 14]], [[0.9, -L / 2 - 1.7, HR + 0.8], [0.9, L / 2 + 1.7, HR + 0.8], [-34, L / 2 + 1.7, HR + 14.3], [-34, -L / 2 - 1.7, HR + 14.3]], SLATE));
+    // the roof: a slate pent climbing back until the mountain takes it (the sculpted front has its own)
+    if (!front) m.withMat(MAT.SLATE, () => m.prism([[0.9, -L / 2 - 1.7, HR + 0.5], [0.9, L / 2 + 1.7, HR + 0.5], [-34, L / 2 + 1.7, HR + 14], [-34, -L / 2 - 1.7, HR + 14]], [[0.9, -L / 2 - 1.7, HR + 0.8], [0.9, L / 2 + 1.7, HR + 0.8], [-34, L / 2 + 1.7, HR + 14.3], [-34, -L / 2 - 1.7, HR + 14.3]], SLATE));
   });
 }
 
@@ -598,7 +640,7 @@ function banner(m, x, y, z, h = 9, len = 4.6) {
  * banners on the gatehouse, the bastions, the horn tower's foot and before the hall. None of it is in anyone's way:
  * posts and poles are thinner than a man, and the gallery's roof is above the heads of those who stand under it.
  */
-function dressing(m, map) {
+function dressing(m, map, props = null) {
   const g = map.segments[map.GATE], f = map.flanks[0], top = RING_TOP;
   const P = (u, v, z) => [g.x + g.nx * u + g.tx * v, g.y + g.ny * u + g.ty * v, z];
   // a gallery over each way in (the gate, the postern, the door from the Deeping Wall): posts at the corners of the
@@ -623,6 +665,11 @@ function dressing(m, map) {
   gallery(ps, ps.len * 0.2 + 1.5);
   gallery(ds, ds.len * 0.3 + 1.2);
   for (const fl of map.flanks) { const p = P(fl.u1 - 1.0, (fl.v1 - 1.0) * fl.sd, top); banner(m, p[0], p[1], p[2], 10, 5.2); }
+  // a great carved horse's head springs from each of the gatehouse's flanks, over the causeway (a sculpted piece: prop.js)
+  if (props && props.gatehorse) {
+    const h = props.gatehorse, s2 = topLeans(h, 0), tall = 3.3, k = tall * h.xy, rear = (s2 > 0 ? -h.box[0] : h.box[1]) * tall;
+    for (const fl of map.flanks) { const p = P(fl.u1 - 0.45 + rear, ((fl.v0 + fl.v1) / 2) * fl.sd, top - 6.2); sculptedAt(m, h, p, [g.nx * s2, g.ny * s2], [g.tx, g.ty], k, k, tall); }
+  }
   for (const b of map.bastions) banner(m, b.x + Math.cos(b.a) * (b.r - 1.6), b.y + Math.sin(b.a) * (b.r - 1.6), top, 8, 4);
   const t2 = KEEP.t2;
   for (const sd of [-1, 1]) { const a = Math.atan2(t2.y - KEEP.t1.y, t2.x - KEEP.t1.x) + Math.PI + sd * 0.5; const x = t2.x + Math.cos(a) * (t2.r - 2), y = t2.y + Math.sin(a) * (t2.r - 2); if (map.tierAt(x, y) === 2) banner(m, x, y, t2.z, 9, 4.6); }
@@ -658,10 +705,10 @@ export function buildStructures(map, segs, cache = new Map(), props = null) {
   for (let k = 0; k < N_WALL; k++) piece('w' + k, `${down(k)}${down(k - 1)}${down(k + 1)}`, (m) => wallSection(m, map, segs, k, bound, H, BASE));
   for (let k = 0; k < N_RING; k++) piece('r' + k, (segs[N_WALL + k].breached ? '1' : '0') + (segs[N_WALL + k].leaves ? 'L' : ''), (m) => ringSection(m, map, segs, k));
   piece('platforms', '', (m) => platforms(m, map));
-  piece('dressing', '', (m) => dressing(m, map));
+  piece('dressing', props && props.gatehorse ? 'horses' : '', (m) => dressing(m, map, props));
   piece('fires', '', (m) => { for (const t of torchSites(map)) brazier(m, t); });
   piece('stairs', '', (m) => stairs(m, map));
-  piece('ward', props && props.horn ? 'sculpted' : '', (m) => innerWard(m, map, props));
+  piece('ward', (props && props.horn ? 'tower' : '') + (props && props.hallfront ? 'hall' : ''), (m) => innerWard(m, map, props));
   piece('ramps', '', (m) => { ramp(m, map, map.causeway, map.causeHalf, map.causeZ, -3, true); ramp(m, map, map.rear, map.rearHalf, map.rearZ, -3, true); });
   for (const s of segs) if (s.breached) piece('x' + s.id, '', (m) => rubble(m, map, s));
   let bytes = 0;
