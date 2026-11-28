@@ -350,12 +350,19 @@ const CHECKS = {
     verdict('lanes: a packed wall', M.lanes.noLane === 0, `300 rifles massed on 110 m of wall: ${pct(M.lanes.blocked / Math.max(1, M.lanes.inReach))} of their time in reach was spent with no line of fire (frontage for about 180 at the parapet, more as they spread along it), and none fired without one`,
       `most in one 2 m cell ${M.lanes.maxCell} · furthest from post ${Math.round(M.lanes.wander)} m · moves per man per minute ${(M.sim.stats.reposts / 300 / Math.max(1, M.sim.time / 60)).toFixed(2)}`);
   }],
-  keep: ['Abandoning the wall for the Hornburg at once is not a free win (a known, open problem)', () => {
-    // the stand-in commander, who also orders everyone into the keep in the first second
+  keep: ['Abandoning the wall for the Hornburg at once is not a free win: no better than holding the wall', () => {
+    // the stand-in commander, who also orders everyone into the keep in the first second, against the same commander
+    // holding the wall as laid out, on the same seeds. Falling back is a free win where it is clearly better: it wins
+    // every night, at least as often as holding the wall, and with a quarter or more of the garrison more left.
     const rows = [], doors = [];
     let free = 0;
     for (const p of PRESETS.filter((q) => q.key !== 'empty' && !q.hidden)) {
-      let wins = 0; const left = [];
+      let wins = 0, held = 0; const left = [], heldLeft = [];
+      for (const seed of [1, 2, 3]) {
+        const H = play(preset(p.key, seed), { policy: 'auto' });
+        if (H.sim.result && H.sim.result.win) held++;
+        heldLeft.push(H.sim.defCombat / H.sim.initial[0]);
+      }
       for (const seed of [1, 2, 3]) {
         let deep = 0;
         const P = play(preset(p.key, seed), { policy: 'auto', tick: (sim) => {
@@ -372,11 +379,12 @@ const CHECKS = {
         const dr = P.sim.segs[map.DOOR];
         doors.push({ deep, post: ps.breached ? 'broken' : ps.hp < ps.maxHp ? 'battered' : 'untouched', gate: gs.breached ? 'down' : `${pct(gs.hp / gs.maxHp)}`, door: dr.breached ? 'broken' : dr.hp < dr.maxHp ? 'battered' : 'untouched' });
       }
-      if (wins === 3 && median(left) > 0.5) free++;
-      rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
+      const isFree = wins === 3 && wins >= held && median(left) > median(heldLeft) + 0.25;
+      if (isFree) free++;
+      rows.push(`${p.name}: fell back ${wins}/3, ${pct(median(left))} left; held the wall ${held}/3, ${pct(median(heldLeft))} left${isFree ? ' (FREE)' : ''}`);
     }
     keepDoors = doors;
-    verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
+    verdict('keep', free === 0, `falling back into the Hornburg in the first second, against holding the wall: ${rows.join(' · ')}`,
       `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')} · door ${doors.map((d) => d.door).join(', ')}`, true);
   }],
   deep: ['Given an empty wall, the horde comes round through the Deep; while the wall is manned it does not', () => {

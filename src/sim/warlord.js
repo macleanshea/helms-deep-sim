@@ -25,6 +25,7 @@ const OBSERVE = 450;             // how far off the horde can count heads on a w
 const F_CULVERT = 3, F_HUNT = 4, F_GATE = 9; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
 const F_POST = 5, F_POSTG = 6; // to the back doors: for those who can climb a ladder, and for those who cannot
 const F_RING = 7;              // to the feet of the rock below the ring, for ladders to be lashed (lashed.js)
+const SEC_RING = 5;            // a force's objective: the valley side of the Hornburg's ring, by lashed ladders
 const FORM_OFF = 470;            // the forming-up line lies this far short of the works (m): beyond the machine guns' reach
 const FORM_X = LAYOUT.wall.span[0] + 20 - FORM_OFF;
 const SHIELD_FAR = 430;          // shields are locked this far out to begin with (m from the works)
@@ -89,7 +90,7 @@ export const warlordMethods = {
     for (const gid of f.groups) this._wlField(gid, f);
   },
 
-  _wlField(gid, f) { this.aimDirty = true; this.gField[gid] = f.reserve || f.sector < 0 ? 0 : f.sector < 3 ? f.sector + 1 : f.sector === 4 ? F_POST + 1 : F_GATE; },
+  _wlField(gid, f) { this.aimDirty = true; this.gField[gid] = f.reserve || f.sector < 0 ? 0 : f.sector < 3 ? f.sector + 1 : f.sector === 4 ? F_POST + 1 : f.sector === SEC_RING ? F_RING + 1 : F_GATE; },
 
   /**
    * Send a force on the field a new objective. It is not obeyed at once: a horn call and a captain's shouting take a
@@ -106,6 +107,7 @@ export const warlordMethods = {
   _wlObj(f) {
     if (f.sector === 3) { const g = this.segs[this.map.GATE]; return g; }
     if (f.sector === 4) return this._postFoot();
+    if (f.sector === SEC_RING) return this._ringMid();
     return this.sectors[f.sector >= 0 ? f.sector : 1];
   },
 
@@ -140,7 +142,9 @@ export const warlordMethods = {
     const P = this.segs[this.map.POSTERN], G = this.segs[this.map.GATE];
     if (G.breached) return [3, 3, 3];
     if (P.breached) return [4, 4, 4];
-    return [4, 4, 3];
+    // the northern force over the empty Deeping Wall and through the Deep for the back doors, the middle one up the
+    // valley side of the ring with lashed ladders, the southern one (with the ram) at the gate: three ways in at once
+    return [4, SEC_RING, 3];
   },
 
   /** Make `main` the sector the catapults pin and the trolls batter. */
@@ -174,6 +178,7 @@ export const warlordMethods = {
   /** The wall segment a troll of company g should batter, or -1. */
   _trollSeg(g) {
     const wl = this.wl, k = wl.breachSeg;
+    if (wl.abandoned) return -1; // (nobody on the Deeping Wall: the trolls go with their forces for the Hornburg's doors)
     if (k < 0 || this.segs[k].breached) return -1;
     const f = wl.forces[this.gForce[g]];
     return f && f.sector === wl.main ? k : -1;
@@ -448,7 +453,7 @@ export const warlordMethods = {
         if (any && !this.segs[this.map.GATE].breached) this._alert(null, 0, round ? 'Horde heading for the postern' : 'Horde turning on the Hornburg', 'bad', at.x, at.y, true);
       } else {
         // men back on the wall: those coming round for the postern turn on the wall in front of them again
-        for (const f of wl.forces) { if (this._wlSec(f) !== 4) continue; this._wlSend(f, NATURAL[f.lane]); }
+        for (const f of wl.forces) { const q = this._wlSec(f); if (q !== 4 && q !== SEC_RING) continue; this._wlSend(f, NATURAL[f.lane]); }
       }
     }
     // what the horde has seen of each sector's wall: a head-count whenever enough of it is close enough to look
@@ -753,8 +758,9 @@ export const warlordMethods = {
       // and for those who can climb, every lashed ladder standing against the ring is a way in as good as a door
       if (k === F_POST) for (const L of this.lashed) if (this.alive[L] && ns < src.length) src[ns++] = this.map.cellOf(this.tx[L], this.ty[L]);
     } else if (k === F_RING) {
-      // the feet of the rock below the ring: where the ladders are carried, to be lashed together
-      for (const f of this.ringFoot) if (f && ns < src.length) src[ns++] = f.c;
+      // the feet of the rock below the ring: where the ladders are carried, to be lashed together (those in the Deep
+      // only once the Deeping Wall has been breached: a ladder cannot be carried over it)
+      for (const f of this.ringFoot) if (f && (!f.deep || this.wl.open) && ns < src.length) src[ns++] = f.c;
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];

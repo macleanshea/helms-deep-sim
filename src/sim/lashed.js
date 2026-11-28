@@ -40,7 +40,9 @@ export const lashedMethods = {
         // a pace further out, so the whole foot stands clear of the rock
         const fx = x + s.nx * 1.5, fy = y + s.ny * 1.5, fc = this.map.cellOf(fx, fy);
         if (this.mtype[fc] === T.CLIFF) continue;
-        return { x: fx, y: fy, c: fc, d: d + 1.5 };
+        // (behind the Deeping Wall, in the Deep: reached only through a breach, or over the wall)
+        const J = this.map.wallJoin, Tp = this.map.wallTop, wx = fy >= J.y ? J.x : this.map.wallAt(Math.max(0, Math.min(1, (fy - J.y) / (Tp.y - J.y)))).x;
+        return { x: fx, y: fy, c: fc, d: d + 1.5, deep: fx > wx };
       }
       return null;
     });
@@ -57,7 +59,7 @@ export const lashedMethods = {
     let best = -1, bs = 1e12;
     for (let k = 0; k < this.segs.length; k++) {
       const f = this.ringFoot[k], s = this.segs[k];
-      if (!f || s.breached || s.ladders + s.claimed >= 1) continue;
+      if (!f || s.breached || s.ladders + s.claimed >= 1 || (f.deep && !this.wl.open)) continue;
       const sc = Math.hypot(f.x - ox, f.y - oy) + this.rand() * 40;
       if (sc < bs) { bs = sc; best = k; }
     }
@@ -144,6 +146,20 @@ export const lashedMethods = {
     this.fx.dust(f.x, f.y, this.map.groundZ(f.x, f.y), 4); this.fx.sound('ladder', f.x, f.y, 0.8);
     if (this.stats.lashedUp === 1) this._alert(null, 0, 'Ladders lashed · Hornburg', 'bad', f.x, f.y, true);
     else this._alert('lashUp', 25, 'Ladders lashed · Hornburg', 'bad', f.x, f.y);
+  },
+
+  /** The middle of the valley side of the ring's feet: where a force sent up the ring by lashed ladders is bound. */
+  _ringMid() {
+    if (this._ringMidP) return this._ringMidP;
+    let sx = 0, sy = 0, n = 0;
+    for (const f of this.ringFoot) if (f && !f.deep) { sx += f.x; sy += f.y; n++; }
+    return (this._ringMidP = n ? { x: sx / n, y: sy / n } : this.segs[this.map.GATE]);
+  },
+
+  /** A foot of the rock on the valley side of the ring for company g to make for (the companies of a force spread over them). */
+  _ringAim(g) {
+    const list = this._valleyFeet || (this._valleyFeet = this.ringFoot.filter((f) => f && !f.deep));
+    return list.length ? list[(g * 7) % list.length] : null;
   },
 
   /** The path to the foot of the rock below the ring (null if not solved yet). */

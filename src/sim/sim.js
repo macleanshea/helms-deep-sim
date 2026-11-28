@@ -1062,7 +1062,8 @@ export class Sim {
         }
         if (k < 0 || this.segs[k].breached) {
           if (k >= 0) this.segs[k].claimed--;
-          if (!tower && this.wl.abandoned) {
+          const fo = this.wl.forces[this.gForce[g]], fsec = fo ? this._wlSec(fo) : -1;
+          if (!tower && this.wl.abandoned && (fsec === 5 || fsec === 3)) {
             // the Deeping Wall given up for the Hornburg: two ladders lashed together, up the ring from the valley floor
             k = this._pickRingSeg(x, y, g); this.aux2[i] = k;
             if (k >= 0) { this.segs[k].claimed++; this._findMate(i); }
@@ -1248,9 +1249,11 @@ export class Sim {
     if (wary && this._fortDist(x, y) < 390) return false; // inside rocket reach: pull back before shooting again
     {
       const m = i % 3;
-      if (m === 1 && this.wl.breachSeg >= 0) {
-        // battering mission: the stretch of wall the trolls are working on
-        const sg = this.segs[this.wl.breachSeg], dx = sg.x - x, dy = sg.y - y, d2 = dx * dx + dy * dy;
+      // battering mission: the stretch of wall the trolls are working on; with the Deeping Wall given up, the
+      // Hornburg's doors: the postern, then the gate
+      const bk = this.wl.abandoned ? (!this.segs[this.map.POSTERN].breached ? this.map.POSTERN : !this.segs[this.map.GATE].breached ? this.map.GATE : -1) : this.wl.breachSeg;
+      if (m === 1 && bk >= 0) {
+        const sg = this.segs[bk], dx = sg.x - x, dy = sg.y - y, d2 = dx * dx + dy * dy;
         if (!sg.breached && d2 <= range * range && d2 >= w.min * w.min) { this.tx[i] = sg.x; this.ty[i] = sg.y; return true; }
       } else if (m === 2 && this.caches.length && this.rand() < 0.4) {
         // the garrison's ammunition

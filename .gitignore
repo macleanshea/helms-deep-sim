@@ -4,3 +4,4 @@ node_modules/
 shots/
 assets-src/
 lab-out/
+.claude/worktrees/
