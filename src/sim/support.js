@@ -45,7 +45,7 @@ export const supportMethods = {
       }
       if (this.ammo[ci] <= 0) {
         this.kill(ci, null, true);
-        this._alert('cacheDry', 25, 'Ammo point dry — call a resupply', 'warn', x, y);
+        this._alert('cacheDry', 25, 'Ammo cache empty', 'warn', x, y);
       }
     }
   },
@@ -62,7 +62,7 @@ export const supportMethods = {
       if (this.ammo[i] < 1) { dry[k]++; sx[k] += this.x[i]; sy[k] += this.y[i]; }
     }
     for (let k = 0; k < 4; k++) {
-      if (armed[k] >= 4 && dry[k] * 2 >= armed[k]) this._alert('dry' + k, 90, `Out of ammunition — ${this.sectors[k].short}`, 'bad', sx[k] / dry[k], sy[k] / dry[k]);
+      if (armed[k] >= 4 && dry[k] * 2 >= armed[k]) this._alert('dry' + k, 90, `Out of ammo · ${this.sectors[k].short}`, 'bad', sx[k] / dry[k], sy[k] / dry[k]);
     }
   },
 
@@ -108,7 +108,7 @@ export const supportMethods = {
         this.timed.push({ t: ti - 0.8, f: () => this._launch(rx, ry, this._altAt('jet', rx, ry, dx * speed, dy * speed) - 5, bx, by, this.map.groundZ(bx, by), W.bomb, DEF, 4, 0.8) });
       }
       this.timed.push({ t: this.time + (sd - 500) / speed, f: () => this.fx.sound('jet', cx, cy, 1) });
-      this.events.push({ type: 'log', text: 'Air strike inbound — 5 seconds', cls: 'good', x: cx, y: cy });
+      this.events.push({ type: 'log', text: 'Air strike inbound · 5 s', cls: 'good', x: cx, y: cy });
     } else if (kind === 'gunship') {
       // three helicopters, spaced evenly around the orbit
       for (let j = 0; j < 3; j++) {
@@ -127,7 +127,7 @@ export const supportMethods = {
       const sx = WORLD_W + 200, sy = y + 50;
       this.aircraft.push({ kind: 'transport', x: sx, y: sy, px: sx, py: sy, cx: x, cy: y, rot: Math.PI, t: 0, st: 0, until: 0, dropped: 0, grp: this.newGroup(DEF) });
       this.fx.sound('helo', x, y, 1);
-      this.events.push({ type: 'log', text: 'Troops inbound', cls: 'good', x, y });
+      this.events.push({ type: 'log', text: 'Reinforcements inbound', cls: 'good', x, y });
     }
     return true;
   },

@@ -84,7 +84,7 @@ function play(setup, opts = {}) {
     sim.step();
     if (pilot) pilot.step();
     if (opts.tick) opts.tick(sim, P);
-    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/slackening/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.short)) }); }
+    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/surging/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.short)) }); }
     sim.events.length = 0;
     // ladders: when each went up
     for (const e of sim.engines) if (sim.alive[e] && sim.type[e] === U.ladder && sim.state[e] === S_DONE) { const k = e * 65536 + sim.gen[e]; if (!P.raised.has(k)) P.raised.set(k, sim.time); }

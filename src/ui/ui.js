@@ -12,8 +12,8 @@ export function reachOf(d) {
   const w = d.wdef || (d.ob === 'claymore' ? WEAPONS.claymore : null);
   // indirect fire is shown with its minimum: it cannot land rounds any closer
   const mn = w && w.arc && w.min;
-  if (w && w.range) return { text: w.range >= 1500 ? 'Map-wide' : `${mn ? mn + '–' : ''}${w.range} m`, what: d.ob ? 'Reach of its blast' : `${w.name} range${mn ? ' (minimum–maximum)' : ''}` };
-  if (d.pool) return { text: `${SUPPLY_R} m`, what: 'Re-arms troops within this radius' };
+  if (w && w.range) return { text: w.range >= 1500 ? 'Map-wide' : `${mn ? mn + '–' : ''}${w.range} m`, what: d.ob ? 'Blast range' : `${w.name} range${mn ? ', minimum to maximum' : ''}` };
+  if (d.pool) return { text: `${SUPPLY_R} m`, what: 'Re-arm range' };
   return null;
 }
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
@@ -87,7 +87,7 @@ export function buildUI(app, portraits) {
     }
     preset.value = cur;
     ui.showBest();
-    preset.title = sb ? 'Autofill the map with a scenario\'s armies' : 'Choose the challenge';
+    preset.title = sb ? 'Replaces both armies on the map' : '';
     for (const b of modeSw.children) b.classList.toggle('active', app.modeChosen && (b.dataset.mode === 'sandbox') === sb);
   };
   /** The best score on the chosen challenge, beside the list (nothing in the sandbox, or before one is won). */
@@ -103,8 +103,8 @@ export function buildUI(app, portraits) {
     const sb = b.dataset.mode === 'sandbox';
     b.addEventListener('click', () => { if (!app.modeChosen || sb !== app.isSandbox()) app.enterMode(b.dataset.mode); b.blur(); });
     bindTip(b, sb ? 'Sandbox' : 'Challenge', sb
-      ? 'Build both armies freely, from scratch or from a scenario. No budget, no waves, and you set the win conditions. Not scored.'
-      : 'Play a scenario as designed: hold until dawn against waves of attackers, within your requisition. Scored, with medals.');
+      ? 'Build both armies and set the rules. Not scored.'
+      : 'Hold a set scenario until dawn, on a budget. Scored, with medals.');
   }
   const btnBegin = $('btnBegin');
   btnBegin.addEventListener('click', () => app.startBattle());
@@ -112,9 +112,10 @@ export function buildUI(app, portraits) {
   ui.refreshBegin = () => {
     const over = !app.isSandbox() ? forceCost(app.setup.groups) - app.setup.budget : 0;
     btnBegin.disabled = over > 0;
-    btnBegin.title = over > 0 ? `${fmt(over)} requisition points over budget — open Advanced under Order of Battle to trim the garrison` : 'Begin the battle (Enter)';
+    btnBegin.title = over > 0 ? `Over budget by ${fmt(over)} pts. Edit the garrison to begin.` : '';
   };
-  $('btnBack').addEventListener('click', () => app.backToSetup());
+  const btnBack = $('btnBack');
+  btnBack.addEventListener('click', () => app.backToSetup());
   $('btnResult').addEventListener('click', () => { if (app.sim && app.sim.result) ui.showEnd(app.sim); });
   $('btnHelp').addEventListener('click', () => { ui.closePopups(); ui.showHelp(); });
   $('btnSettings').addEventListener('click', (e) => { e.stopPropagation(); ui.toggleSettings(); $('btnSettings').blur(); });
@@ -128,7 +129,7 @@ export function buildUI(app, portraits) {
     const sandbox = !app.setup || app.isSandbox();
     if (tab === ORC && !sandbox) {
       // in a challenge the enemy is what it is
-      const box = el('div', 'locked', '<b>The enemy is fixed in a challenge.</b><span>Switch to Sandbox to build both armies freely. Sandbox battles are not scored.</span>');
+      const box = el('div', 'locked', '<b>Attackers are fixed in a challenge</b><span>Sandbox lets you edit both armies. It is not scored.</span>');
       const b = el('button', null, 'Switch to Sandbox'); b.addEventListener('click', () => app.enterMode('sandbox'));
       box.append(b); palette.append(box);
       return;
@@ -138,7 +139,7 @@ export function buildUI(app, portraits) {
       const b = el('button', 'card ' + (d.team === DEF ? 'def' : 'orc') + (app.tool && app.tool.kind === 'place' && app.tool.type === d.key ? ' active' : ''));
       const ic = el('div', 'ico'); ic.append(icon(d, 44));
       const r = reachOf(d);
-      const meta = (r ? `<i class="rng" title="${r.what}">${RANGE_SVG}${r.text}</i>` : '') + (d.cost && showCost ? `<em title="Requisition points each">${d.cost} pts</em>` : '');
+      const meta = (r ? `<i class="rng" title="${r.what}">${RANGE_SVG}${r.text}</i>` : '') + (d.cost && showCost ? `<em title="Requisition cost">${d.cost} pts</em>` : '');
       b.append(ic, el('div', null, `<b><span class="nm">${d.name}</span>${meta ? `<span class="meta">${meta}</span>` : ''}</b><span>${d.desc}</span>`));
       b.addEventListener('click', () => { app.selectPlaceTool(app.tool && app.tool.type === d.key ? null : d.key); b.blur(); });
       if (d.note) bindTip(b, d.name, `${d.note}<br><br><b>Counter:</b> ${d.counter}`);
@@ -148,12 +149,12 @@ export function buildUI(app, portraits) {
     const section = (title, list) => { if (!list.length) return; palette.append(el('div', 'pal-head', title)); list.forEach(card); };
     if (tab === DEF) {
       section('Troops', mine.filter((d) => d.cls === C.INF));
-      section('Vehicles', mine.filter((d) => d.cls === C.VEH || d.cls === C.GUN));
-      section('Field works', mine.filter((d) => d.cls === C.OBST || d.cls === C.CACHE));
+      section('Vehicles and guns', mine.filter((d) => d.cls === C.VEH || d.cls === C.GUN));
+      section('Obstacles and supply', mine.filter((d) => d.cls === C.OBST || d.cls === C.CACHE));
     } else {
       // a whole host in waves, without laying out each one by hand
       const cur = app.setup.groups.filter((g) => g.team === ORC && g.phase != null).reduce((a, g) => a + g.count * strength(UNITS[U[g.type]]), 0);
-      const box = el('div', 'raise', `<b>Automated placement</b><span>Raise a horde with troops, ladders, engines and captains.${cur ? ` Replaces the ${fmt(cur)} raised now.` : ''}</span>`);
+      const box = el('div', 'raise', `<b>Raise a horde</b><span>Fills the valley with a mixed horde of this size.${cur ? ` Replaces the current ${fmt(cur)}.` : ''}</span>`);
       const row = el('div', 'row'), inp = el('input'), go = el('button', 'primary', cur ? 'Replace' : 'Raise');
       inp.type = 'number'; inp.min = 100; inp.max = 40000; inp.step = 500; inp.value = cur ? Math.round(cur / 500) * 500 || 500 : 8000;
       go.addEventListener('click', () => { app.raiseHorde(Math.max(100, Math.min(40000, +inp.value | 0))); go.blur(); });
@@ -161,7 +162,7 @@ export function buildUI(app, portraits) {
       // siege engines are the attackers' vehicles; everything on foot (or paw) is troops
       const engine = (d) => d.role === R.RAM || d.role === R.CATAPULT || d.role === R.TOWER;
       section('Troops', mine.filter((d) => !engine(d)));
-      section('Vehicles', mine.filter(engine));
+      section('Siege engines', mine.filter(engine));
     }
   }
   for (const t of document.querySelectorAll('#teamTabs .tab')) t.addEventListener('click', () => {
@@ -177,7 +178,7 @@ export function buildUI(app, portraits) {
   ui.refreshPalette = renderPalette;
 
   // -------------------------------------------------------------- roster
-  const roster = $('roster'), oobNote = $('oobNote'), btnAdv = $('btnAdvanced');
+  const roster = $('roster'), btnAdv = $('btnAdvanced');
   const attackSec = $('attackSec'), attackList = $('attackList');
   btnAdv.addEventListener('click', () => { app.oobOpen = !app.oobOpen; btnAdv.blur(); ui.refreshRoster(); renderPalette(); ui.refreshInspector(); });
   ui.refreshRoster = () => {
@@ -187,13 +188,11 @@ export function buildUI(app, portraits) {
     const ws = sandbox ? [] : waveSummary(app.setup.groups, true).filter((w) => w.size > 0);
     attackSec.hidden = ws.length < 2;
     attackList.innerHTML = '';
-    for (const w of ws) attackList.append(el('div', 'wrow', `<i>${w.k + 1}</i><div>${w.name}${w.k === 0 ? ' — on the field' : ''}<span>${w.note || 'infantry'}</span></div><b>${fmt(w.size)}</b>`));
+    for (const w of ws) attackList.append(el('div', 'wrow', `<i>${w.k + 1}</i><div>${w.name}${w.k === 0 ? ' · on the field' : ''}<span>${w.note || 'infantry only'}</span></div><b>${fmt(w.size)}</b>`));
     // in a challenge the order of battle folds away behind Advanced: the garrison is issued ready to fight
     btnAdv.hidden = sandbox;
     btnAdv.setAttribute('aria-expanded', String(open));
     btnAdv.classList.toggle('open', open);
-    oobNote.hidden = open;
-    oobNote.innerHTML = 'The garrison is issued ready to fight. Open <b>Advanced</b> to change it.';
     roster.hidden = !open;
     roster.innerHTML = '';
     if (!open) return;
@@ -202,17 +201,17 @@ export function buildUI(app, portraits) {
       for (const g of app.setup.groups) if (g.team === team) byType.set(g.type, (byType.get(g.type) || 0) + g.count);
       let total = 0; for (const [k, v] of byType) if (UNITS[U[k]].cls !== C.OBST) total += v * strength(UNITS[U[k]]);
       const locked = team === ORC && !sandbox;
-      const head = el('div', 'side-head ' + (team === DEF ? 'def' : 'orc'), `<div>${team === DEF ? 'DEFENDERS' : 'ATTACKERS'} <span>· ${fmt(total)}</span></div>`);
+      const head = el('div', 'side-head ' + (team === DEF ? 'def' : 'orc'), `<div>${team === DEF ? 'Defenders' : 'Attackers'} <span>· ${fmt(total)}</span></div>`);
       const clr = el('button', null, 'Clear'); clr.addEventListener('click', () => app.clearTeam(team));
       if (byType.size && !locked) head.append(clr);
       roster.append(head);
       if (team === DEF && !sandbox) {
         // what the garrison has cost against what the scenario allows
         const spent = forceCost(app.setup.groups), budget = app.setup.budget, over = spent > budget;
-        const req = el('div', 'req' + (over ? ' over' : ''), `<div><span>Requisition points</span><b>${fmt(spent)} / ${fmt(budget)}</b></div><div class="bar"><i style="width:${Math.min(100, (100 * spent) / Math.max(1, budget))}%"></i></div>${over ? `<small>Over by ${fmt(spent - budget)} — remove something before the battle.</small>` : `<small>${spent >= budget ? 'All spent' : `${fmt(budget - spent)} left — unspent points add to the score`}</small>`}`);
+        const req = el('div', 'req' + (over ? ' over' : ''), `<div><span>Requisition</span><b>${fmt(spent)} / ${fmt(budget)} pts</b></div><div class="bar"><i style="width:${Math.min(100, (100 * spent) / Math.max(1, budget))}%"></i></div>${over ? `<small>Over by ${fmt(spent - budget)} pts. Remove units to begin.</small>` : `<small>${spent >= budget ? 'All spent' : `${fmt(budget - spent)} pts left. Unspent points add to your score.`}</small>`}`);
         roster.append(req);
       }
-      if (!byType.size) roster.append(el('div', 'empty', team === DEF ? 'No defenders placed yet.' : 'No attackers placed yet.'));
+      if (!byType.size) roster.append(el('div', 'empty', team === DEF ? 'No defenders yet. Pick a unit to place.' : 'No attackers yet. Open the Attackers tab.'));
       for (const d of UNITS) {
         if (!byType.has(d.key)) continue;
         const row = el('div', 'rrow ' + (team === DEF ? 'def' : 'orc'));
@@ -233,17 +232,17 @@ export function buildUI(app, portraits) {
     if (!g) { insp.hidden = true; return; }
     insp.hidden = false;
     const d = UNITS[U[g.type]];
-    insp.innerHTML = `<div class="sec-head"><h3>Selected formation</h3><i class="info" tabindex="0">?</i></div><div style="font-weight:700;margin-bottom:6px">${d.name}</div>`;
-    bindTip(insp.querySelector('.info'), 'Moving a formation', 'Drag it on the map to move it. <b>[</b> <b>]</b> rotate it, <b>Del</b> removes it.');
+    insp.innerHTML = `<div class="sec-head"><h3>Formation</h3><i class="info" tabindex="0">?</i></div><div style="font-weight:700;margin-bottom:6px">${d.name}</div>`;
+    bindTip(insp.querySelector('.info'), 'Formation', 'Drag on the map to move. <b>[</b> <b>]</b> rotate, <b>Del</b> deletes.');
     const addNum = (label, val, min, max, fn) => { const r = el('div', 'opt'); const i = el('input'); i.type = 'number'; i.min = min; i.max = max; i.value = val; i.addEventListener('change', () => fn(Math.max(min, Math.min(max, +i.value || 0)))); r.append(el('span', null, label), i); insp.append(r); };
-    addNum(d.cls === C.OBST ? 'Pieces' : 'Units', g.count, 1, 20000, (v) => app.editGroup(g, { count: v | 0 }));
-    if (d.cost && !app.isSandbox() && app.oobOpen) insp.append(el('div', 'opt', `<span>Requisition points</span><b>${fmt(d.cost * g.count)}</b>`));
+    addNum('Count', g.count, 1, 20000, (v) => app.editGroup(g, { count: v | 0 }));
+    if (d.cost && !app.isSandbox() && app.oobOpen) insp.append(el('div', 'opt', `<span>Cost</span><b>${fmt(d.cost * g.count)} pts</b>`));
     if (g.team === ORC) addNum('Advance after (s)', g.delay || 0, 0, 3600, (v) => app.editGroup(g, { delay: v }));
     const btns = el('div', 'btns');
     const mk = (t, fn, cls, title) => { const b = el('button', cls, t); b.title = title; b.addEventListener('click', fn); btns.append(b); };
     mk('<span class="rot">⟲</span>Rotate', () => app.editGroup(g, { ang: g.ang - Math.PI / 12 }), 'rotate', 'Rotate left ([)');
     mk('Rotate<span class="rot">⟳</span>', () => app.editGroup(g, { ang: g.ang + Math.PI / 12 }), 'rotate', 'Rotate right (])');
-    mk('Delete', () => app.removeGroup(g), 'danger', 'Remove the formation (Del)');
+    mk('Delete', () => app.removeGroup(g), 'danger', 'Delete formation (Del)');
     insp.append(btns);
   };
 
@@ -269,21 +268,21 @@ export function buildUI(app, portraits) {
       if (tipText) bindTip(r, label, tipText);
     };
     // battle options
-    sel(options, 'Ammunition', o.ammoMult, [[0.5, 'Scarce (50%)'], [1, 'Standard'], [1.5, 'Plentiful (150%)'], [2, 'Double'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'How much ammunition each defender starts with. Out of rounds, they fight hand to hand.');
-    sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'On'], [0, 'Off']], (v) => { o.morale = !!v; }, 'A company that takes heavy losses quickly breaks and runs. Commanders steady the troops around them.');
+    sel(options, 'Ammo', o.ammoMult, [[0.5, '50%'], [1, '100%'], [1.5, '150%'], [2, '200%'], [99, 'Unlimited']], (v) => { o.ammoMult = v; }, 'Starting ammo for every defender. Troops with none fight hand to hand.');
+    sel(options, 'Morale', o.morale === false ? 0 : 1, [[1, 'On'], [0, 'Off']], (v) => { o.morale = !!v; }, 'Units that take heavy losses quickly rout. Commanders and Uruk captains steady those near them.');
     // support: Command Points in a challenge, a number of calls per kind in the sandbox
     if (sb) for (const k in SUPPORT) num(supportOpts, SUPPORT[k].name, o.support[k], 0, 99, (v) => { o.support[k] = v; }, SUPPORT[k].desc);
     else {
       // the same rows as the sandbox, read-only: the pool, then what each call costs from it
-      const cpTip = 'One pool pays for every support call. It refills slowly; killing captains, trolls and siege engines pays a bounty.';
-      num(supportOpts, 'Command Points at start', o.cpStart, 0, 99, () => {}, cpTip);
-      num(supportOpts, 'Command Points per min', Math.round(o.cpRate * 60), 0, 99, () => {}, cpTip);
-      for (const k in SUPPORT) num(supportOpts, `${SUPPORT[k].name} cost`, SUPPORT[k].cost, 0, 99, () => {}, `${SUPPORT[k].desc} Costs ${SUPPORT[k].cost} Command Points a call.`);
+      const cpTip = 'Pay for support calls. They refill slowly; killing captains, trolls and siege engines earns more.';
+      num(supportOpts, 'Command points at start', o.cpStart, 0, 99, () => {}, cpTip);
+      num(supportOpts, 'Command points per min', Math.round(o.cpRate * 60), 0, 99, () => {}, cpTip);
+      for (const k in SUPPORT) num(supportOpts, `${SUPPORT[k].name} cost`, SUPPORT[k].cost, 0, 99, () => {}, `${SUPPORT[k].desc} Costs ${SUPPORT[k].cost} command points.`);
     }
     // win conditions: the defenders win if either is met; they lose if the garrison is wiped out
-    sel(winOpts, 'Relief at dawn', o.dawn, [[0, 'Never'], [480, 'After 8 min'], [600, 'After 10 min'], [720, 'After 12 min'], [900, 'After 15 min'], [1200, 'After 20 min'], [1800, 'After 30 min']], (v) => { o.dawn = v; },
-      `Hold out this long and the relief column arrives: you win.${sb ? '' : ' The last and heaviest wave lands shortly before dawn.'}`);
-    sel(winOpts, 'Attackers flee at', o.rout, [[0, 'Never — to the last'], [0.01, '1% remaining'], [0.05, '5% remaining'], [0.08, '8% remaining'], [0.15, '15% remaining'], [0.25, '25% remaining']], (v) => { o.rout = v; }, 'The attackers break and flee when this little of them is left: you win. The white mark on their bar shows the point.');
+    sel(winOpts, 'Dawn after', o.dawn, [[0, 'Never'], [480, '8 min'], [600, '10 min'], [720, '12 min'], [900, '15 min'], [1200, '20 min'], [1800, '30 min']], (v) => { o.dawn = v; },
+      `Hold out this long to win.${sb ? '' : ' The final wave attacks shortly before dawn.'}`);
+    sel(winOpts, 'Horde routs at', o.rout, [[0, 'Never'], [0.01, '1% strength'], [0.05, '5% strength'], [0.08, '8% strength'], [0.15, '15% strength'], [0.25, '25% strength']], (v) => { o.rout = v; }, 'You win when the horde falls to this share of its starting strength. The white mark on the attackers bar shows it.');
   };
 
   // --------------------------------------------------------- command bar
@@ -305,26 +304,26 @@ export function buildUI(app, portraits) {
   };
   // the purse every challenge support call is paid from (the sandbox counts uses instead)
   const cpBox = el('div', 'cpbox', '<small>Command</small><b id="cpVal">0</b><div class="bar"><i id="cpBar"></i></div><small id="cpRate"></small>');
-  bindTip(cpBox, 'Command Points', 'Pays for every support call. It refills slowly; killing captains, trolls and siege engines pays a bounty.');
+  bindTip(cpBox, 'Command points', 'Pay for support calls. They refill slowly; killing captains, trolls and siege engines earns more.');
   cmdbar.append(cpBox);
-  const supTip = (k) => () => `${SUPPORT[k].desc} <i class="cost">${app.sim && app.sim.opt.sandbox ? 'The corner number is how many calls are left.' : `Costs ${SUPPORT[k].cost} Command Points.`}</i>`;
+  const supTip = (k) => () => `${SUPPORT[k].desc} <i class="cost">${app.sim && app.sim.opt.sandbox ? `${app.sim.support[k].left} left` : `Costs ${SUPPORT[k].cost} command points`}</i>`;
   const sup = (k) => addCmd(k, SUPPORT[k].name, SUPPORT[k].key, ICONS[k], SUPPORT[k].name, supTip(k), () => app.armSupport(k));
-  addGroup('Strike');
+  addGroup('Fire');
   sup('air'); sup('gunship');
-  addCmd('fire', 'Target Artillery', 'T', ICONS.fire, 'Target Artillery', 'Direct your own mortars and howitzers. Opens the artillery panel: click the map to fire every section in range, or task each one. Free, as often as you like.', () => app.toggleFireMission());
-  addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map: every weapon in range concentrates on it for 30 s. Press again to cancel.', () => app.armFocus());
-  addGroup('Resupply &amp; Reinforce');
+  addCmd('fire', 'Target Artillery', 'T', ICONS.fire, 'Target Artillery', 'Aim your mortars and howitzers. Click the map to fire every battery in range. Free.', () => app.toggleFireMission());
+  addCmd('focus', 'Focus Fire', 'F', ICONS.focus, 'Focus Fire', 'Drag a circle on the map. Every weapon in range fires there for 30 s.', () => app.armFocus());
+  addGroup('Garrison');
   sup('supply'); sup('reinforce');
-  addCmd('retreat', 'Fall Back', 'R', ICONS.retreat, 'Fall Back', 'All infantry outside the Hornburg fall back to the keep. With troops selected, <b>R</b> pulls back only those; <b>Shift+R</b> always pulls back everyone.', () => app.retreat(false));
+  addCmd('retreat', 'Fall Back', 'R', ICONS.retreat, 'Fall Back', 'Infantry outside the Hornburg retreat into it. With troops selected, only they retreat; <b>Shift+R</b> always sends everyone.', () => app.retreat(false));
   addGroup('Overlays');
-  addCmd('zones', 'Fire Zones', 'Z', ICONS.zones, 'Fire Zones', 'Where each mortar and howitzer section can land its rounds.', () => app.toggleOverlay('zones'));
-  addCmd('ranges', 'Ranges', 'V', ICONS.ranges, 'Ranges', 'How far the rest of the garrison reaches, by weapon (only the selection, if any). Troops on a wall reach a little further.', () => app.toggleOverlay('ranges'));
-  addCmd('losses', 'Losses', 'L', ICONS.losses, 'Losses', 'Where soldiers and attackers have fallen so far.', () => app.toggleLosses());
+  addCmd('zones', 'Artillery Range', 'Z', ICONS.zones, 'Artillery Range', 'Shows where each battery can fire.', () => app.toggleOverlay('zones'));
+  addCmd('ranges', 'Weapon Range', 'V', ICONS.ranges, 'Weapon Range', 'Shows range by weapon, for the selection or the whole garrison. Troops on a wall reach further.', () => app.toggleOverlay('ranges'));
+  addCmd('losses', 'Losses', 'L', ICONS.losses, 'Losses', 'Shows where troops on both sides have died.', () => app.toggleLosses());
 
   // ------------------------------------------------------ artillery panel
   const artyPanel = $('artyPanel'), overlayKey = $('overlayKey');
   let artyRows = null, artyKey = '';
-  const MODES = [['free', 'Free'], ['target', 'Target'], ['hold', 'Hold']];
+  const MODES = [['free', 'Auto'], ['target', 'Target'], ['hold', 'Hold']];
   const modeSeg = (onPick) => {
     const seg = el('div', 'mseg');
     for (const [m, t] of MODES) { const b = el('button', null, t); b.dataset.mode = m; b.addEventListener('click', () => { onPick(m); b.blur(); }); seg.append(b); }
@@ -332,11 +331,11 @@ export function buildUI(app, portraits) {
   };
   const buildArty = (list) => {
     artyPanel.innerHTML = '';
-    const head = el('div', 'ap-head', '<b>Artillery</b><span class="dim">click the map to fire</span>');
+    const head = el('div', 'ap-head', '<b>Artillery</b>');
     const x = el('button', 'x', '✕'); x.title = 'Close (T)'; x.addEventListener('click', () => app.closeArtyPanel()); head.append(x);
     artyPanel.append(head);
     const all = el('div', 'ap-row all');
-    all.append(el('div', 'ap-name', '<b>All sections</b>'), modeSeg((m) => app.artyOrder(null, m)));
+    all.append(el('div', 'ap-name', '<b>All batteries</b>'), modeSeg((m) => app.artyOrder(null, m)));
     artyPanel.append(all);
     artyRows = list.map((a, k) => {
       const row = el('div', 'ap-row');
@@ -346,7 +345,7 @@ export function buildUI(app, portraits) {
       artyPanel.append(row);
       return { row, info: nm.querySelector('small'), seg, a };
     });
-    artyPanel.append(el('p', 'tip', '<b>Target</b>, then click the map. Sections out of range keep choosing their own targets.'));
+    artyPanel.append(el('p', 'tip', '<b>Target</b> fires where you click the map.'));
   };
   ui.refreshArty = () => {
     const sim = app.sim;
@@ -361,7 +360,7 @@ export function buildUI(app, portraits) {
     for (const r of artyRows) {
       const a = r.a, dead = !a.n;
       r.row.classList.toggle('dead', dead);
-      r.info.textContent = dead ? 'destroyed' : `${a.n} ${a.key === 'howitzer' ? 'guns' : 'tubes'} · ${Math.round(a.ammo * 100)}% ammo · ${a.key === 'howitzer' ? 'map-wide' : a.w.range + ' m'}${a.mode === 'hold' ? ' · holding' : a.mode === 'target' ? ' · on target' : ''}`;
+      r.info.textContent = dead ? 'Destroyed' : `${a.n} ${a.n === 1 ? 'gun' : 'guns'} · ${Math.round(a.ammo * 100)}% ammo · ${a.key === 'howitzer' ? 'map-wide' : a.w.range + ' m'}`;
       for (const b of r.seg.children) {
         const m = b.dataset.mode;
         b.classList.toggle('active', !dead && modeOf(a) === m);
@@ -384,7 +383,7 @@ export function buildUI(app, portraits) {
     const life = loc ? 12 : 7;
     const t = el('div', 'toast ' + cls + (loc ? ' loc' : ''), text);
     t.style.animationDuration = life + 's';
-    if (loc) { t.title = 'Click to look there'; t.addEventListener('click', () => app.jumpTo(loc.x, loc.y)); }
+    if (loc) { t.title = 'Go to location'; t.addEventListener('click', () => app.jumpTo(loc.x, loc.y)); }
     feed.append(t);
     while (feed.children.length > 7) feed.firstChild.remove();
     setTimeout(() => t.remove(), life * 1000);
@@ -421,14 +420,14 @@ export function buildUI(app, portraits) {
     orcRes.style.width = (100 * res / o0) + '%';
     orcRout.hidden = !(sim.opt.rout > 0); orcRout.style.left = (100 * sim.opt.rout) + '%';
     orcLbl.textContent = res > 0 ? `Attackers · ${fmt(res)} to come` : 'Attackers';
-    orcForce.title = sim.opt.rout > 0 ? `The attackers break and run when ${Math.round(sim.opt.rout * 100)}% of them are left (the white mark).` : '';
-    waveBox.hidden = !wi;
+    orcForce.title = sim.opt.rout > 0 ? `The horde routs at ${Math.round(sim.opt.rout * 100)}% strength (white mark)` : '';
+    waveBox.hidden = !wi || !!sim.result;
     if (wi) {
       if (wavePips.children.length !== wi.W) { wavePips.innerHTML = ''; for (let k = 0; k < wi.W; k++) wavePips.append(el('i')); }
       for (let k = 0; k < wi.W; k++) wavePips.children[k].className = k < wi.k ? 'done' : k === wi.k ? 'now' : k === wi.k + 1 && wi.next && wi.next.forming ? 'soon' : '';
       const nx = wi.next;
       waveName.textContent = `Wave ${wi.k + 1} of ${wi.W} · ${wi.name}`;
-      waveNote.textContent = sim.result ? '' : nx ? `next wave in ${mmss(nx.in)}` : 'final wave';
+      waveNote.textContent = sim.result ? '' : nx ? `Next wave in ${mmss(nx.in)}` : 'Final wave';
       waveBox.classList.toggle('lull', wi.phase === 'lull' && !(nx && nx.forming));
       waveBox.classList.toggle('hot', wi.phase === 'engaged');
     }
@@ -437,8 +436,9 @@ export function buildUI(app, portraits) {
     ammoBar.style.width = (am * 100) + '%';
     ammoPct.parentElement.classList.toggle('low', am < 0.3 && sim.opt.ammoMult <= 50);
     $('btnResult').hidden = !sim.result;
+    btnBack.textContent = sim.result ? 'Back to setup' : 'End battle';
     clock.textContent = mmss(sim.time);
-    dawn.textContent = sim.opt.dawn > 0 ? `Relief in ${mmss(sim.opt.dawn - sim.time)}` : 'No relief coming';
+    dawn.textContent = sim.opt.dawn > 0 ? `Dawn in ${mmss(sim.opt.dawn - sim.time)}` : '';
     for (const b of document.querySelectorAll('#speedCtl .seg')) { const s = +b.dataset.speed; b.classList.toggle('active', app.paused ? s === 0 : s === app.speed); }
     // the pause button turns into a play button while the battle is paused
     if (pauseBtn.dataset.state !== String(app.paused)) {
@@ -452,7 +452,7 @@ export function buildUI(app, portraits) {
     if (!sb) {
       cpVal.textContent = Math.floor(sim.cp + 1e-6);
       cpBar.style.width = (100 * (sim.cp - Math.floor(sim.cp + 1e-6))) + '%';
-      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'full' : `+${Math.round(sim.opt.cpRate * 60)} / min`;
+      cpRate.textContent = sim.cp >= sim.opt.cpCap ? 'Full' : `+${Math.round(sim.opt.cpRate * 60)} / min`;
     }
     for (const k in SUPPORT) {
       const s = sim.support[k], c = cmds[k], can = sim.affordSupport(k);
@@ -485,10 +485,10 @@ export function buildUI(app, portraits) {
     for (const i of sel) { const d = UNITS[sim.type[i]]; by.set(d.name, (by.get(d.name) || 0) + 1); const r = reachOf(d); reach.add(r ? r.text : '—'); if (d.ammo) { am2 += Math.min(1, sim.ammo[i] / sim.maxAmmo(i)); an++; } hp += sim.hp[i] / d.hp; mo += sim.gMorale[sim.grp[i]]; }
     let html = `<b>${fmt(sel.length)} selected</b>`;
     for (const [n, c] of [...by].sort((a, b) => b[1] - a[1]).slice(0, 5)) html += `<div class="line"><span>${n}</span><span>${fmt(c)}</span></div>`;
-    html += `<div class="line"><span>Ammunition</span><span>${an ? Math.round(100 * am2 / an) + '%' : '—'}</span></div><div class="line"><span>Condition</span><span>${Math.round(100 * hp / sel.length)}%</span></div><div class="line"><span>Morale</span><span>${Math.round(mo / sel.length)}%</span></div><div class="line"><span>Range</span><span>${reach.size === 1 ? [...reach][0] : 'mixed'}</span></div>`;
+    html += `<div class="line"><span>Ammo</span><span>${an ? Math.round(100 * am2 / an) + '%' : '—'}</span></div><div class="line"><span>Health</span><span>${Math.round(100 * hp / sel.length)}%</span></div><div class="line"><span>Morale</span><span>${Math.round(mo / sel.length)}%</span></div><div class="line"><span>Range</span><span>${reach.size === 1 ? [...reach][0] : 'Mixed'}</span></div>`;
     const st = sim.holdR[sel[0]], mixed = sel.some((i) => sim.holdR[i] !== st);
-    html += `<div class="line"><span>Fire</span><span class="${st && !mixed ? 'held' : ''}">${mixed ? 'mixed' : app.stanceName(st)}</span></div>`;
-    html += '<p class="tip"><b>Right-click</b> move · <b>H</b> fire discipline · <b>R</b> fall back to the keep · <b>X</b> halt · <b>Shift+6…0</b> make a group</p>';
+    html += `<div class="line"><span>Fire mode</span><span class="${st && !mixed ? 'held' : ''}">${mixed ? 'Mixed' : app.stanceName(st)}</span></div>`;
+    html += '<p class="tip"><b>Right-click</b> move · <b>H</b> fire mode · <b>R</b> fall back · <b>X</b> halt</p>';
     selinfo.innerHTML = html; selinfo.hidden = false;
   };
 
@@ -504,60 +504,61 @@ export function buildUI(app, portraits) {
   const rows = (list) => `<div class="keys">${list.map(([a, b]) => `<div>${a}</div><span>${b}</span>`).join('')}</div>`;
   const HELP = [
     ['basics', 'Basics', `
-      <h4>Two ways to play</h4>${rows([
-        ['Challenge', 'A scenario as designed: the enemy attacks in waves and the garrison is issued at full requisition (open <b>Advanced</b> under Order of Battle to change it). Support costs Command Points. Scored, with medals.'],
-        ['Sandbox', 'Build both armies freely. No budget and no waves: every attacker is on the field from the start, support has a set number of calls, and you choose the win conditions. Not scored.'],
+      <h4>Modes</h4>${rows([
+        ['Challenge', 'A set scenario. Attackers come in waves, the garrison has a budget, and support costs command points. Scored.'],
+        ['Sandbox', 'Build both armies and set the rules. Every attacker starts on the map. Not scored.'],
       ])}
       <h4>Winning</h4>${rows([
-        ['Victory', 'Hold until the relief column arrives at dawn, or break the attackers: they run when their bar reaches the white mark.'],
+        ['Victory', 'Hold until dawn, or rout the horde: it flees when its bar drops to the white mark.'],
         ['Defeat', 'The garrison is wiped out.'],
       ])}
-      <h4>A challenge night</h4>${rows([
-        ['Waves', 'The vanguard starts on the field; escalades, the siege train and a final assault follow. The top bar counts down to the next one. Cut a wave down fast to earn a lull.'],
-        ['Command Points', 'One pool pays for all support. It refills slowly; killing captains, trolls and siege engines pays a bounty.'],
-        ['Score', 'The win, soldiers brought through, an intact gate and wall, and requisition left unspent.'],
+      <h4>Challenges</h4>${rows([
+        ['Waves', 'The top bar counts down to the next wave. Destroy a wave quickly to earn a pause before the next.'],
+        ['Command points', 'Pay for support calls. They refill slowly; killing captains, trolls and siege engines earns more.'],
+        ['Score', 'Points for winning, surviving defenders, an intact gate and wall, and unspent requisition.'],
       ])}`],
     ['controls', 'Controls', `
-      <h4>Setting up</h4>${rows([
-        [k('Click'), 'Drop a block of the chosen unit. The dashed ring shows its reach'],
-        [k('Drag'), 'Draw a line: along a wall top to man the battlements, or across the valley for wire, obstacles and mines'],
-        [k('Click formation'), `Select it, then drag to move it. ${k('[', ']')} rotate, ${k('Del')} remove`],
+      <h4>Setup</h4>${rows([
+        [k('Click'), 'Place a block of the chosen unit. The dashed ring shows its range'],
+        [k('Drag'), `Draw a line. On a wall, troops line the parapet; hold ${k('Alt')} to place freely`],
+        [k('Click formation'), `Select it. Drag to move, ${k('[', ']')} to rotate, ${k('Del')} to delete`],
         [k('Enter'), 'Begin the battle'],
       ])}
       <h4>Orders</h4>${rows([
-        [`${k('Drag')} · ${k('Double-click')}`, 'Box-select defenders · select every unit of that kind in view'],
-        [`${k('Right-click')} · ${k('X')}`, 'Move the selection · halt it'],
-        [k('H'), 'Fire discipline: at will, hold to 150 m, hold to 75 m, hold fire. Close shots hit more often, so holding stretches ammunition'],
-        [`${k('R')} · ${k('Shift+R')}`, 'Pull the selection back to the Hornburg · everyone falls back'],
-        [`${k('Shift+6')}…${k('0')}`, 'Make a control group; tap the number to recall it, twice to look at it'],
+        [`${k('Drag')} · ${k('Double-click')}`, 'Select troops · select every unit of that type in view'],
+        [`${k('Right-click')} · ${k('X')}`, 'Move · halt'],
+        [k('H'), 'Fire mode: at will, hold to 150 m, hold to 75 m, hold fire. Closer shots hit more often and save ammo'],
+        [`${k('R')} · ${k('Shift+R')}`, 'Selected troops fall back to the Hornburg · everyone falls back'],
+        [`${k('Shift+6')}…${k('0')}`, 'Set a control group. Press its number to select it, twice to jump to it'],
       ])}
       <h4>Support</h4>${rows([
-        [`${k('1')}–${k('4')}`, 'Call support, then click the target (drag to aim an air strike)'],
-        [k('T'), 'Target artillery: aim your own mortars and howitzers'],
-        [k('F'), 'Focus fire: drag a circle; every weapon in range concentrates there'],
-        [`${k('Z')} · ${k('V')} · ${k('L')}`, 'Overlays: fire zones · weapon ranges · losses'],
+        [`${k('1')}–${k('4')}`, 'Call support, then click a target'],
+        [k('T'), 'Target Artillery: aim your mortars and howitzers'],
+        [k('F'), 'Focus Fire: drag a circle; every weapon in range fires there'],
+        [`${k('Z')} · ${k('V')} · ${k('L')}`, 'Overlays: artillery range · weapon range · losses'],
       ])}
       <h4>Time and camera</h4>${rows([
         [`${k('Space')} ${k('−')} ${k('+')}`, 'Pause · slower · faster'],
-        [k('Scroll'), 'Zoom toward the cursor'],
+        [k('Scroll'), 'Zoom'],
         [`${k('Right-drag')} ${k('W A S D')}`, 'Pan'],
-        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, 'Turn the view. Dragging up or down (or <b>PgUp</b> <b>PgDn</b>) tips it'],
+        [`${k('Middle-drag')} ${k('Q')} ${k('E')}`, `Rotate. Drag up or down, or ${k('PgUp')} ${k('PgDn')}, to tilt`],
         [k('Home'), 'Reset the view'],
-        [k('G'), 'Jump to the latest alert (again for the one before). Clicking an alert or the minimap looks there too'],
+        [k('G'), 'Jump to the latest alert; press again for earlier ones'],
         [k('F2'), 'Performance overlay'],
       ])}`],
     ['tips', 'Tips', `${rows([
-        ['Ammunition', 'Troops re-arm within 60 m of a cache or supply drop. An amber pip marks a soldier out of rounds.'],
-        ['Lines of fire', 'Nobody shoots through his own men. On a battlement two ranks fire, the front one kneeling at the parapet; on open ground three, prone, kneeling and standing. Anyone further back looks for a gap nearby or waits his turn, and steps up when a man ahead falls. A man on a wall covers the ground in front of him, not along the wall. Packing more men onto a wall does not add fire: spread them along it.'],
-        ['The back door', 'The Hornburg gate is strong; the postern at its rear, up the ramp from the Deep, is not. Leave the Deeping Wall empty and the horde comes over it, or through the culvert, and up that ramp: falling back means holding the postern too. And where the wall meets the keep, its walk runs through an arch into the court: the door there can be battered down by anyone holding that end of the wall.'],
-        ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Guns on the Hornburg and grenades can.'],
-        ['Suppression ▼', 'Machine guns and shellfire pin companies down: they slow, their archers stop shooting and their nerve wears away. Crossbow volleys and catapult rocks pin your own platoons the same way: they fire slower and wilder until it lifts.'],
-        ['Shield walls ▣', 'Inside the reach of your small arms the Uruk-hai lock shields (pale on the map, marked ▣): slower, but most bullets from the front are stopped, and riflemen hold their fire until it is close. Mortars, grenades and guns firing from the flank are the answer.'],
-        ['Captains ★', 'They follow behind their own companies, which will not rout while he stands and rally to him if they do. The troops around him take most shots aimed at him: thin them, then mark him with focus fire.'],
-        ['Siege works', 'Small arms cannot hurt a ladder, ram or tower, only the Uruk-hai and trolls moving it; others step in for the fallen, and a dropped engine can be picked up again. Men at an uncontested ladder head throw the ladder down. Alerts warn of each engine in time to act.'],
-        ['The reserve', 'Warg riders wait out of range for a breach or a fallen gate, and ride down troops caught outside the walls. Shortly before dawn everything the enemy has left comes on at once.'],
+        ['Ammo', 'Troops re-arm within 60 m of an ammo cache or crate. An amber pip marks a soldier with no ammo.'],
+        ['Lines of fire', 'Only two ranks can fire from a wall, three on open ground. Spread troops out instead of packing them in.'],
+        ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Grenades and guns on the Hornburg can.'],
+        ['The postern', 'The gate behind the Hornburg is weak. If the Deeping Wall falls, the horde reaches it through the Deep.'],
+        ['The wall door', 'Where the wall joins the Hornburg, a door leads into the court. Attackers holding that end of the wall can break it down.'],
+        ['Pinned ▼', 'Machine guns and shellfire pin companies: they slow down and stop shooting. Crossbows and catapults pin your platoons the same way.'],
+        ['Shield wall ▣', 'Within small-arms range, Uruk-hai lock shields that stop most bullets from the front. Use explosives or flanking fire.'],
+        ['Captains ★', 'Companies near a captain rarely rout, and nearby troops absorb shots aimed at the captain. Thin the escort, then use Focus Fire.'],
+        ['Siege engines', 'Small arms hurt only the crews of ladders, rams and towers. Troops at the top of a ladder throw it down once it is clear.'],
+        ['Warg riders', 'They wait out of range for a breach and attack troops caught outside the walls. Shortly before dawn, the whole horde attacks at once.'],
       ])}`],
-    ['enemy', 'Tactics', `${rows(UNITS.filter((d) => d.team === ORC && d.note).map((d) => [d.name, `${d.note}<br><i>Counter:</i> ${d.counter}`]))}`],
+    ['enemy', 'Enemy', `${rows(UNITS.filter((d) => d.team === ORC && d.note).map((d) => [d.name, `${d.note}<br><i>Counter:</i> ${d.counter}`]))}`],
   ];
   let helpTab = 'basics';
   ui.showHelp = () => {
@@ -584,12 +585,12 @@ export function buildUI(app, portraits) {
     modal.hidden = false;
     modal.innerHTML = `<div class="dialog welcome">
       <div class="wl-brand"><svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg><div><h1>Helm’s Deep</h1><small>Modern Defense Simulator</small></div></div>
-      <p class="lead">A modern garrison holds the Hornburg and the Deeping Wall against a host of Uruk-hai. Lay out troops, armour and field works, then command the defence in real time: call in strikes, direct your guns, keep the ammunition flowing and fall back to the keep when the wall gives way.</p>
+      <p class="lead">A modern garrison defends the Hornburg and the Deeping Wall against a horde of Uruk-hai. Place your troops, then command the defence in real time.</p>
       <div class="wl-modes">
-        <button class="wl-mode primary-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies freely, from scratch or from a scenario. No budget and no waves, and you set the win conditions.</span><em>Start building →</em></button>
-        <button class="wl-mode" id="wlChallenge"><b>Challenge</b><span>Hold the Deep until dawn against waves of attackers, with the garrison your requisition can field. Scored, with medals.</span><em>Take command →</em></button>
+        <button class="wl-mode primary-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies and set the rules. Not scored.</span><em>Start building →</em></button>
+        <button class="wl-mode" id="wlChallenge"><b>Challenge</b><span>Hold a set scenario until dawn, on a budget. Scored, with medals.</span><em>Take command →</em></button>
       </div>
-      <div class="wl-foot"><button class="link" id="wlHelp">How to play</button><span>You can switch modes any time from the top bar.</span></div></div>`;
+      <div class="wl-foot"><button class="link" id="wlHelp">How to play</button></div></div>`;
     const go = (mode) => { onModalClose = null; ui.hideModal(); app.enterMode(mode); };
     onModalClose = () => app.enterMode('sandbox'); // Esc: the default, the sandbox
     $('wlSandbox').addEventListener('click', () => go('sandbox'));
@@ -614,8 +615,8 @@ export function buildUI(app, portraits) {
     if (coached.has(kind)) return;
     coached.add(kind);
     coachBody.innerHTML = kind === 'sandbox'
-      ? '<b>Both armies are yours to change</b><p>The Hornburg Garrison and its horde are on the map: change anything from the panel on the left. Pick another scenario here to autofill the map, or <b>Blank Map</b> to build both sides from nothing.</p>'
-      : '<b>The Hornburg Garrison is ready</b><p>The garrison is in place: press <b>Begin Battle</b> to take command. Pick another challenge here, or open <b>Advanced</b> on the right to rework the garrison.</p>';
+      ? '<b>Both armies are yours to edit</b><p>Pick a scenario here to load its armies, or <b>Blank Map</b> to start empty.</p>'
+      : '<b>The garrison is ready</b><p>Press <b>Begin battle</b>, or pick another scenario here.</p>';
     coach.hidden = false;
     placeCoach();
   };
@@ -627,18 +628,17 @@ export function buildUI(app, portraits) {
 
   // --------------------------------------------------------------- settings
   const menu = $('settingsMenu'), btnSettings = $('btnSettings');
-  const QUALITY = [['auto', 'Auto', 'Moves between the levels by itself to keep the frame rate smooth'], ['low', 'Low', 'Plainest: no anti-aliasing, glow or HDR; soldiers in full detail only close up'],
-    ['medium', 'Medium', 'Light anti-aliasing, glow and HDR; full detail at middle distance'], ['high', 'High', 'Full anti-aliasing and resolution; full detail from far off'], ['ultra', 'Ultra', 'As High, with soldiers in full detail from very far off']];
+  const QUALITY = [['auto', 'Auto', ''], ['low', 'Low', 'Fastest. No anti-aliasing, glow or HDR'], ['medium', 'Medium', 'Light anti-aliasing, glow and HDR'],
+    ['high', 'High', 'Full anti-aliasing and resolution'], ['ultra', 'Ultra', 'High, with detailed soldiers at any distance']];
   const renderSettings = () => {
     const cur = app.settings.quality, now = app.gfx.level, fixed = !app.gfx.auto && cur === 'auto'; // (fixed: a test address is holding the quality)
     menu.innerHTML = '<h3>Settings</h3>';
     const nowName = QUALITY.find((q) => q[0] === now)[1];
-    const r = el('div', 'set-row'), lab = el('div', null, `<b>Graphics quality</b><span>${cur === 'auto' && !fixed ? `Auto keeps the frame rate smooth by itself. It is on ${nowName} now.` : 'Higher levels are sharper and show soldiers in full detail from further out, and cost frame rate.'}</span>`);
+    const r = el('div', 'set-row'), lab = el('div', null, `<b>Graphics quality</b><span>${cur === 'auto' && !fixed ? `Auto adjusts to keep the frame rate smooth. Now: ${nowName}.` : 'Higher is sharper but slower.'}</span>`);
     const seg = el('div', 'set-seg');
     for (const [v, t, tip] of QUALITY) {
       const b = el('button', v === cur ? 'active' : '', t);
-      if (v === 'auto') b.title = tip;
-      else { const L = app.lodAt(v), f = (z) => z.toFixed(1); b.title = `${tip} (dots below ${f(L.dot)} px/m, full models from ${f(L.hero)})`; }
+      if (tip) b.title = tip;
       b.addEventListener('click', () => { app.setSetting('quality', v); renderSettings(); });
       seg.append(b);
     }
@@ -647,7 +647,7 @@ export function buildUI(app, portraits) {
     const r2 = el('div', 'set-row set-inline'), inp = el('input');
     inp.type = 'number'; inp.min = 1; inp.max = 9999; inp.value = app.settings.seed;
     inp.addEventListener('change', () => { const v = Math.max(1, Math.min(9999, +inp.value | 0 || 1)); inp.value = v; app.setSetting('seed', v); });
-    r2.append(el('div', null, '<b>Random seed</b><span>Sandbox battles: the same setup, seed and orders replay the same battle.</span>'), inp);
+    r2.append(el('div', null, '<b>Random seed</b><span>Sandbox only. The same seed, setup and orders replay the same battle.</span>'), inp);
     menu.append(r2);
   };
   /** Auto has moved to another level: show it, if the menu is open. */
@@ -682,21 +682,21 @@ export function buildUI(app, portraits) {
         <div class="lines">${sc.lines.map(([l, p, dt]) => `<div class="${p ? '' : 'zero'}"><span>${l}${dt ? ` <i>${dt}</i>` : ''}</span><b>${p ? '+' + fmt(p) : '—'}</b></div>`).join('')}</div></div>`;
     modal.hidden = false;
     modal.innerHTML = `<div class="dialog">
-      <h1 class="${r.win ? 'win' : 'lose'}">${r.win ? 'Victory' : 'The Deep has fallen'}</h1>
+      <h1 class="${r.win ? 'win' : 'lose'}">${r.win ? 'Victory' : 'Defeat'}</h1>
       <p class="sub">${r.reason}</p>
       ${scoreHtml}
       <div class="stats">
         <div class="stat"><small>Duration</small><b>${mmss(r.time)}</b></div>
-        <div class="stat"><small>Enemy killed</small><b>${fmt(totalK)}</b></div>
-        <div class="stat"><small>Enemy routed</small><b>${fmt(st.fled)}</b></div>
+        <div class="stat"><small>Attackers killed</small><b>${fmt(totalK)}</b></div>
+        <div class="stat"><small>Attackers routed</small><b>${fmt(st.fled)}</b></div>
         <div class="stat"><small>Defenders lost</small><b>${fmt(totalL)} <span style="font-size:12px;color:var(--dim)">/ ${fmt(sim.initial[0])}</span></b></div>
       </div>
       <div class="cols">
         <div><h3>Kills by weapon</h3>${kills.slice(0, 11).map(([k, v]) => `<div class="krow"><span>${wname(k)}</span><div class="kb"><i style="width:${(100 * v) / maxK}%"></i></div><span>${fmt(v)}</span></div>`).join('') || '<div class="empty">None</div>'}</div>
-        <div><h3>Defender losses</h3>${lost.slice(0, 9).map(([k, v]) => `<div class="krow loss"><span>${UNITS[U[k]].name}</span><div class="kb"><i style="width:${(100 * v) / maxL}%"></i></div><span>${fmt(v)}</span></div>`).join('') || '<div class="empty">Not a single soldier.</div>'}
-        <h3 style="margin-top:14px">The fight</h3><div class="krow"><span>Sections breached</span><div></div><span>${st.breaches}</span></div><div class="krow"><span>Companies broken</span><div></div><span>${st.routs}</span></div><div class="krow"><span>Rounds fired</span><div></div><span>${fmt(st.shots)}</span></div><div class="krow"><span>Exchange ratio</span><div></div><span>${totalL ? (totalK / totalL).toFixed(1) + ' : 1' : '—'}</span></div></div>
+        <div><h3>Defender losses</h3>${lost.slice(0, 9).map(([k, v]) => `<div class="krow loss"><span>${UNITS[U[k]].name}</span><div class="kb"><i style="width:${(100 * v) / maxL}%"></i></div><span>${fmt(v)}</span></div>`).join('') || '<div class="empty">None</div>'}
+        <h3 style="margin-top:14px">Battle</h3><div class="krow"><span>Wall breaches</span><div></div><span>${st.breaches}</span></div><div class="krow"><span>Companies routed</span><div></div><span>${st.routs}</span></div><div class="krow"><span>Rounds fired</span><div></div><span>${fmt(st.shots)}</span></div><div class="krow"><span>Kill ratio</span><div></div><span>${totalL ? (totalK / totalL).toFixed(1) + ' : 1' : '—'}</span></div></div>
       </div>
-      <div class="actions"><button id="mView">Survey the field</button><button id="mEdit">Change the setup</button><button class="primary" id="mAgain">Fight again</button></div></div>`;
+      <div class="actions"><button id="mView">View battlefield</button><button id="mEdit">Back to setup</button><button class="primary" id="mAgain">Fight again</button></div></div>`;
     $('mView').addEventListener('click', () => { ui.hideModal(); app.showLosses = true; });
     $('mEdit').addEventListener('click', () => { ui.hideModal(); app.backToSetup(); });
     $('mAgain').addEventListener('click', () => { ui.hideModal(); app.startBattle(); });
