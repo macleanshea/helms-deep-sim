@@ -7,7 +7,10 @@ import { figure, dim } from './figure.js';
 import { C } from './legacy.js';
 
 const A = PART.ARM;
-const WOOD = C.wood, WOODD = C.woodDk, IRON = C.iron, IRONL = C.ironLt, SKIN = [0.36, 0.3, 0.25], WHITE = [0.92, 0.9, 0.84];
+const WOOD = C.wood, WOODD = C.woodDk, IRON = C.iron, IRONL = C.ironLt, SKIN = [0.36, 0.3, 0.25], WHITE = [0.92, 0.9, 0.84], ROPE = [0.55, 0.46, 0.32];
+
+/** Length of the lashed ladder's model from its foot to the head of its rails (the renderer stretches it to the span it must reach). */
+export const LASHED_LEN = 24.6;
 
 /** A lightly built Uruk for crews: walks, arms up to whatever it carries or pushes at height z. */
 function crewman(m, x, y, hold = 1.45, reach = 0.25) {
@@ -82,6 +85,32 @@ export const siege = {
   },
   // the ladder alone: with crewed engines on, its carriers are soldiers in their own right
   ladderBare: { build: (m) => ladderBody(m) },
+  // two ladders lashed end to end, up the Hornburg's ring wall (src/sim/lashed.js). Laid flat along +x from its foot:
+  // the renderer pitches it up with the instance's tilt and stretches it (by LASHED_LEN) to reach the parapet. The upper
+  // ladder's rails lie inside the lower's for the last 1.2 m of it, bound with rope in three places; its hooks reach
+  // over the parapet (shaped for a pitch of about 63 degrees: model -z is the side toward the wall).
+  ladderLashed: {
+    build: (m) => {
+      rungs(m, [0, 0, 0], [12.6, 0, 0], 0.4, 26, 0.045);
+      rungs(m, [11.4, 0, 0], [LASHED_LEN, 0, 0], 0.265, 26, 0.045);
+      m.withMat(MAT.HIDE, () => { for (const x of [11.55, 12.0, 12.45]) for (const s of [-1, 1]) m.box(x, s * 0.333, 0, 0.13, 0.3, 0.19, ROPE); });
+      m.withMat(MAT.IRON, () => {
+        for (const s of [-1, 1]) {
+          m.tube([LASHED_LEN, s * 0.265, 0], [LASHED_LEN + 0.42, s * 0.265, -0.82], 0.05, 0.04, 5, IRONL);
+          m.tube([LASHED_LEN + 0.42, s * 0.265, -0.82], [LASHED_LEN + 0.11, s * 0.265, -0.98], 0.04, 0.02, 5, IRONL);
+          m.box(0.1, s * 0.4, 0, 0.3, 0.14, 0.14, IRON);
+        }
+      });
+    },
+    // the stand-in (also its shadow): rails and every other rung, and the lashing as one block
+    mid: (m) => {
+      for (const [x0, x1, h] of [[0, 12.6, 0.4], [11.4, LASHED_LEN, 0.265]]) {
+        for (const y of [h, -h]) m.beam([x0, y, 0], [x1, y, 0], 0.16, C.wood);
+        for (let k = 1; k < 13; k++) { const x = x0 + ((x1 - x0) * k) / 13; m.beam([x, h, 0], [x, -h, 0], 0.09, C.woodDk); }
+      }
+      m.box(12, 0, 0, 1.2, 0.95, 0.22, C.hide);
+    },
+  },
   // the same ladder raised against the wall
   ladderUp: {
     build: (m) => {

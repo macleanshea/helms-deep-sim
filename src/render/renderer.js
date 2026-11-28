@@ -12,11 +12,12 @@ import { WORLD_W, WORLD_H, UNITS, DEF, U, R } from '../config.js';
 import { HM_W, HM_H, MARGIN, GZ_W, HM_RES } from '../map.js';
 import { COLS, SPR } from './atlas.js';
 import { buildModels } from './models/index.js';
+import { LASHED_LEN } from './models/siege.js';
 import { buildMaterials } from './materials.js';
 import { buildStructures, torchSites } from './structures.js';
 import { viewProj, orthoMatrix, camState, FOV } from './camera.js';
 import { UNIT_TRI_BUDGET } from './perf.js';
-import { S_DONE, S_CLIMB, LADDER_TIME, MAX_UNITS } from '../sim/sim.js';
+import { S_DONE, S_CLIMB, MAX_UNITS } from '../sim/sim.js';
 import * as SH from './shaders.js';
 import { LAYOUT } from '../layout.js';
 
@@ -46,6 +47,9 @@ const MESH_OF = { rifle: [['rifle'], 1.3, 1], mg: [['mg'], 1.3, 1], marksman: [[
   ifv: [['ifv'], 1, 0], tank: [['tank'], 1, 0], cache: [['cache'], 1, 0], crate: [['crate'], 1, 0], uruk: [['uruk', 'urukB', 'urukC'], 1.3, 1], archer: [['archer', 'archerB'], 1.3, 1], berserker: [['berserker', 'berserkerB'], 1.4, 1], sapper: [['sapper'], 1.35, 0], chief: [['chief'], 1.6, 0],
   warg: [['warg'], 1.35, 1], troll: [['troll'], 1.25, 1], ladder: [['ladder'], 1, 0], ram: [['ram'], 1.15, 0], catapult: [['catapult'], 1.15, 0], tower: [['tower'], 1, 0] };
 const PROP_MESH = { wire: 'wire', av: 'hedgehog', mine: 'mine', claymore: 'claymore' };
+// where a lashed ladder (src/sim/lashed.js) rests on the ring's parapet: just outside the breast wall's outer face, at
+// the sill of its embrasures (structures.js `battlement`: the breast wall stands 0.41 m out from the face, 1.1 m high)
+const LASH_OUT = 0.45, LASH_UP = 1.1;
 
 function compile(gl, vs, fs) {
   const p = gl.createProgram();
@@ -969,7 +973,7 @@ export class Renderer {
 
   /** Queue every visible unit. Returns the number of far-view dots written to the particle buffer. */
   _fillUnits(cam, cs, sim, al, vw, vh, L, clock, torches) {
-    const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2 } = sim;
+    const { alive, x, y, px, py, rot, trot, type, team, hitT, fireT, el, state, ammo, vx, vy, aux, bx, by, target2, isLashed } = sim;
     const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
     const { ex, ey, ez, rx, ry, ux, uy, uz, fx: fwx, fy: fwy, fz: fwz, f: focal, near } = cs;
     const hw = vw / 2, hh = vh / 2, dprI = 1 / (cam.dpr || 1);
@@ -986,20 +990,23 @@ export class Renderer {
     let W = (WASH_FROM - cam.zoom * dprI) / (WASH_FROM - WASH_FULL); W = W < 0 ? 0 : W > 1 ? 1 : W; W = W * W * (3 - 2 * W);
     for (let i = 0, n = sim.n; i < n; i++) {
       if (!alive[i]) continue;
-      const xi = px[i] + (x[i] - px[i]) * al, yi = py[i] + (y[i] - py[i]) * al;
-      let zi;
+      let xi = px[i] + (x[i] - px[i]) * al, yi = py[i] + (y[i] - py[i]) * al, zi;
       const st = state[i];
       if (st === S_CLIMB) {
         const L = target2[i], tower = L >= 0 && type[L] === U.tower;
         if (tower) continue; // inside the tower
-        const u = Math.min(1, (time - aux[i]) / LADDER_TIME);
-        zi = gz[((by[i] / HM_RES) | 0) * GZ_W + ((bx[i] / HM_RES) | 0)] * (1 - u) + segTop[0] * u;
+        // as Sim.unitZ: from the ground at the foot to the walk of the wall the ladder leans on, over the climb's own time
+        const u = Math.min(1, (time - aux[i]) / sim._climbTime(L)), zf = gz[((by[i] / HM_RES) | 0) * GZ_W + ((bx[i] / HM_RES) | 0)];
+        const hd = L >= 0 && alive[L] && isLashed[L] ? this._lashedHead(sim, L) : null;
+        // up a lashed ladder: along the timber as it is drawn (the simulation moves him straight to the walk behind the parapet)
+        if (hd) { xi = bx[i] + (hd[0] - bx[i]) * u; yi = by[i] + (hd[1] - by[i]) * u; zi = zf + (hd[2] - zf) * u; }
+        else { const k = L >= 0 && alive[L] ? sim.aux2[L] : -1; zi = zf * (1 - u) + segTop[k >= 0 ? k : 0] * u; }
       } else if (el[i]) { const sg = mseg[((yi / 4) | 0) * (WORLD_W / 4) + ((xi / 4) | 0)]; zi = sg >= 0 ? segTop[sg] : gz[((yi / HM_RES) | 0) * GZ_W + ((xi / HM_RES) | 0)]; }
       else zi = gz[((yi / HM_RES) | 0) * GZ_W + ((xi / HM_RES) | 0)];
       const dx = xi - ex, dy = yi - ey, dz = zi - ez, w = dx * fwx + dy * fwy + dz * fwz;
       if (w < near) continue;
       // off screen, with room for the tallest and widest thing drawn (a siege tower, a ladder laid flat)
-      const z0 = focal / w, sx = (dx * rx + dy * ry) * z0, sy = (dx * ux + dy * uy + dz * uz) * z0, pad = 14 * z0 + 8;
+      const z0 = focal / w, sx = (dx * rx + dy * ry) * z0, sy = (dx * ux + dy * uy + dz * uz) * z0, pad = (st === S_DONE && isLashed[i] ? 26 : 14) * z0 + 8; // (a lashed ladder's head stands 26 m from its foot)
       if (sx < -hw - pad || sx > hw + pad || sy < -hh - pad || sy > hh + pad) continue;
       const zc = z0 * dprI, tier = zc < zDot ? 3 : zc < zBox ? 2 : zc < zHero ? 1 : 0;
       this._tier = tier === 3 ? 2 : tier;
@@ -1047,6 +1054,17 @@ export class Renderer {
       // no two soldiers stand quite the same height or wear quite the same shade
       const sc = um_i.jitter ? um_i.scale * (0.95 + ((h2 >> 4) & 31) * 0.0034) : um_i.scale;
       const v = 200 + (h % 56);
+      if (st === S_DONE && isLashed[i]) {
+        // two ladders lashed end to end, from the foot on the valley floor to the ring's parapet: the one model, laid flat,
+        // pitched up by the tilt byte (a turn in 255ths) and stretched so that its head reaches the parapet's height
+        // whatever the tilt rounds to (the head then lands within 0.3 m of the face, under its hooks)
+        const hd = this._lashedHead(sim, i);
+        if (hd) {
+          const run = Math.hypot(hd[0] - xi, hd[1] - yi), rise = hd[2] - zi, tb = Math.round((Math.atan2(rise, run) / 6.2832) * 255);
+          this._put(this.meshes.ladderLashed, xi, yi, zi, Math.atan2(hd[1] - yi, hd[0] - xi), rise / Math.sin((tb / 255) * 6.2832) / LASHED_LEN, 0, v, v, v, flash, 0, 0, tb);
+          continue;
+        }
+      }
       const sp = Math.sqrt(vx[i] * vx[i] + vy[i] * vy[i]);
       const walk = st === S_CLIMB ? 200 : sp > 0.3 ? Math.min(255, sp * 80) | 0 : 0;
       const yaw = rot[i];
@@ -1114,6 +1132,15 @@ export class Renderer {
     }
     this.stats.units = drawn; this.stats.dots = dots;
     return dots;
+  }
+
+  /** Where lashed ladder L rests on the parapet of the stretch of the ring it leans on: [x, y, z] (scratch), or null. */
+  _lashedHead(sim, L) {
+    const k = sim.aux2[L], s = k >= 0 ? sim.segs[k] : null;
+    if (!s) return null;
+    const h = this._lh || (this._lh = new Float64Array(3)), d = s.half + LASH_OUT;
+    h[0] = s.x + s.nx * d; h[1] = s.y + s.ny * d; h[2] = s.top + LASH_UP;
+    return h;
   }
 
   /** Ordnance in flight, aircraft, parachutes, flying debris, wrecks. */

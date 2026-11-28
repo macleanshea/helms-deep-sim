@@ -10,7 +10,9 @@
 // Also here: defenders throwing a raised ladder back off the wall.
 
 import { WORLD_W, WORLD_H, DT, ORC, UNITS, U, R, C, T } from '../config.js';
-import { S_MOVE, S_WAIT, S_DONE, S_FLEE, LADDER_TIME, LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH, FINE_CELL as FINE, FINE_W as FW, FINE_H as FH } from './sim.js';
+import { S_MOVE, S_WAIT, S_DONE, S_FLEE, LADDER_TIME, LASHED_TIME, LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH, FINE_CELL as FINE, FINE_W as FW, FINE_H as FH } from './sim.js';
+
+import { LASHED_GAP } from './lashed.js';
 
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS; // the defender grid (must match sim.js)
 const DRAFT_R2 = 45 * 45;
@@ -179,7 +181,8 @@ export const engineMethods = {
     // off, with the men at the top cut down or carried with it, though more slowly
     if (att && def < att * 2) { this.cd2[L] = 0; return; }
     const lashed = this.isLashed[L];
-    const loaded = this.time < this.linkT[L] - 0.75 + LADDER_TIME;
+    // (someone is on it: the last man started up less than a climb ago)
+    const loaded = this.time < this.linkT[L] - (lashed ? LASHED_GAP : 0.75) + (lashed ? LASHED_TIME : LADDER_TIME);
     // three men, six seconds; far longer with climbers' weight on it. A lashed ladder, long and top-heavy, goes over at a push
     this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? (lashed ? 0.6 : 0.35) : 1) * (att ? 0.5 : 1) * (lashed ? 2 : 1);
     if (this.cd2[L] < 3) return;
