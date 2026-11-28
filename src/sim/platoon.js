@@ -17,12 +17,15 @@
 //                 idle, walks back to the nearest ammo when its pouches are nearly empty and returns to
 //                 its post after. The remnant of a platoon that has lost three men in four joins the
 //                 nearest platoon beside it.
+//                 A ladder brought up against a stretch of wall nobody is standing on, close by along the walk,
+//                 draws three men from the nearest auto platoon to heave it off; they go back to their post
+//                 once it is down (or after 40 s).
 //   Manual        Holds the ground it was given and fires at what it can see; moves only when ordered.
 //
 // Reinforcements landed by helicopter are one mixed platoon that forms a line on landing.
 
-import { DEF, T, UNITS, C, WORLD_W, WORLD_H } from '../config.js';
-import { S_MOVE } from './sim.js';
+import { DEF, T, U, UNITS, C, WORLD_W, WORLD_H } from '../config.js';
+import { S_MOVE, S_DONE, FINE_CELL, FINE_W, FINE_H } from './sim.js';
 import { SUPPLY_R } from './support.js';
 
 const MAXG = 4096;
@@ -33,6 +36,9 @@ const PLATOON_MAX = 80;    // ... unless that would make a platoon bigger than t
 const THINK = 20;          // ticks between a platoon's looks round (2 s)
 const IDLE = 10;           // seconds without a shot before a platoon counts as idle
 const MOVE_GAP = 15;       // seconds between one platoon's moves on its own account
+const PARTY_R = 70;        // a ladder standing unwatched this close along the wall draws a party from an auto platoon (m)
+const PARTY_N = 3;         // men in it: enough to heave a ladder off
+const PARTY_T = 40;        // seconds before a party gives it up and goes back to its post
 
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS; // the defender grid (must match sim.js)
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS; // the attacker grid
@@ -44,7 +50,8 @@ export const platoonMethods = {
     this.gTask = new Uint8Array(MAXG); // 0 at its post, 1 shifted along a wall, 2 counter-attacking, 3 re-arming
     this.gHoldA = new Float32Array(MAXG); // fire discipline an auto platoon keeps by itself as its ammo runs down (m; 0 none)
     this._autoSolves = 0; this._autoSolveT = 0;
-    this.stats.autoMoves = 0;
+    this.stats.autoMoves = 0; this.stats.ladderParties = 0;
+    this.parties = new Map(); // ladder -> the party sent to heave it off: { gen, ids: [unit, gen], hx, hy, t }
   },
 
   /** Is this unit a soldier of a platoon (direct-fire foot)? Mortars stay in their batteries, commanders alone. */
@@ -243,6 +250,7 @@ export const platoonMethods = {
     if (this.tick % THINK !== 11) return;
     if (this.time - this._autoSolveT > 1) { this._autoSolveT = this.time; this._autoSolves = 0; }
     const mem = this._members();
+    this._ladderParties(mem);
     for (const [g, ids] of mem) {
       if (g === this.miscGroup[DEF] || this.gExempt[g] || !ids.length) continue;
       const d = UNITS[this.type[ids[0]]];
@@ -258,6 +266,68 @@ export const platoonMethods = {
       if (this.time - this.gMoveT[g] < MOVE_GAP) continue;
       this._autoThink(g, ids);
     }
+  },
+
+  /**
+   * Ladders up, or being brought up, against a stretch of wall that nobody is standing on: the nearest auto platoon on that wall, within
+   * 70 m along it, sends its three nearest men to heave each off, and has them back once it is down (or after 40 s).
+   */
+  _ladderParties(mem) {
+    const P = this.parties;
+    for (const [L, p] of P) {
+      const on = this.alive[L] && this.gen[L] === p.gen && this.aux2[L] === p.k;
+      // the head taken before the party got there: three men do not throw themselves on a ladder its climbers hold
+      let lost = false;
+      if (on && this._attAt(p.lx, p.ly) >= 2) { lost = true; for (const [i, gn] of p.ids) if (this.alive[i] && this.gen[i] === gn && (this.x[i] - p.lx) ** 2 + (this.y[i] - p.ly) ** 2 < 64) { lost = false; break; } }
+      if (on && !lost && this.time - p.t < PARTY_T) continue;
+      const live = p.ids.filter(([i, gn]) => this.alive[i] && this.gen[i] === gn && this.team[i] === DEF).map(([i]) => i);
+      if (live.length && this._autoSolves >= 2) continue; // (no path to spare this second: next look)
+      if (live.length) { this._autoSolves++; this.orderMove(live, p.hx, p.hy, null, null, true); }
+      P.delete(L);
+    }
+    if (this._autoSolves >= 2) return;
+    for (const L of this.engines) {
+      if (this._autoSolves >= 2) return;
+      if (!this.alive[L] || this.type[L] !== U.ladder || P.has(L)) continue;
+      const k = this.aux2[L]; if (k < 0) continue;
+      // one standing, being raised, or carried the last 50 m to the foot of the wall: the men on the walk see it coming
+      const sg = this.segs[k], ring = sg.group === 1, f = ring ? this.ringFoot[k] : null;
+      if (this.state[L] !== S_DONE && (ring ? !f || Math.hypot(this.x[L] - f.x, this.y[L] - f.y) > 50 : Math.hypot(this.x[L] - sg.ox, this.y[L] - sg.oy) > 50)) continue;
+      const hx = ring ? f.hx : sg.x + sg.nx * (sg.half - 1.6), hy = ring ? f.hy : sg.y + sg.ny * (sg.half - 1.6), wg = sg.group;
+      if (this._defNear(hx, hy, 6, 1) || this._attAt(hx, hy) >= 2) continue; // (someone is at its head already: his own men, or its climbers)
+      // the nearest man of an auto platoon on that wall, standing at his post
+      let bi = -1, bd = PARTY_R * PARTY_R;
+      for (let j = 0; j < this.n; j++) {
+        if (!this.alive[j] || this.team[j] !== DEF || !this.el[j] || this.state[j] === S_MOVE) continue;
+        const g = this.grp[j];
+        if (!this.gAuto[g] || this.gExempt[g] || g === this.miscGroup[DEF] || this.gState[g] >= 2 || this.gTask[g] === 3 || this.gAlive[g] < PARTY_N * 2) continue;
+        const d2 = (this.x[j] - hx) ** 2 + (this.y[j] - hy) ** 2;
+        if (d2 >= bd) continue;
+        const sj = this.mseg[this.map.cellOf(this.x[j], this.y[j])];
+        if (sj < 0 || this.segs[sj].group !== wg) continue;
+        bd = d2; bi = j;
+      }
+      if (bi < 0) continue;
+      const ids = (mem.get(this.grp[bi]) || []).filter((j) => this.el[j] && this.state[j] !== S_MOVE && this._platoonable(UNITS[this.type[j]]));
+      ids.sort((a, b) => ((this.x[a] - hx) ** 2 + (this.y[a] - hy) ** 2) - ((this.x[b] - hx) ** 2 + (this.y[b] - hy) ** 2));
+      const party = ids.slice(0, PARTY_N);
+      if (party.length < 2) continue;
+      let cx = 0, cy = 0; for (const j of party) { cx += this.x[j]; cy += this.y[j]; }
+      this._autoSolves++;
+      if (!this.orderMove(party, hx, hy, null, null, true)) continue;
+      P.set(L, { gen: this.gen[L], k, lx: hx, ly: hy, ids: party.map((j) => [j, this.gen[j]]), hx: cx / party.length, hy: cy / party.length, t: this.time });
+      this.stats.ladderParties++;
+    }
+  },
+
+  /** Attackers on a wall walk within 8 m of a point. */
+  _attAt(x, y) {
+    const fx = (x / FINE_CELL) | 0, fy = (y / FINE_CELL) | 0;
+    let n = 0;
+    for (let yy = Math.max(0, fy - 3); yy <= Math.min(FINE_H - 1, fy + 3); yy++) for (let xx = Math.max(0, fx - 3); xx <= Math.min(FINE_W - 1, fx + 3); xx++) {
+      for (let j = this.head[yy * FINE_W + xx]; j >= 0; j = this.next[j]) if (this.team[j] !== DEF && this.el[j] && this.alive[j] && (this.x[j] - x) ** 2 + (this.y[j] - y) ** 2 < 64) n++;
+    }
+    return n;
   },
 
   /** A platoon reduced to a remnant joins the nearest platoon on its level within 30 m. */

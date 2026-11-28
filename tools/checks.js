@@ -39,7 +39,7 @@ function play(setup, opts = {}) {
   const N = sim.x.length, px = new Float32Array(N), py = new Float32Array(N), pg = new Uint16Array(N);
   // where each defender was posted, and whether anything but his own search for a firing place has moved him since
   const x0 = Float32Array.from(sim.x), y0 = Float32Array.from(sim.y), g0 = Uint16Array.from(sim.gen), moved = new Uint8Array(N);
-  const om = sim.orderMove.bind(sim); sim.orderMove = (ids, x, y) => { for (const i of ids) moved[i] = 1; return om(ids, x, y); };
+  const om = sim.orderMove.bind(sim); sim.orderMove = (ids, x, y, ...rest) => { for (const i of ids) moved[i] = 1; return om(ids, x, y, ...rest); }; // (facing and the auto flag passed on: a platoon's own move is not an order)
   const tk = sim._toKeep.bind(sim); sim._toKeep = (list) => { for (const [, i] of list) moved[i] = 1; return tk(list); };
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === DEF && UNITS[sim.type[i]].cls === C.INF) P.lanes.def0++;
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.type[i] === U.rifle) P.rifles0++;
