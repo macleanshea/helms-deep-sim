@@ -87,7 +87,7 @@ function gearModel(kind, opt) {
 function buildUnit(name) {
   const recipe = JSON.parse(fs.readFileSync(path.join(here, 'units', `${name}.json`), 'utf8'));
   const S = readSource(recipe.use || name); // (`use`: another unit's body and clips, with gear and a choice of clips of its own)
-  let m = S.mesh, colour = S.colour;
+  let m = S.mesh, colour = S.colour, riderArms = null;
   if (recipe.rider) {
     // a rider: another unit's figure, seated, made part of this mesh and carried by the bones of the back. The two
     // textures go side by side, so each model's texture coordinates are squeezed into its own half.
@@ -113,6 +113,9 @@ function buildUnit(name) {
     index.set(m.index); for (let q = 0; q < fig.index.length; q++) index[m.index.length + q] = fig.index[q] + n0;
     m = { ...m, pos, nrm, uv, joints, weights, index, saddleTop: top };
     colour = `${S.colour}+${rs.colour}`;
+    // his sword hand and shield arm, in this model's space: he rides armed (see the gear, below)
+    const at = (n) => fig.joint(n).map((q, e) => (q - fig.hips[e]) * k + seat[e]);
+    riderArms = { hand: at('RightHand'), fore: at('LeftForeArm'), left: at('LeftHand'), bone: bones[bones.length - 1][0], k: R.height / 1.9 };
   }
   let nv = m.pos.length / 3; const nj = m.skin.names.length;
   if (nj > 64) throw new Error(`${name}: ${nj} bones (64 at most)`);
@@ -298,6 +301,12 @@ function buildUnit(name) {
       }
     } else throw new Error(`${name}: unknown gear "${it.kind}"`);
     if (meshed) for (let q = g0; q < gear.length; q++) { gear[q].meshed = true; if (gear[q].swatch === SW.wood) gear[q].swatch = SW.leather; } // (its boxes stand in only at the coarsest level, in the darker of the timber colours: the models' wood is old and stained)
+  }
+  if (riderArms) {
+    // a rider's sword and shield: set by his hands as he sits, and carried by the beast's back like the rest of him
+    const G = (p) => [0, 1, 2].map((e) => (p[AX[e]] - o[AX[e]]) * s), h = G(riderArms.hand), fo = G(riderArms.fore), lh = G(riderArms.left), q = riderArms.k;
+    fit('sword', riderArms.bone, h, [0.35, 0, 0.94], [-0.94, 0, 0.35], 1.0 * q, 0.1, 0.5, { tip: 'light' });
+    fit('shield', riderArms.bone, [(fo[0] + lh[0]) / 2 + 0.03, (fo[1] + lh[1]) / 2 + 0.08 * q, (fo[2] + lh[2]) / 2 + 0.03], [0, 0, 1], [0.97, -0.25, 0], 0.9 * q, 0.5, 0.5, { long: 'y', front: true });
   }
   // ---- join the gear's models to the figure: their vertices follow one bone each, their pictures go beside the figure's
   let partOf = null; // which piece each vertex belongs to once gear is joined: 0 the figure, then each piece of gear

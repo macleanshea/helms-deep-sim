@@ -400,7 +400,7 @@ Pictures of the new models are in `docs/progress/m9-units/`.
 
 **Rough edges since put right:** a machine's lower levels now give each triangle one colour (that of its first
 corner) instead of smearing the texture across its many small islands, and a deck is laid on the hull under the
-turret so nothing shows through when it turns. **Still rough:** the warg's rider sits in one fixed pose; the image
+turret so nothing shows through when it turns. **Since:** the warg's rider rides armed: his sword arm is raised (`rider.js`, `raise`), and the sword and shield models are set by his hands and carried by the beast's back with the rest of him. He still does not move of himself. The image
 model refused the first wording of the howitzer's concept and took a plainer one.
 
 **A picture of its own for every level of detail.** The generator cuts each figure's texture into about a

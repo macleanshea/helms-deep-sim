@@ -22,7 +22,7 @@ const move = (x, y, z) => { const m = ident(); m[12] = x; m[13] = y; m[14] = z; 
  * @returns { pos, nrm, uv, index, hips: [x, y, z], height } in the figure's own units, hips where they were
  */
 export function seated(src, pose = {}) {
-  const P = { thigh: 1.2, splay: 0.55, knee: 1.35, lean: 0.16, arm: 0.75, elbow: 0.5, ...pose };
+  const P = { thigh: 1.2, splay: 0.55, knee: 1.35, lean: 0.16, arm: 0.75, elbow: 0.5, raise: 0.95, ...pose }; // raise: how far the sword arm is lifted from the rein hand's level
   const m = src.mesh, names = m.skin.names, nj = names.length, nv = m.pos.length / 3;
   const pivot = names.map((_, j) => { // where each bone turns, from its inverse-bind matrix
     const b = m.skin.ibm.subarray(j * 16, j * 16 + 16), l = b[0] * b[0] + b[1] * b[1] + b[2] * b[2] || 1;
@@ -34,6 +34,7 @@ export function seated(src, pose = {}) {
     turn[`${s}UpLeg`] = mul(rot('z', P.splay * side(`${s}UpLeg`)), rot('x', -P.thigh));
     turn[`${s}Leg`] = rot('x', P.knee);
     turn[`${s}Arm`] = rot('y', -P.arm * side(`${s}Arm`)); // the arms, held out to the sides at rest, come round to the front
+    if (s === 'Right' && P.raise) turn.RightArm = mul(rot('z', P.raise * side('RightArm')), rot('y', -P.arm * 0.35 * side('RightArm'))); // the sword arm: up and a little forward, blade over his head
     turn[`${s}ForeArm`] = rot('y', -P.elbow * side(`${s}Arm`));
   }
   turn.Spine02 = rot('x', P.lean); turn.neck = rot('x', -P.lean * 0.7);
@@ -61,5 +62,7 @@ export function seated(src, pose = {}) {
     const l = Math.hypot(qx, qy, qz) || 1;
     pos.set([px, py, pz], v * 3); nrm.set([qx / l, qy / l, qz / l], v * 3);
   }
-  return { pos, nrm, uv: m.uv, index: m.index, hips: pivot[id('Hips')], height: hi - lo };
+  // (where a joint has come to in this pose: the rider's gear is set by his hands)
+  const joint = (n) => { const j = id(n), M = W[j], p = pivot[j]; return [M[0] * p[0] + M[4] * p[1] + M[8] * p[2] + M[12], M[1] * p[0] + M[5] * p[1] + M[9] * p[2] + M[13], M[2] * p[0] + M[6] * p[1] + M[10] * p[2] + M[14]]; };
+  return { pos, nrm, uv: m.uv, index: m.index, hips: pivot[id('Hips')], height: hi - lo, joint };
 }
