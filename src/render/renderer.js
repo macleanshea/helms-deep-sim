@@ -522,6 +522,20 @@ export class Renderer {
     ]);
   }
 
+  /** A painted layer has arrived (the stone's patina: stains, lichen and damp, laid over the built blocks). */
+  addTexture(name, image) {
+    if (name !== 'patina') return;
+    const gl = this.gl;
+    this.patinaTex = this.patinaTex || gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.patinaTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    const an = gl.getExtension('EXT_texture_filter_anisotropic'); if (an) gl.texParameterf(gl.TEXTURE_2D, an.TEXTURE_MAX_ANISOTROPY_EXT, 4);
+  }
+
   /** A sculpted piece of the fortress has arrived: the fortress is built again with it in place of the built-in one. */
   addProp(name, prop) { (this.props || (this.props = {}))[name] = prop; this.structVersion = -1; }
 
@@ -711,6 +725,14 @@ export class Renderer {
     gl.drawElements(gl.TRIANGLES, this.terrain.count, gl.UNSIGNED_INT, 0);
     p = this.pStruct;
     gl.useProgram(p.p); this._common(p.u, env);
+    if (p.u.uPatina) {
+      if (!this.patinaTex) { // (until the painted layer loads: mid grey, which leaves the stone as built)
+        this.patinaTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, this.patinaTex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      }
+      gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.patinaTex); gl.uniform1i(p.u.uPatina, 10); gl.activeTexture(gl.TEXTURE0);
+    }
     if (p.u.uRound) {
       // (each radius is nudged so that a whole number of 8 m stone tiles goes round: the pattern then meets itself at the seam)
       const K = LAYOUT.keep, lay = (r) => (Math.max(1, Math.round((2 * Math.PI * r) / 8)) * 8) / (2 * Math.PI);

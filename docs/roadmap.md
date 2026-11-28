@@ -284,6 +284,11 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   they fight from), so it stays built, and takes its character from a great carved horse's head springing from
   each flank over the causeway. `structures.js sculptedAt()` sets any such piece by a frame. 70 credits.
 
+- **Painted stone.** The image model painted the stone's patina with no joints in it (broad mottling, damp streaks
+  running down, lichen); `tools/assets/patina.py` makes it tile and levels it to mid grey, and the fortress shader
+  multiplies the built blocks by it, 21 m to a repeat, along each wall's own length. The blocks and their relief
+  stay the game's own, so joints and paint never disagree. 50 KB.
+
 **Still to do toward the references:** rock outcrops under the walls, more dressing (barrels, carts). Lightning already lights by
 direction (it raises the moon's light and the sky's, and shadows fall with it). A moon in the sky was tried and
 taken out: the game's camera never lifts far enough to show sky.

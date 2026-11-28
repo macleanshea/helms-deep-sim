@@ -37,11 +37,14 @@ export function parseProp(buf) {
   return { ...h, pos, nrm, shade, index };
 }
 
-export async function loadUnitPacks(onUnit, progress, onProp) {
+export async function loadUnitPacks(onUnit, progress, onProp, onTexture) {
   let manifest;
   try { const r = await fetch(`${BASE}manifest.json`, { cache: 'no-cache' }); if (!r.ok) return 0; manifest = await r.json(); } catch { return 0; }
   const names = Object.keys(manifest.units || {});
   let done = 0;
+  if (onTexture) for (const [name, t] of Object.entries(manifest.textures || {})) {
+    fetch(BASE + t.file).then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); }).then((b) => createImageBitmap(b, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })).then((im) => onTexture(name, im)).catch((err) => console.warn(`texture "${name}" did not load`, err));
+  }
   if (onProp) for (const [name, p] of Object.entries(manifest.props || {})) {
     fetch(BASE + p.file).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((b) => onProp(name, parseProp(b))).catch((err) => console.warn(`fortress piece "${name}" did not load; the built-in one stays`, err));
   }

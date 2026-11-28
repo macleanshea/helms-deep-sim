@@ -139,5 +139,11 @@
       "file": "gatehorse-prop.b8c6ad7564.bin",
       "bytes": 113774
     }
+  },
+  "textures": {
+    "patina": {
+      "file": "patina.10c7066e40.webp",
+      "bytes": 54494
+    }
   }
 }

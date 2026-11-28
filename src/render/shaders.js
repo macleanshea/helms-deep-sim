@@ -243,6 +243,7 @@ in vec3 vW; in vec3 vN; in vec3 vC; flat in float vMat; out vec4 o;
 uniform sampler2D uDecal;
 ${NOISE_LITE}${LIGHT}${MATERIAL}
 uniform vec3 uBases;   // the floors walls stand on above the valley's: the court, the inner court, the upper court
+uniform sampler2D uPatina; // a painted layer over the built stone: broad stains, lichen, damp (mid grey = none)
 uniform vec4 uRound[4]; // the round works (horn tower, upper court, inner court, the ring): centre, how far out their faces reach, and the radius their courses are laid at
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
@@ -280,6 +281,7 @@ void main(){
   float rough = B.z, spec = B.w;
   if (L < 2.5) {
     c *= 0.9 + 0.2*fbm3(vec2(u, vW.z)*0.11 + 3.);                       // broad weathering hides the repeat
+    c *= mix(vec3(1.), 2.*texture(uPatina, (top ? vW.xy : vec2(u, vW.z))/21.).rgb, top ? 0.4 : 0.75);   // the painted patina, 21 m to a repeat
     if (!top) {
       // rain streaks running down from the parapets, damp and moss at the foot
       c *= 1. - 0.2*smoothstep(0.5, 0.9, noise(vec2(u*0.9, vW.z*0.06)));
