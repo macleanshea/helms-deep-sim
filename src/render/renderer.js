@@ -27,17 +27,17 @@ const SUN = (() => { const v = [-0.5, 0.4, 0.77], l = Math.hypot(...v); return v
 // region covered by the shadow map: the fortress and its approaches
 const SB = { x0: LAYOUT.shadowBox[0], x1: LAYOUT.shadowBox[2], y0: LAYOUT.shadowBox[1], y1: LAYOUT.shadowBox[3], z0: -8, z1: 120 };
 
-// Levels of detail by scale on screen (CSS px per metre where the unit stands): dots, boxes, stand-ins, full models. The player's
+// Levels of detail by scale on screen (CSS px per meter where the unit stands): dots, boxes, stand-ins, full models. The player's
 // model-detail setting (`heroScale`) moves the whole ladder: full models take over at HERO_ZOOM x
 // heroScale (0.5 = twice as far out); dots move out more gently, with the square root of it, so the
 // whole valley stays cheap to draw; and boxes give way to stand-ins at the geometric midpoint, so
 // boxes and stand-ins each cover the same span of zoom at every setting.
 const DOT_ZOOM = 2.0;
 const HERO_ZOOM = { high: 11, medium: 14, low: 18 };
-// The zooms (CSS px per metre at the middle of the view) between which soldiers are washed toward their side's colour.
+// The zooms (CSS px per meter at the middle of the view) between which soldiers are washed toward their side's color.
 const WASH_FROM = 5.5, WASH_FULL = 2.6;
 export const HERO_SCALE_DEFAULT = 0.3;
-// how linear light is scaled from the display-space mood colours in main.js
+// how linear light is scaled from the display-space mood colors in main.js
 const SUN_GAIN = 1.3, AMB_GAIN = 1.1, EXPOSURE = 1.05;
 
 // simulation unit type -> model names (one is picked per unit, for variety), drawing scale, and
@@ -69,7 +69,7 @@ export class Renderer {
     const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' });
     if (!gl) throw new Error('WebGL2 is required');
     this.gl = gl;
-    // HDR: the picture kept in true light values (half floats) until one tone curve at the end. Needs float colour buffers;
+    // HDR: the picture kept in true light values (half floats) until one tone curve at the end. Needs float color buffers;
     // ?hdr=0 turns it off; the 'low' quality draws straight to the screen and never uses it.
     this.hdrOK = !!gl.getExtension('EXT_color_buffer_float') && !/[?&]hdr=0\b/.test(typeof location !== 'undefined' ? location.search : '');
     this._hdr = -1;
@@ -162,7 +162,7 @@ export class Renderer {
     this.unitMesh = UNITS.map((d) => {
       const m = MESH_OF[d.key];
       if (!m) return null;
-      // a variant that has not been modelled falls back to the first
+      // a variant that has not been modeled falls back to the first
       const variants = m[0].map((n) => this.meshes[n]).filter(Boolean);
       return { variants, scale: m[1], jitter: m[2], turret: d.key === 'tank' ? this.meshes.tankTurret : d.key === 'ifv' ? this.meshes.ifvTurret : null };
     });
@@ -257,7 +257,7 @@ export class Renderer {
 
   /**
    * Take up a unit model built from files (see assets.js and tools/assets/build.js): its levels of detail, its
-   * colours and its clips. From then on every unit of that kind is drawn with it instead of the built-in model.
+   * colors and its clips. From then on every unit of that kind is drawn with it instead of the built-in model.
    */
   addUnitAsset(name, pack, image) {
     const gl = this.gl, unit = UNITS.findIndex((d) => d.key === name);
@@ -428,7 +428,7 @@ export class Renderer {
     const px = new Uint8Array(N * N * 4);
     for (let c = 0; c < N * N; c++) { px[c * 4] = Math.min(255, I[c] * 255); px[c * 4 + 3] = I[c] > 1e-4 ? Math.min(255, (Z[c] / I[c] / 64) * 255) : 0; }
     // The same map's other two channels: how closed in each place is by what stands round it (green), and the height of
-    // its floor (blue). The lighting code dims the sky's light by the first, most at the floor and less with every metre
+    // its floor (blue). The lighting code dims the sky's light by the first, most at the floor and less with every meter
     // above it: the foot of a wall, a corner of a court, the well of a stair sit in shade, and the fortress on its ground.
     const gz = this.map.gz, at = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : gz[((y / HM_RES) | 0) * GZ_W + ((x / HM_RES) | 0)]);
     const DIRS = 12, RING = [2.2, 4.4, 7.5, 12];
@@ -451,7 +451,7 @@ export class Renderer {
 
   /**
    * The horde's torches as a second map of firelight, over the whole field and made afresh each frame from the
-   * torch-bearers in view (a coarse one: a torch's light is a pool a dozen metres across). The ground, the wall's
+   * torch-bearers in view (a coarse one: a torch's light is a pool a dozen meters across). The ground, the wall's
    * foot and the companies themselves are lit by it as the host comes on.
    */
   _bakeHordeTorches() {
@@ -619,7 +619,7 @@ export class Renderer {
   }
 
   setQuality(q) { this.quality = q; }
-  /** Zoom (CSS px per metre) at which full models take over from stand-ins at the current settings. */
+  /** Zoom (CSS px per meter) at which full models take over from stand-ins at the current settings. */
   heroZoom(q = this.quality) { return this.lod(q).hero; }
   /** Zooms below which units are dots, boxes and stand-ins; full models from `hero` up. */
   lod(q = this.quality) {
@@ -689,7 +689,7 @@ export class Renderer {
     const gl = this.gl;
     gl.uniformMatrix4fv(u.uVP, false, this.vp);
     if (u.uSun) gl.uniform3fv(u.uSun, SUN);
-    // mood colours are authored in display space; the shaders light in linear space
+    // mood colors are authored in display space; the shaders light in linear space
     if (u.uSunCol) gl.uniform3f(u.uSunCol, env.sun[0] * env.sun[0] * SUN_GAIN, env.sun[1] * env.sun[1] * SUN_GAIN, env.sun[2] * env.sun[2] * SUN_GAIN);
     if (u.uAmb) gl.uniform3f(u.uAmb, env.amb[0] * env.amb[0] * AMB_GAIN, env.amb[1] * env.amb[1] * AMB_GAIN, env.amb[2] * env.amb[2] * AMB_GAIN);
     if (u.uEye) gl.uniform3fv(u.uEye, this.eye);
@@ -704,7 +704,7 @@ export class Renderer {
     }
     if (u.uTorch2 && this.torch2Tex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, this.torch2Tex); gl.uniform1i(u.uTorch2, 8); gl.uniform2f(u.uTorch2Size, WORLD_W, WORLD_H); }
     if (u.uFog) gl.uniform3fv(u.uFog, env.fog);
-    if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 40, MARGIN - 8); // the ground is gone into the haze before the modelled terrain ends
+    if (u.uWorld) gl.uniform4f(u.uWorld, WORLD_W, WORLD_H, 40, MARGIN - 8); // the ground is gone into the haze before the modeled terrain ends
     if (u.uShadowVP) { gl.uniformMatrix4fv(u.uShadowVP, false, this.shadowVP); gl.uniform1f(u.uShadowOn, env.shadows ? 1 : 0); gl.uniform1f(u.uShadowTexel, this.shadowTexel); gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.uShadow, 2); }
     if (u.uLPos) { gl.uniform4fv(u.uLPos, this.lpos); gl.uniform3fv(u.uLCol, this.lcol); }
     if (u.uDecal) { gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.decalTex); gl.uniform1i(u.uDecal, 1); }
@@ -730,7 +730,7 @@ export class Renderer {
     this.stats.draws += 2;
   }
 
-  /** The ground and the fortress in colour. `pre`: their depths are already laid down (see _scenePre), so only what shows is shaded. */
+  /** The ground and the fortress in color. `pre`: their depths are already laid down (see _scenePre), so only what shows is shaded. */
   _scene(env, pre = false) {
     const gl = this.gl;
     gl.enable(gl.DEPTH_TEST); gl.depthMask(!pre); gl.depthFunc(pre ? gl.LEQUAL : gl.LESS); gl.disable(gl.BLEND);
@@ -744,7 +744,7 @@ export class Renderer {
     p = this.pStruct;
     gl.useProgram(p.p); this._common(p.u, env);
     if (p.u.uPatina) {
-      if (!this.patinaTex) { // (until the painted layer loads: mid grey, which leaves the stone as built)
+      if (!this.patinaTex) { // (until the painted layer loads: mid gray, which leaves the stone as built)
         this.patinaTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, this.patinaTex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([128, 128, 128, 255]));
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
@@ -838,7 +838,7 @@ export class Renderer {
   }
 
   /**
-   * @param cam  {x, y, zoom, yaw, dpr}  zoom in device px per metre
+   * @param cam  {x, y, zoom, yaw, dpr}  zoom in device px per meter
    * @param env  {amb, sun, fog: [r,g,b], lift, flash, shadows}
    */
   render(cam, sim, fx, al, env, clock) {
@@ -973,13 +973,13 @@ export class Renderer {
     const grp = sim.grp, gShield = sim.gShield, crewOf = sim.crewOf, poseOf = sim.pose, ladderBare = this.meshes.ladderBare, ramBare = this.meshes.ramBare;
     const { ex, ey, ez, rx, ry, ux, uy, uz, fx: fwx, fy: fwy, fz: fwz, f: focal, near } = cs;
     const hw = vw / 2, hh = vh / 2, dprI = 1 / (cam.dpr || 1);
-    // each unit's level of detail comes from its scale on screen (CSS px per metre where it stands)
+    // each unit's level of detail comes from its scale on screen (CSS px per meter where it stands)
     const bias = this.lodBias, zDot = L.dot * bias, zBox = L.box * bias, zHero = L.hero * bias, zClose = Math.max(L.hero * 3.2, 30) * bias; // zClose: from here in, a soldier stands some sixty pixels tall and earns the finest model
     const gz = this.map.gz, mseg = sim.mseg, segTop = sim.segTop, time = sim.time, um = this.unitMesh;
     const PFv = this.partF, PU = this.partU;
     let dots = 0, drawn = 0;
     this._nHT = 0;
-    // the side tint: none from WASH_FROM px per metre in, full by WASH_FULL, the same for every unit in view
+    // the side tint: none from WASH_FROM px per meter in, full by WASH_FULL, the same for every unit in view
     // Dots or figures is likewise one choice for the whole view, by the zoom: taken unit by unit, a tilted view drew the far
     // half of a block as a red carpet of dots and the near half as men. (Under load the bias moves the change closer in.)
     const dotsNow = cam.zoom * dprI < zDot * 1.3;
@@ -1024,13 +1024,13 @@ export class Renderer {
         }
       }
       if (dotsNow && d.size < 7) {
-        // far view: a coloured dot. cyan = armed defender, amber = out of ammunition, red = attacker
+        // far view: a colored dot. cyan = armed defender, amber = out of ammunition, red = attacker
         if (dots >= this.partMax) continue; // (the particle buffer is full: a horde this size is a carpet of dots already)
         const o = dots * PF;
         PFv[o] = xi; PFv[o + 1] = yi; PFv[o + 2] = zi + 1; PFv[o + 3] = d.size * 0.42; PFv[o + 4] = d.size * 0.42; PFv[o + 5] = 0; PFv[o + 6] = SPR.dot;
         let r, g, b;
         if (team[i] === DEF) { if (d.ammo && ammo[i] < 1) { r = 255; g = 168; b = 60; } else { r = 110; g = 210; b = 255; } }
-        else if (gShield[grp[i]] && crewOf[i] < 0) { r = 214 + (h % 24); g = 216 + (h % 20); b = 226; } // behind locked shields: a steel-pale dot, neither side's colour
+        else if (gShield[grp[i]] && crewOf[i] < 0) { r = 214 + (h % 24); g = 216 + (h % 20); b = 226; } // behind locked shields: a steel-pale dot, neither side's color
         else { r = 150 + (h % 80); g = 42 + (h % 24); b = 30; }
         if (flash) { r = 255; g = 255; b = 255; }
         PU[o + 7] = ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
@@ -1087,7 +1087,7 @@ export class Renderer {
         else this._tier = zc >= zClose ? 0 : tier === 0 ? 1 : tier === 1 ? 2 : 3;
         // seen from far off, the two armies are tinted by side so they still read at a glance. How far is one figure for the whole
         // map, set by the zoom alone (W): never by how near the camera a soldier happens to stand, which painted a block half and half
-        // (the last argument is the wash: how far the figure is taken from its own colours toward its side's)
+        // (the last argument is the wash: how far the figure is taken from its own colors toward its side's)
         if (A.big > 1) { this._put(A, xi, yi, zi, yaw, js, cl.start + fr, v, v, v, flash, 0, 0, 0); continue; } // (a machine is told by its size)
         let r = v, g = v - (h2 & 7), b = v - ((h2 >> 9) & 15), wm = 0;
         if (sh) { r = 255; g = 244; b = 226; } // (behind locked shields a rank catches the light)

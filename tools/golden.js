@@ -28,7 +28,7 @@ const BATTLES = [
 ];
 
 const sha = (parts) => { const h = createHash('sha256'); for (const p of parts) h.update(typeof p === 'string' ? p : Buffer.from(p.buffer, p.byteOffset, p.byteLength)); return h.digest('hex').slice(0, 16); };
-/** JSON with numbers rounded to a micrometre, so a hash does not turn on the last bit of a sum. */
+/** JSON with numbers rounded to a micrometer, so a hash does not turn on the last bit of a sum. */
 const plain = (v) => JSON.stringify(v, (k, x) => (typeof x === 'number' ? Math.round(x * 1e6) / 1e6 : typeof x === 'function' ? undefined : x));
 
 function mapHashes() {

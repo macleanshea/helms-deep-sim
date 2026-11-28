@@ -48,7 +48,7 @@ function helm(m, h, o = {}) {
 /** Leather cap that leaves the face bare. */
 function cap(m, h, col = LEATHER) { m.mat = MAT.HIDE; m.sphere([h[0] - 0.01, 0, h[2] + 0.02], [0.12, 0.108, 0.105], col, 0, 8, 3, 0.42, 1); }
 
-/** Breastplate, shoulder guards and a skirt of cloth and plates. o: plate, cloth colours; bare (no breastplate). */
+/** Breastplate, shoulder guards and a skirt of cloth and plates. o: plate, cloth colors; bare (no breastplate). */
 function armour(m, o = {}) {
   const b = BULK * (o.k || 1), plate = o.plate || C.iron, cloth = o.cloth || C.rust;
   if (!o.bare) {
@@ -80,7 +80,7 @@ function shield(m, hand) {
   m.pop();
 }
 
-/** An Uruk body with the usual gear. o: pose, skin / armour options, bare, noHelm, parts. Returns the joints. */
+/** An Uruk body with the usual gear. o: pose, skin / armor options, bare, noHelm, parts. Returns the joints. */
 function uruk(m, o = {}) {
   const k = o.k || 1;
   const J = figure(m, {

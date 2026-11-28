@@ -22,7 +22,7 @@ function crewman(m, x, y, hold = 1.45, reach = 0.25) {
     m.withMat(MAT.PLAIN, () => m.box(J.head[0] + 0.118, 0, J.head[2] + 0.06, 0.02, 0.07, 0.06, WHITE));
   });
 }
-/** Solid wooden wheel with an iron tyre and hub, lying across the frame. */
+/** Solid wooden wheel with an iron tire and hub, lying across the frame. */
 function cartWheel(m, x, y, z, r, w, n = 12) {
   m.withMat(MAT.TIMBER, () => m.lathe([[r * 0.94, -w / 2], [r * 0.94, w / 2], [r * 0.94, w / 2], [0, w / 2, dim(WOODD, 0.8)]], n, WOODD, 0, [x, y, z], 'y'));
   m.withMat(MAT.IRON, () => { m.lathe([[r * 0.94, -w * 0.6], [r, -w * 0.6], [r, w * 0.6], [r * 0.94, w * 0.6]], n, IRON, 0, [x, y, z], 'y', { capA: false, capB: false }); m.lathe([[r * 0.22, w / 2], [r * 0.16, w / 2 + 0.1], [0, w / 2 + 0.1]], 8, IRONL, 0, [x, y, z], 'y', { capA: false }); });
@@ -71,7 +71,7 @@ function ladderBody(m) {
 }
 
 export const siege = {
-  // a twelve-metre ladder carried at shoulder height
+  // a twelve-meter ladder carried at shoulder height
   ladder: {
     // hip, -, -, -, -, knee, -, -, -, fore-and-aft position of the carriers
     anim: [0.9, 0, 0, 0, 0, 0.5, 0, 0, 0, 3.6],

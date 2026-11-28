@@ -50,7 +50,7 @@ export const directorMethods = {
       this.count[ORC] += n;
       this.stats.startOrc[g.type] = (this.stats.startOrc[g.type] || 0) + g.count;
     }
-    // the vanguard starts on the field: estimate when it reaches the defences
+    // the vanguard starts on the field: estimate when it reaches the defenses
     let front = 0;
     for (const g of groups) if (g.team === ORC && g.phase === 0 && g.x > front) front = g.x;
     waves[0].contactT = Math.max(0, (this.map.wallJoin.x - 250 - front) / APPROACH);

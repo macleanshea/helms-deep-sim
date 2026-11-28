@@ -71,16 +71,16 @@ const app = {
 let ui;
 let dpr = 1, vw = 1, vh = 1;
 const T2 = [0, 0, 0], T3 = [0, 0, 0], T4 = [0, 0, 0], RP = [0, 0, 0, 0];
-const MAX_ZOOM = 90; // closest view (px per metre at the middle of the screen): a soldier stands a fifth of the screen high
+const MAX_ZOOM = 90; // closest view (px per meter at the middle of the screen): a soldier stands a fifth of the screen high
 
 // ------------------------------------------------------------------ camera
 const heightAt = (x, y) => (x < 0 || y < 0 || x >= WORLD_W || y >= WORLD_H ? 0 : app.sim ? app.sim.surfZ(x, y) : map.groundZ(x, y));
 app.cam.ground = map.terrZ; // the camera stays clear of the mountainsides (walls it may look over or through)
-/** World -> overlay pixels: [x, y, scale there in px per metre (0: behind the camera)]. Result is valid until the next call. */
+/** World -> overlay pixels: [x, y, scale there in px per meter (0: behind the camera)]. Result is valid until the next call. */
 const S = (x, y, z = 0) => toScreen(app.cam, vw, vh, x, y, z, T2);
 /** How flat a circle lying on the ground at a point looks from the camera: 1 from straight above, near 0 edge on. */
 const flatAt = (x, y, z) => { const q = camState(app.cam, vw, vh); return Math.max(0.04, (q.ez - z) / Math.hypot(x - q.ex, y - q.ey, z - q.ez)); };
-/** How far above its centre, in pixels, the far edge of a ground circle of radius r appears. */
+/** How far above its center, in pixels, the far edge of a ground circle of radius r appears. */
 const riseOf = (x, y, z, r) => { const a = S(x, y, z)[1], yaw = app.cam.yaw; return a - toScreen(app.cam, vw, vh, x + Math.sin(yaw) * r, y - Math.cos(yaw) * r, z, T4)[1]; };
 const labXY = new Float32Array(160);
 function pickAt(sx, sy) { const p = pick(app.cam, vw, vh, sx, sy, heightAt, T3); return { x: p[0], y: p[1], z: p[2] }; }
@@ -206,7 +206,7 @@ app.clearTeam = (team) => { app.setup.groups = app.setup.groups.filter((g) => g.
 app.editGroup = (g, patch) => { Object.assign(g, patch); if (patch.ang != null && !g.w) g.w = groupBounds(g).hw * 2 - UNITS[U[g.type]].spacing * 2; groupsChanged(); };
 app.removeGroup = (g) => { app.setup.groups = app.setup.groups.filter((q) => q !== g); if (app.selGroup === g) app.selGroup = null; groupsChanged(); };
 
-/** The band of wall walk a group posted along a wall takes up: its length, and how far out and in from the wall's centre line it reaches. */
+/** The band of wall walk a group posted along a wall takes up: its length, and how far out and in from the wall's center line it reaches. */
 function runBand(g) {
   const r = g.run, d = UNITS[U[g.type]], half = r.wall ? KEEP.half : WALL_HALF, len = wallRunLength(map, r.wall, r.a, r.b);
   const st = Math.min(d.spacing * (g.spread || 1), 1.5), ranks = Math.ceil(g.count / Math.max(1, Math.floor(len / st) + 1));
@@ -300,7 +300,7 @@ app.armSupport = (k) => {
 };
 app.armFocus = () => {
   if (app.mode !== 'battle' || app.sim.result) return;
-  if (app.sim.focus) { app.sim.clearFocus(); ui.toast('Focus Fire cancelled'); return; }
+  if (app.sim.focus) { app.sim.clearFocus(); ui.toast('Focus Fire canceled'); return; }
   if (app.tool && app.tool.kind === 'focus') { app.tool = null; ui.hint(null); return; }
   app.tool = { kind: 'focus' };
   audio.play('click');
@@ -465,7 +465,7 @@ function placement(d) {
     if (lock.wall === 1) { let db = b - a; db -= Math.round(db / 360) * 360; b = a + db; } // (the short way round the ring)
     let len = wallRunLength(map, lock.wall, a, b);
     if (len < click) {
-      // a click: as much of the walk as the block needs standing two deep, centred where it was clicked
+      // a click: as much of the walk as the block needs standing two deep, centered where it was clicked
       const st = Math.min(def.spacing, 1.5), want = Math.max(st, Math.ceil(app.brushCount / 2) * st), du = (want / 2) / (lock.wall ? (KEEP.r * Math.PI) / 180 : map.wallLen);
       a = lock.u - du; b = lock.u + du;
       if (!lock.wall) { a = Math.max(0, a); b = Math.min(1, b); }
@@ -668,7 +668,7 @@ const FONT = '"Inter","Segoe UI",system-ui,sans-serif';
 let selSetSrc = null, selSetVal = null; // the selection as a Set, rebuilt only when the selection array changes
 /**
  * Add a circle lying flat on the ground to path `c`, as the camera sees it; `rev` winds it the other way (a hole).
- * Returns [x, y, scale, rise]: its centre on screen and how far above the centre its far edge appears. Valid until the next call.
+ * Returns [x, y, scale, rise]: its center on screen and how far above the center its far edge appears. Valid until the next call.
  */
 function ring(c, x, y, z, r, rev = false) {
   const n = r > 60 ? 64 : r > 12 ? 40 : 24;
@@ -833,7 +833,7 @@ function drawRanges(c) {
   const ks = key.map((q) => q[1]).join();
   if (ks !== rangeCache.keyStr) { rangeCache.keyStr = ks; ui.setOverlayKey(key.length ? key : null); }
 }
-/** Every forced gate and every gap in the walls gets a marker, so the state of the defences reads at a glance. */
+/** Every forced gate and every gap in the walls gets a marker, so the state of the defenses reads at a glance. */
 function drawBreaches(c) {
   const segs = app.sim.segs, z = app.cam.zoom;
   for (let k = 0; k < segs.length; k++) {
@@ -965,7 +965,7 @@ function drawOverlay(dtReal) {
 
   // ---- battle ----
   const t = app.clock;
-  // where the fallen lie: a heat field over the ground for the horde (deeper colour = more dead in that
+  // where the fallen lie: a heat field over the ground for the horde (deeper color = more dead in that
   // 16 m square) and a ring for every square where defenders have died
   if (app.showLosses) {
     const L = sim.loss[ORC], H2 = LOSS_CELL / 2;
@@ -1062,7 +1062,7 @@ function drawOverlay(dtReal) {
     const tw = c.measureText(txt).width + 10;
     c.fillStyle = 'rgba(10,13,16,0.72)'; c.beginPath(); c.roundRect(p[0] - tw / 2, p[1] - 9, tw, 18, 4); c.fill();
     c.fillStyle = st >= 2 ? (orc ? '#f2f2ea' : '#ff8b73') : wall ? '#d6dae6' : !st && !conf ? '#8fd8ff' : orc ? '#f0b34a' : '#ffb86a';
-    c.fillText(txt, p[0], p[1] + 0.5); // middle baseline: vertically centred in the tag
+    c.fillText(txt, p[0], p[1] + 0.5); // middle baseline: vertically centered in the tag
   }
   // commanders: a star over each so they can be found (and hunted)
   for (const team of [DEF, ORC]) for (const i of sim.cmds[team]) {
@@ -1313,7 +1313,7 @@ function frame(now) {
     if (ks.has('e')) cam.yaw -= 1.3 * rdt;
     clampCam();
   }
-  // the view looks at whatever stands at its centre: a wall walk, the court, the valley floor (eased, so crossing a parapet does not jolt)
+  // the view looks at whatever stands at its center: a wall walk, the court, the valley floor (eased, so crossing a parapet does not jolt)
   { const tz = Math.max(0, Math.min(30, heightAt(cam.x, cam.y))); cam.z += (tz - cam.z) * Math.min(1, rdt * 6); if (Math.abs(tz - cam.z) < 0.01) cam.z = tz; }
   if (app.previewDirty && !(app.drag && app.drag.kind === 'moveGroup')) rebuildPreview();
 
@@ -1369,7 +1369,7 @@ function frame(now) {
     sim.events.length = 0;
   }
 
-  // light: a stormy night that greys toward dawn, with the odd flash of lightning
+  // light: a stormy night that grays toward dawn, with the odd flash of lightning
   let mood = MOOD.setup;
   if (app.mode === 'battle') {
     const p = sim.opt.dawn > 0 ? Math.min(1, sim.time / sim.opt.dawn) : Math.min(0.7, sim.time / 1500);

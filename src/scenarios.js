@@ -60,11 +60,11 @@ export function wallPoint(map, wall, u) {
   let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
   return { x: p.x, y: p.y, nx, ny };
 }
-/** How long a stretch of wall walk is, in metres, between two values of `u` (see wallPoint). */
+/** How long a stretch of wall walk is, in meters, between two values of `u` (see wallPoint). */
 export const wallRunLength = (map, wall, a, b) => (wall === 1 ? (Math.abs(b - a) * Math.PI / 180) * KEEP.r : Math.abs(b - a) * map.wallLen);
 
 /**
- * Where the front rank stands, measured out from a wall walk's centre line at (x, y) along its outward normal: a pace
+ * Where the front rank stands, measured out from a wall walk's center line at (x, y) along its outward normal: a pace
  * inside the parapet, and where a bastion swells out from the Hornburg's wall there, a pace inside the bastion's own
  * parapet. Men line the battlements as built, not the line the wall would take without its bastions.
  */
@@ -433,7 +433,7 @@ export const PRESETS = [
   // Not offered in the game: the heaviest load there is, for the ?bench run (see render/perf.js).
   {
     key: 'benchmark', name: 'Benchmark: Combined Arms vs. the Host', hidden: true,
-    blurb: 'Armour in front of the wall, guns in the Deep, and 30,000 attackers in 6 waves',
+    blurb: 'Armor in front of the wall, guns in the Deep, and 30,000 attackers in 6 waves',
     build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),

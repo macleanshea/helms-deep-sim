@@ -10,7 +10,7 @@ export function readGlb(file) {
   if (buf.readUInt32LE(0) !== 0x46546c67) throw new Error(`${file}: not a .glb`);
   const jl = buf.readUInt32LE(12), gltf = JSON.parse(buf.subarray(20, 20 + jl).toString('utf8'));
   const bin = buf.subarray(20 + jl + 8, 20 + jl + 8 + buf.readUInt32LE(20 + jl));
-  /** An accessor as a flat array of numbers (normalised integers become 0..1 or -1..1 when `norm`). */
+  /** An accessor as a flat array of numbers (normalized integers become 0..1 or -1..1 when `norm`). */
   const accessor = (i, norm = true) => {
     const a = gltf.accessors[i], bv = gltf.bufferViews[a.bufferView], T = COMP[a.componentType], n = NCOMP[a.type];
     const stride = bv.byteStride || T.BYTES_PER_ELEMENT * n, base = bin.byteOffset + (bv.byteOffset || 0) + (a.byteOffset || 0);

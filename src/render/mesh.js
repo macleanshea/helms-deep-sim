@@ -1,11 +1,11 @@
 // Procedural mesh construction.
 // Local space: +x forward, +y left, +z up, origin at the feet. Every vertex carries a position,
-// a normal, a colour, an animation "part" id (see PART; animated in the vertex shader) and a
+// a normal, a color, an animation "part" id (see PART; animated in the vertex shader) and a
 // material id (see materials.js) that selects the surface texture.
 //
 // Besides flat-shaded boxes and beams there are smooth primitives built on loft(): tubes, limbs,
 // spheres and lathed profiles, plus chamfered boxes and extruded outlines for hard surfaces. A small
-// transform stack lets a part be modelled once and then placed, turned or mirrored.
+// transform stack lets a part be modeled once and then placed, turned or mirrored.
 
 export const PART = { NONE: 0, LEG_L: 1, LEG_R: 2, ARM: 3, ARM_FREE: 4, BANNER: 5, ROTOR: 6, SHIN_L: 7, SHIN_R: 8, TAIL_ROTOR: 9, FOREARM: 10 };
 
@@ -20,7 +20,7 @@ const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a
 const len = (a) => Math.hypot(a[0], a[1], a[2]);
 const unit = (a) => { const l = len(a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
 
-/** Ring lying flat (for upright bodies): centre and radii along x and y. */
+/** Ring lying flat (for upright bodies): center and radii along x and y. */
 export const ringZ = (x, y, z, rx, ry = rx, col) => ({ c: [x, y, z], u: [rx, 0, 0], v: [0, ry, 0], col });
 /** Ring facing along x (for bodies that run fore and aft): radii along y and z. */
 export const ringX = (x, y, z, ry, rz = ry, col) => ({ c: [x, y, z], u: [0, ry, 0], v: [0, 0, rz], col });
@@ -68,7 +68,7 @@ export class MeshBuilder {
   _n(n) { const M = this.M; return M ? unit([M[0] * n[0] + M[1] * n[1] + M[2] * n[2], M[4] * n[0] + M[5] * n[1] + M[6] * n[2], M[8] * n[0] + M[9] * n[1] + M[10] * n[2]]) : n; }
 
   // --------------------------------------------------------------- emitters
-  /** One triangle. Normals may be null (flat shaded); colours are per vertex. */
+  /** One triangle. Normals may be null (flat shaded); colors are per vertex. */
   _tri(a, b, c, na, nb, nc, ca, cb, cc, part) {
     if (this.M) { a = this._p(a); b = this._p(b); c = this._p(c); if (na) { na = this._n(na); nb = this._n(nb); nc = this._n(nc); } }
     if (this.flip) { let t = b; b = c; c = t; t = nb; nb = nc; nc = t; t = cb; cb = cc; cc = t; }
@@ -91,7 +91,7 @@ export class MeshBuilder {
     const n = cross(sub(b, a), sub(c, a));
     if (dot(n, sub(a, from)) >= 0) this.quad(a, b, c, d, col, part); else this.quad(a, d, c, b, col, part);
   }
-  /** Flat quad with a colour at each corner, wound to face away from `from`. */
+  /** Flat quad with a color at each corner, wound to face away from `from`. */
   quadC(a, b, c, d, from, ca, cb, cc, cd, part = 0) {
     if (dot(cross(sub(b, a), sub(c, a)), sub(a, from)) >= 0) { this._tri(a, b, c, null, null, null, ca, cb, cc, part); this._tri(a, c, d, null, null, null, ca, cc, cd, part); }
     else { this._tri(a, d, c, null, null, null, ca, cd, cc, part); this._tri(a, c, b, null, null, null, ca, cc, cb, part); }
@@ -103,7 +103,7 @@ export class MeshBuilder {
   }
   /**
    * Vertical (or battered) wall face from p to q between heights z0 and z1, oriented to face (fx, fy);
-   * darker at its foot. `batter` pushes the foot outward by that many metres.
+   * darker at its foot. `batter` pushes the foot outward by that many meters.
    */
   wall(p, q, z0, z1, fx, fy, col, part = 0, foot = 0.62, batter = 0) {
     if ((q[1] - p[1]) * fx - (q[0] - p[0]) * fy < 0) { const t = p; p = q; q = t; }
@@ -121,7 +121,7 @@ export class MeshBuilder {
   }
 
   // ------------------------------------------------------------ hard shapes
-  /** Box from a centre, a frame of three half-axes and a colour. `shade` darkens the underside. */
+  /** Box from a center, a frame of three half-axes and a color. `shade` darkens the underside. */
   frameBox(c, ax, ay, az, col, part = 0, shade = 0) {
     // a mirrored frame would turn the faces inside out; a box is symmetric, so just flip one axis back
     if (ax[0] * (ay[1] * az[2] - ay[2] * az[1]) - ax[1] * (ay[0] * az[2] - ay[2] * az[0]) + ax[2] * (ay[0] * az[1] - ay[1] * az[0]) < 0) az = [-az[0], -az[1], -az[2]];
@@ -135,14 +135,14 @@ export class MeshBuilder {
     this.quad(p[2], p[3], p[7], p[6], col, part);
     this.quad(p[3], p[0], p[4], p[7], col, part);
   }
-  /** Axis-aligned box (optionally yawed): centre and full sizes. */
+  /** Axis-aligned box (optionally yawed): center and full sizes. */
   box(cx, cy, cz, sx, sy, sz, col, part = 0, yaw = 0) {
     const c = Math.cos(yaw), s = Math.sin(yaw);
     this.frameBox([cx, cy, cz], [c * sx / 2, s * sx / 2, 0], [-s * sy / 2, c * sy / 2, 0], [0, 0, sz / 2], col, part);
   }
   /**
    * Box with chamfered edges, shaded across the chamfers so the edges read as rounded and catch the
-   * light: centre, full sizes and chamfer width.
+   * light: center, full sizes and chamfer width.
    */
   cbox(cx, cy, cz, sx, sy, sz, ch, col, part = 0) {
     const hx = sx / 2, hy = sy / 2, hz = sz / 2;
@@ -244,7 +244,7 @@ export class MeshBuilder {
     if (!sgn) sgn = 1;
     for (let i = 0; i < m; i++) for (let k = 0; k < cols; k++) {
       if (Nn[i][k]) { if (sgn < 0) Nn[i][k] = mul(Nn[i][k], -1); continue; }
-      // a pinched ring: take the direction its nearest full neighbour faces, on average
+      // a pinched ring: take the direction its nearest full neighbor faces, on average
       let av = null;
       for (let d = 1; d < m && !av; d++) for (const j of [i - d, i + d]) {
         if (j < 0 || j >= m || av) continue;

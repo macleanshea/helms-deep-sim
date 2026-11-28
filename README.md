@@ -28,7 +28,7 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 
 ## Playing
 
-The battlefield is shown in a 3D view modelled on the film's set: the Hornburg on
+The battlefield is shown in a 3D view modeled on the film's set: the Hornburg on
 its rock against the southern cliff (on your right as you look up the valley), its inner ward
 climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
 its culvert.
@@ -43,7 +43,7 @@ three, one to a difficulty:
 
 | | Scenario | The night |
 | --- | --- | --- |
-| Easy | **First Night** | A company on the centre of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
+| Easy | **First Night** | A company on the center of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
 | Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
 | Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
 
@@ -54,7 +54,7 @@ guessed: see *Headless runs and balance* below.
 
 - The enemy and the battle options are fixed. The garrison is issued at its full
   **requisition**; open **Edit garrison** under Forces on the right to see the requisition
-  points (and each unit's cost in the left panel) and rework it. **Begin battle** is greyed out
+  points (and each unit's cost in the left panel) and rework it. **Begin battle** is grayed out
   while the garrison costs more than the budget. The order of attack, wave by wave, sits below.
 - Support is paid for from one pool of **Command Points** that refills slowly through the
   night. Killing captains, trolls and siege engines pays a bounty.
@@ -151,7 +151,7 @@ Orders can be given while paused. The battle waits while a dialog is open.
 - Machine guns and shellfire **suppress**: a pinned company (▼) slows to a crawl, its archers
   stop shooting and its morale wears away. Berserkers cannot be pinned, and warg riders keep most
   of their pace under fire.
-- Both sides have command units (★). Lose one and nearby companies are briefly disorganised
+- Both sides have command units (★). Lose one and nearby companies are briefly disorganized
   and lose morale. An Uruk captain follows behind his own companies. While he stands they almost
   never rout, and a broken company falls back on the nearest captain and rallies there. He is not
   shot on sight, and the troops pressed around him take most shots aimed at him: thin them with
@@ -225,7 +225,7 @@ blocky stand-ins of about seventy triangles, and the full models (about a thousa
 a soldier, several thousand for a vehicle). The **Graphics quality** level places the ladder:
 full models take over at a zoom proportional to its detail step, dots give way at that step's square
 root (so the whole valley stays cheap), and boxes give way to stand-ins midway between the two on a
-log scale. In screen pixels per metre:
+log scale. In screen pixels per meter:
 
 | Level | Dots below | Boxes below | Stand-ins below (full models from) |
 | --- | --- | --- | --- |
@@ -264,7 +264,7 @@ files, `build.js` to the game's), and `docs/roadmap.md` describes it.
   from files above (`assets.js` loads them, and the skinned path in `renderer.js` draws them).
   - `materials.js` generates the surface textures on the GPU at start-up: sixteen tiling
     materials (dressed stone, flagstones, rock, grass, mud, timber, slate, iron, painted steel,
-    cloth, camouflage, hide and so on), each with colour detail, a normal map, roughness and
+    cloth, camouflage, hide and so on), each with color detail, a normal map, roughness and
     specular strength. Every vertex names its material.
   - `mesh.js` is the model-building kit: boxes and beams, chamfered boxes, extruded outlines,
     and smooth lofted shapes (tubes, limbs, spheres, lathed profiles), with a transform stack
@@ -307,7 +307,7 @@ shells the thickest of the press) within the Command Point budget; `none` gives 
 state hashes match. Each run also reports how the siege went: ladders raised and thrown down,
 engines dropped and picked up again, when the first attacker reached the wall and when the first
 foothold was won, how far from the works each kind of attacker fell, and the cost of the dearest
-ten steps. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
+ten steps. `tools/matrix.js` runs the lot in parallel and summarizes wins, end time
 and survivors per scenario.
 
 **How difficulty is judged.** The yardstick is the stand-in commander, who calls support sensibly
@@ -335,7 +335,7 @@ needs (a ram to the gate, the horde to the wall, the garrison between court, wal
 then prints the map's measurements; `npm run golden` hashes the map, the fortress mesh and whole
 battles against `docs/baseline/golden.json`, so a refactor can prove it changed nothing (a change
 meant to alter the map or the rules re-records them with `-- --update`); and `npm run shots` takes
-fixed-camera screenshots with Playwright on the software rasteriser and can compare them with an
+fixed-camera screenshots with Playwright on the software rasterizer and can compare them with an
 earlier set (`-- --compare docs/baseline/shots`). `docs/roadmap.md` is the plan these guard.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a

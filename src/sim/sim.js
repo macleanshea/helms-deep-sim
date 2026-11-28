@@ -21,7 +21,7 @@ const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast 
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS;    // coarse grid of defenders
 const BCS = 8, BW = WORLD_W / BCS, BH = WORLD_H / BCS;    // grid of big bodies (trolls, engines)
-const CAP = 4;            // most foot soldiers that fit in one fine cell (about one a square metre)
+const CAP = 4;            // most foot soldiers that fit in one fine cell (about one a square meter)
 const GATE_HP = 7800, POSTERN_HP = 1300, DOOR_HP = 1300, DOOR_COST = 310; // the Hornburg's doors and the crossing price of the door in a path (map.js holds the stone defaults)
 export const FINE_CELL = FINE, FINE_W = FW, FINE_H = FH;
 export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
@@ -29,7 +29,7 @@ export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 export const S_IDLE = 0, S_MOVE = 1, S_ACT = 2, S_DONE = 3, S_FLEE = 4, S_WAIT = 5, S_CLIMB = 6;
 export const LADDER_TIME = 4, TOWER_TIME = 5;
 export const WIRE_COST = 70; // what a section of standing wire adds to the cost of a path through its cell (open ground is 10)
-// direction index for a (dy+1)*3+(dx+1) neighbour offset
+// direction index for a (dy+1)*3+(dx+1) neighbor offset
 const KDIR = [5, 6, 7, 4, -1, 0, 3, 2, 1];
 
 const NOFX = new Proxy({}, { get: () => () => {} });
@@ -145,9 +145,9 @@ export class Sim {
     this._bx = NaN; this._by = 0; this._bp = 0;
     this._initMorale();
     this.miscGroup = [this.newGroup(DEF, true), this.newGroup(ORC, true)];
-    // the defence is reported on by sector: three stretches of the Deeping Wall and the Hornburg
+    // the defense is reported on by sector: three stretches of the Deeping Wall and the Hornburg
     // named by landmark rather than compass point, so the names hold whichever way the map is drawn
-    this.sectors = [['the wall by the keep', 'keep end'], ['the centre of the wall', 'centre'], ['the cliff end of the wall', 'cliff end'], ['the Hornburg', 'Hornburg']].map(([name, short], k) => {
+    this.sectors = [['the wall by the keep', 'keep end'], ['the center of the wall', 'center'], ['the cliff end of the wall', 'cliff end'], ['the Hornburg', 'Hornburg']].map(([name, short], k) => {
       if (k === 3) return { name, short, x: PO.hornburgFront[0], y: PO.hornburgFront[1] };
       const sg = this.segs[Math.floor(((k + 0.5) * N_WALL) / 3)];
       return { name, short, x: sg.x, y: sg.y };
@@ -549,7 +549,7 @@ export class Sim {
     if ((k = d[c + GW]) !== 255) { const w = (1 - fx) * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((k = d[c + GW + 1]) !== 255) { const w = fx * fy; sx += DXN[k] * w; sy += DYN[k] * w; }
     if ((own || sx * sx + sy * sy < 0.36)) {
-      // where the neighbouring cells pull against each other (beside a ramp, round a corner) the blend
+      // where the neighboring cells pull against each other (beside a ramp, round a corner) the blend
       // cancels out and he would dither on the spot, or (`own`) it has just walked him into ground he
       // cannot step onto, off the edge of a causeway: go by the cell he is standing on
       const c0 = ((y / CELL) | 0) * GW + ((x / CELL) | 0);
@@ -1215,7 +1215,7 @@ export class Sim {
     const x0 = Math.max(0, ((x - range) / DCS) | 0), x1 = Math.min(DW - 1, ((x + range) / DCS) | 0);
     const y0 = Math.max(0, ((y - range) / DCS) | 0), y1 = Math.min(DH - 1, ((y + range) / DCS) | 0);
     const r2 = range * range, m2 = w.min * w.min;
-    // a pinning mission favours the sector the escalade is going in against
+    // a pinning mission favors the sector the escalade is going in against
     const aimY = i % 3 !== 1 ? this.wl.mainY : -1;
     let best = -1, bs = 0;
     for (let yy = y0; yy <= y1; yy++) for (let xx = x0; xx <= x1; xx++) {
@@ -1468,7 +1468,7 @@ export class Sim {
   _bullet(t, w, sx, sy) {
     const g = this.grp[t];
     let p = 0;
-    if (this.gShield[g]) p = this.crewOf[t] < 0 ? 0.7 : 0.45;                                    // carriers have their hands full: only their neighbours' shields cover them
+    if (this.gShield[g]) p = this.crewOf[t] < 0 ? 0.7 : 0.45;                                    // carriers have their hands full: only their neighbors' shields cover them
     else if (this.type[t] === U.archer && this.time - this.fireT[t] < 6 && !this.el[t]) p = 0.5;  // a pavise, once he has halted to shoot
     if (p && !(this.ob[((this.y[t] / CELL) | 0) * GW + ((this.x[t] / CELL) | 0)] & OB.WIRE)) {
       const dx = sx - this.x[t], dy = sy - this.y[t], r = this.rot[t];
@@ -1518,7 +1518,7 @@ export class Sim {
       const dx = f.x - x, dy = f.y - y, rr = range + f.r;
       if (dx * dx + dy * dy < rr * rr) {
         if (w.pref) {
-          // marksmen and anti-armour go for whatever of theirs stands inside the marked circle: this is how a captain is hunted
+          // marksmen and anti-armor go for whatever of theirs stands inside the marked circle: this is how a captain is hunted
           const hv = this.hvt, f2 = f.r * f.r;
           let best = -1, bs = 1e18;
           for (let k = 0; k < hv.length; k++) {
@@ -1795,7 +1795,7 @@ export class Sim {
 
   stop(ids) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.state[i] = S_IDLE; this.vx[i] = this.vy[i] = 0; } }
 
-  /** Fire discipline for the given defenders: 0 at will, a distance in metres to hold until, or -1 to hold fire. */
+  /** Fire discipline for the given defenders: 0 at will, a distance in meters to hold until, or -1 to hold fire. */
   setStance(ids, v) { for (const i of ids) if (this.alive[i] && this.team[i] === DEF) { this.holdR[i] = v; this.target[i] = -1; this.target2[i] = -1; } }
 
   /** Send the listed [distance, unit] pairs to free positions inside the Hornburg. */
@@ -1903,7 +1903,7 @@ export class Sim {
     this.updateArtillery();
   }
 
-  /** Refresh each section's strength, centre and ammunition (cheap enough to call a few times a second). */
+  /** Refresh each section's strength, center and ammunition (cheap enough to call a few times a second). */
   updateArtillery() {
     const A = this.arty;
     if (!A.length) return A;

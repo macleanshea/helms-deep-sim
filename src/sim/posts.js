@@ -49,7 +49,7 @@ export const postMethods = {
     return n;
   },
 
-  /** Is an attacker within a few metres on the same level? */
+  /** Is an attacker within a few meters on the same level? */
   _orcClose(x, y, lv) {
     const fx = (x / FINE) | 0, fy = (y / FINE) | 0;
     for (let cy = Math.max(0, fy - 2); cy <= Math.min(FH - 1, fy + 2); cy++) for (let cx = Math.max(0, fx - 2); cx <= Math.min(FW - 1, fx + 2); cx++) {

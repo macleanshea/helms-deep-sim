@@ -13,7 +13,7 @@ export function autopilot(sim, policy = 'auto') {
   const call = (kind, x, y, x2, y2) => { if (!sim.callSupport(kind, x, y, x2, y2)) return false; calls[kind] = (calls[kind] || 0) + 1; return true; };
   const cellXY = (c) => ({ x: (c % OW) * OCS + 8, y: ((c / OW) | 0) * OCS + 8 });
 
-  /** Centre of the densest attacker cell that is not danger-close, or null. */
+  /** Center of the densest attacker cell that is not danger-close, or null. */
   function densest(min) {
     let best = -1, bc = min;
     for (let c = 0; c < sim.ocCount.length; c++) if (sim.ocCount[c] > bc && !sim.danger[c]) { bc = sim.ocCount[c]; best = c; }

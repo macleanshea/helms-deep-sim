@@ -25,7 +25,7 @@ const OBSERVE = 450;             // how far off the horde can count heads on a w
 const F_CULVERT = 3, F_HUNT = 4, F_GATE = 9; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
 const F_POST = 5, F_POSTG = 6; // to the back doors: for those who can climb a ladder, and for those who cannot
 
-/** Seconds for a formation of this type to cover `dist` metres, allowing for the shield wall's pace. */
+/** Seconds for a formation of this type to cover `dist` meters, allowing for the shield wall's pace. */
 function travel(type, dist) {
   const d = UNITS[U[type]];
   let v = d.speed || 1;
@@ -223,7 +223,7 @@ export const warlordMethods = {
   _wlStart(groups) {
     const wl = this.wl;
     if (!wl.forces.length) return;
-    this._morale(true); // company centres
+    this._morale(true); // company centers
     let kind = 'assault', hasRam = false;
     for (const g of groups) if (g.team === ORC && !(g.phase > 0)) { if (g.kind) kind = g.kind; if (g.type === 'ram') hasRam = true; }
     const plan = this._wlPlan(0, kind, hasRam);
@@ -582,7 +582,7 @@ export const warlordMethods = {
       }
       let tx = x, ty = y;
       if (n) { tx = sx / n - 80; ty = sy / n; }
-      // the captains of one force space themselves along its front, forty metres or more apart
+      // the captains of one force space themselves along its front, forty meters or more apart
       let rank = 0, mates = 1;
       for (const ci of this.cmds[ORC]) {
         if (ci === i || !this.alive[ci]) continue;

@@ -81,7 +81,7 @@ export function buildUI(app, portraits) {
     const blank = PRESETS.find((p) => p.key === 'empty'), rest = PRESETS.filter((p) => p !== blank && !p.hidden);
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
-      // (the best score won on it is shown beside the list, labelled: tacked onto the name it read as part of the name)
+      // (the best score won on it is shown beside the list, labeled: tacked onto the name it read as part of the name)
       const o = el('option', null, p.name + (p.level ? ` (${p.level})` : '') + (b && b.medal ? '  ★' : ''));
       o.value = p.key; preset.append(o);
     }
@@ -585,7 +585,7 @@ export function buildUI(app, portraits) {
     modal.hidden = false;
     modal.innerHTML = `<div class="dialog welcome">
       <div class="wl-brand"><svg viewBox="0 0 32 32" width="46" height="46" aria-hidden="true"><path d="M5 26V12l5-4 2 4h8l2-4 5 4v14h-8v-6a3 3 0 0 0-6 0v6z" fill="currentColor"/></svg><div><h1>Helm’s Deep</h1><small>Modern Defense Simulator</small></div></div>
-      <p class="lead">A modern garrison defends the Hornburg and the Deeping Wall against a horde of Uruk-hai. Place your troops, then command the defence in real time.</p>
+      <p class="lead">A modern garrison defends the Hornburg and the Deeping Wall against a horde of Uruk-hai. Place your troops, then command the defense in real time.</p>
       <div class="wl-modes">
         <button class="wl-mode primary-mode" id="wlSandbox"><b>Sandbox</b><span>Build both armies and set the rules. Not scored.</span><em>Start building →</em></button>
         <button class="wl-mode" id="wlChallenge"><b>Challenge</b><span>Hold a set scenario until dawn, on a budget. Scored, with medals.</span><em>Take command →</em></button>

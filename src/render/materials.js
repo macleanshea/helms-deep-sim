@@ -1,8 +1,8 @@
 // Surface materials. Every vertex names a material; the shaders look it up in two texture arrays
 // that are generated on the GPU at start-up (no image files):
-//   A: rgb = albedo detail (0.5 is neutral — it multiplies the vertex or terrain colour), a = height
+//   A: rgb = albedo detail (0.5 is neutral — it multiplies the vertex or terrain color), a = height
 //   B: rg = tangent-space normal, b = roughness, a = specular strength
-// Each layer tiles seamlessly; TILE gives its size in metres on the surface.
+// Each layer tiles seamlessly; TILE gives its size in meters on the surface.
 
 export const MAT = {
   PLAIN: 0, ASHLAR: 1, FLAG: 2, ROCK: 3, GRASS: 4, DIRT: 5, GRAVEL: 6, TIMBER: 7, SLATE: 8,
@@ -12,7 +12,7 @@ export const MAT = {
   TIMBER_V: 17,  // timber with the planks running the other way
 };
 export const LAYERS = 16;
-/** Metres covered by one repeat of each layer. */
+/** Meters covered by one repeat of each layer. */
 export const TILE = [1, 8, 6, 14, 5, 5, 3, 2.4, 3, 1.2, 2.5, 0.6, 1.4, 1.0, 0.5, 1];
 /** How strongly each layer's height field turns into a normal map. */
 const BUMP = [0, 3.2, 2.6, 4.2, 1.6, 2.2, 3.0, 2.2, 2.6, 1.1, 0.5, 0.9, 0.9, 1.5, 0.3, 0];
@@ -57,14 +57,14 @@ float weave(vec2 uv, float n){ return 0.5 + 0.5*sin(uv.x*TAU*n)*sin(uv.y*TAU*n);
 // one generator per layer, so each program compiles only the material it draws
 const FN = {
   1: `M matOf(vec2 uv){
-  // coursed ashlar as masons lay it: courses half a metre high, the blocks of each course a length of their own
+  // coursed ashlar as masons lay it: courses half a meter high, the blocks of each course a length of their own
   // (five to eight to the tile), joints tight and a little ragged, the odd stone replaced in a darker or paler
   // rock, arrises chipped, the whole face weathered in broad stains that ignore the blocks
   float rows = 16., row = floor(uv.y*rows), nb = 5. + floor(h21(vec2(row, 3.))*3.99);
   float gx = uv.x*nb + h21(vec2(row, 7.));
   vec2 id = vec2(mod(floor(gx), nb), row), f = vec2(fract(gx), fract(uv.y*rows));
   float rag = (pfbm(uv, 32., 3)-.5)*0.035;
-  float dx = min(f.x, 1.-f.x)*(8./nb), dy = min(f.y, 1.-f.y)*0.5;          // metres to the nearest joint
+  float dx = min(f.x, 1.-f.x)*(8./nb), dy = min(f.y, 1.-f.y)*0.5;          // meters to the nearest joint
   float d = min(dx, dy) + rag;
   float chip = smoothstep(0.10, 0.0, dx + dy*0.9 + (pfbm(uv+.21, 48., 2)-.5)*0.12)*step(0.55, h21(id+1.7));   // a knocked corner
   float face = smoothstep(0.006, 0.03, d)*(1.-chip*0.8), hb = h21(id+3.), grain = pfbm(uv, 28., 5);
@@ -207,7 +207,7 @@ const FN = {
 }
 `,
   12: `M matOf(vec2 uv){
-  // four-colour disruptive pattern over the weave
+  // four-color disruptive pattern over the weave
   vec2 w = uv + (vec2(pfbm(uv,4.,3), pfbm(uv+.5,4.,3))-.5)*0.22;
   float a = pfbm(w, 3., 4), b = pfbm(w+.31, 5., 4), wv = weave(uv, 40.), wr = pfbm(uv+.6, 3., 3);
   vec3 c = vec3(0.5);
@@ -289,8 +289,8 @@ export function buildMaterials(gl, compile, vsFull, vaoFull, res = 512) {
     // the height pass must be readable (with wrap-around) before the normals are derived from it
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, pass ? b : a); gl.generateMipmap(gl.TEXTURE_2D_ARRAY);
   }
-  // average colour of every layer (its smallest mip), so shaders can divide it out: the detail then
-  // varies a surface's colour without shifting it
+  // average color of every layer (its smallest mip), so shaders can divide it out: the detail then
+  // varies a surface's color without shifting it
   const mean = new Float32Array(LAYERS * 3), px = new Uint8Array(4), top = Math.floor(Math.log2(res));
   for (let l = 0; l < LAYERS; l++) {
     gl.framebufferTextureLayer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, a, top, l);

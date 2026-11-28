@@ -17,7 +17,7 @@ export const T = { GROUND: 0, CLIFF: 1, WALL: 2, WATER: 3, COURT: 4, ROAD: 5, ST
 export const WALL_H = 12;     // Deeping Wall walkway
 export const PLATEAU_Z = 12;  // Hornburg rock and courtyard
 export const RING_TOP = 21;   // Hornburg curtain wall walkway
-export const STEP = 3.3;      // largest height change a unit can walk between neighbouring cells
+export const STEP = 3.3;      // largest height change a unit can walk between neighboring cells
 export const WAY_STEP = 0.9;  // and the largest between a built roadway (the causeway, the rear ramp) and the ground beside it: they have
                               // walled sides, and are got onto and off at their ends
 
@@ -27,12 +27,12 @@ export const OB = { WIRE: 1, AV: 2 };
 // ticks a second), a troll 14, an engine's crew 40; at an obstacle a troll among it wrenches 30 a tick loose and an engine's crew 6.
 export const WIRE_HP = 1000, AV_HP = 1500;
 
-// armour classes
+// armor classes
 export const A = { FLESH: 0, HEAVY: 1, WOOD: 2, INF: 3, VEH: 4, GUN: 5, ENGINE: 6 };
 // damage kinds
 export const K = { BULLET: 0, HEAVY: 1, HE: 2, AP: 3, MELEE: 4, BOLT: 5, ROCK: 6, SMASH: 7 };
 
-// damage multiplier [kind][armour]. ENGINE is a crewed siege engine: small arms cannot hurt the timber, only its carriers.
+// damage multiplier [kind][armor]. ENGINE is a crewed siege engine: small arms cannot hurt the timber, only its carriers.
 export const ARMOR_MULT = [
   /* bullet */ [1, 0.22, 0.12, 1, 0.3, 0.6, 0],
   /* heavy  */ [1, 0.7, 0.6, 1, 1, 1, 0.5],
@@ -91,16 +91,16 @@ export const UNITS = [
     desc: 'Picks off captains, sappers and ladder crews.' },
   { key: 'grenadier', cost: 25, team: DEF, name: 'Grenadier', cls: C.INF, hp: 100, speed: 3.3, rad: 0.5, size: 3.4, spr: 3, w: 'gl', ammo: 30, spacing: 2.2, supply: 2,
     desc: 'Hits attackers massed at the foot of the wall.' },
-  { key: 'at', cost: 35, team: DEF, name: 'Anti-Armour Gunner', cls: C.INF, hp: 100, speed: 3.0, rad: 0.55, size: 3.6, spr: 4, w: 'rocket', ammo: 8, spacing: 2.6, supply: 3,
+  { key: 'at', cost: 35, team: DEF, name: 'Anti-Armor Gunner', cls: C.INF, hp: 100, speed: 3.0, rad: 0.55, size: 3.6, spr: 4, w: 'rocket', ammo: 8, spacing: 2.6, supply: 3,
     desc: 'Guided rockets. Fires only at trolls and siege engines.' },
   { key: 'mortar', cost: 60, team: DEF, name: 'Mortar Gunner', cls: C.INF, hp: 140, speed: 2.2, rad: 1.0, size: 5.2, spr: 5, w: 'mortar', ammo: 30, spacing: 6, supply: 4,
     desc: 'Fires over walls. Holds fire near your own troops.' },
   { key: 'howitzer', cost: 220, team: DEF, name: 'Howitzer', cls: C.GUN, hp: 500, speed: 0, rad: 2.4, size: 10, spr: 6, w: 'howitzer', ammo: 24, spacing: 14, supply: 6,
     desc: 'Heavy artillery that reaches the whole map. Cannot move.' },
   { key: 'ifv', cost: 260, team: DEF, name: 'Fighting Vehicle', cls: C.VEH, hp: 1800, speed: 9, rad: 2.4, size: 8.5, spr: 7, turret: 8, w: 'autocannon', ammo: 400, spacing: 10, supply: 5,
-    desc: 'Fast armoured vehicle with a 30 mm autocannon.' },
+    desc: 'Fast armored vehicle with a 30 mm autocannon.' },
   { key: 'tank', cost: 420, team: DEF, name: 'Main Battle Tank', cls: C.VEH, hp: 3600, speed: 8, rad: 2.8, size: 10.5, spr: 9, turret: 10, w: 'tankgun', ammo: 40, w2: 'coax', ammo2: 700, spacing: 12, supply: 6,
-    desc: 'Heavy armour. Its gun kills trolls; blades barely hurt it.' },
+    desc: 'Heavy armor. Its gun kills trolls; blades barely hurt it.' },
   { key: 'cache', cost: 80, team: DEF, name: 'Ammo Cache', cls: C.CACHE, hp: 300, speed: 0, rad: 1.6, size: 5.5, spr: 11, pool: 150, spacing: 8,
     desc: 'Re-arms nearby troops until it runs out.' },
   { key: 'cmd', cost: 120, team: DEF, name: 'Commander', cls: C.INF, hp: 170, speed: 3.2, rad: 0.6, size: 3.8, spr: 13, w: 'rifle', ammo: 60, spacing: 3.2, supply: 1, cmd: true, aura: 110,
@@ -117,7 +117,7 @@ export const UNITS = [
     desc: 'Air-dropped ammo.' },
   // ---- attackers -------------------------------------------------------
   { key: 'uruk', team: ORC, name: 'Uruk-hai', role: R.MELEE, hp: 130, speed: 4.8, rad: 0.5, size: 3.2, spr: 16, mdmg: 24, mreload: 1.0, reach: 1.3, spacing: 1.7, armor: A.FLESH,
-    desc: 'Armoured heavy infantry. The bulk of the horde.',
+    desc: 'Armored heavy infantry. The bulk of the horde.',
     note: 'Carry and escort the siege engines, lock shields as they close in, and storm the ladders.', counter: 'Explosives, wire and flanking fire break a shield wall. Rifles kill the exposed.' },
   { key: 'archer', team: ORC, name: 'Crossbow Uruk', role: R.ARCHER, hp: 90, speed: 4.5, rad: 0.5, size: 3.2, spr: 17, w: 'xbow', mdmg: 18, mreload: 1.2, reach: 1.3, spacing: 1.8, armor: A.FLESH,
     desc: 'Fires volleys. Weak against troops behind battlements.',

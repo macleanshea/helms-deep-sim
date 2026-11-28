@@ -1,6 +1,6 @@
 // Unit models that come from files rather than from code (built by tools/assets/build.js into assets/game/).
 //
-// `loadUnitPacks` fetches the manifest, then each unit's pack and colour texture, and hands each to `onUnit` as it
+// `loadUnitPacks` fetches the manifest, then each unit's pack and color texture, and hands each to `onUnit` as it
 // arrives: the game starts on its built-in models and takes these up when they are ready. Nothing here is needed
 // for the game to run: a pack that fails to load leaves that unit on its built-in model.
 

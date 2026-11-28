@@ -18,7 +18,7 @@
  * @param regions [x, y, w, h] in it for each level
  * @param byBone  keep vertices of different bones apart even where they share a place (machines)
  * @param group   a number for each vertex (the figure 0, each piece of gear its own): a texel is painted only from its own
- *                group's surface, so a sword's grip does not take the colour of the hand closed round it
+ *                group's surface, so a sword's grip does not take the color of the hand closed round it
  * @returns { px: Uint8Array(W * H * 3), levels: [{ from: Int32Array, uv: Float32Array, index: Uint32Array, charts }] }
  */
 export function rebake(m, levels, src, W, H, regions, byBone = false, group = null) {
@@ -60,14 +60,14 @@ export function rebake(m, levels, src, W, H, regions, byBone = false, group = nu
     }
     for (const l of edges.values()) if (l.length === 2) { adj[l[0]].push(l[1]); adj[l[1]].push(l[0]); }
     const facing = (t, c) => fn[t * 3 + (c >> 1)] * (c & 1 ? -1 : 1);
-    // a triangle among neighbours that mostly face another way joins them, if it can be seen from there: fewer, larger patches
+    // a triangle among neighbors that mostly face another way joins them, if it can be seen from there: fewer, larger patches
     for (let pass = 0; pass < 4; pass++) for (let t = 0; t < nt; t++) {
       const n = adj[t]; if (n.length < 2) continue;
       let best = -1, bc = 0;
       for (const c of new Set(n.map((q) => cls[q]))) { const k = n.filter((q) => cls[q] === c).length; if (k > bc) { bc = k; best = c; } }
       if (best !== cls[t] && bc >= 2 && facing(t, best) > 0.3) cls[t] = best;
     }
-    // a scrap of a few triangles facing its own way joins the neighbour it shares most edges with, where it can be seen from there
+    // a scrap of a few triangles facing its own way joins the neighbor it shares most edges with, where it can be seen from there
     for (let pass = 0; pass < (level ? 5 : 3); pass++) {
       const comp = new Int32Array(nt).fill(-1); let nc = 0;
       for (let seed = 0; seed < nt; seed++) {
@@ -82,7 +82,7 @@ export function rebake(m, levels, src, W, H, regions, byBone = false, group = nu
         if (best >= 0) for (const t of mem) cls[t] = best;
       }
     }
-    // ---- patches: neighbouring triangles that face the same way, as long as they do not lie over one another seen from there
+    // ---- patches: neighboring triangles that face the same way, as long as they do not lie over one another seen from there
     const chart = new Int32Array(nt).fill(-1), charts = [];
     const uvOf = (p, c, o) => { const a = c >> 1; o[0] = P[p * 3 + (a + 1) % 3]; o[1] = P[p * 3 + (a + 2) % 3]; };
     let area = 0; for (let t = 0; t < nt; t++) { const a = T[t * 6] * 3, b = T[t * 6 + 1] * 3, c = T[t * 6 + 2] * 3; area += Math.hypot(P[b] - P[a], P[b + 1] - P[a + 1], P[b + 2] - P[a + 2]) * Math.hypot(P[c] - P[a], P[c + 1] - P[a + 1], P[c + 2] - P[a + 2]) * 0.5; }
@@ -154,14 +154,14 @@ export function rebake(m, levels, src, W, H, regions, byBone = false, group = nu
         const den = (ty[1] - ty[2]) * (tx[0] - tx[2]) + (tx[2] - tx[1]) * (ty[0] - ty[2]);
         if (Math.abs(den) < 1e-9) continue;
         const X0 = Math.max(RX, Math.floor(Math.min(tx[0], tx[1], tx[2]) - 1)), X1 = Math.min(RX + RW - 1, Math.ceil(Math.max(tx[0], tx[1], tx[2]) + 1)), Y0 = Math.max(RY, Math.floor(Math.min(ty[0], ty[1], ty[2]) - 1)), Y1 = Math.min(RY + RH - 1, Math.ceil(Math.max(ty[0], ty[1], ty[2]) + 1));
-        // (a texel is painted if its centre lies in the triangle or within about a texel of it: the margin is what filtering reads at an edge)
+        // (a texel is painted if its center lies in the triangle or within about a texel of it: the margin is what filtering reads at an edge)
         const ad = Math.abs(den), k0 = ad / (Math.hypot(tx[1] - tx[2], ty[1] - ty[2]) || 1), k1 = ad / (Math.hypot(tx[0] - tx[2], ty[0] - ty[2]) || 1), k2 = ad / (Math.hypot(tx[0] - tx[1], ty[0] - ty[1]) || 1); // (a corner's weight times these: texels from the edge opposite)
         for (let y = Y0; y <= Y1; y++) for (let x = X0; x <= X1; x++) {
           const cx = x + 0.5, cy = y + 0.5;
           let b0 = ((ty[1] - ty[2]) * (cx - tx[2]) + (tx[2] - tx[1]) * (cy - ty[2])) / den, b1 = ((ty[2] - ty[0]) * (cx - tx[2]) + (tx[0] - tx[2]) * (cy - ty[2])) / den, b2 = 1 - b0 - b1;
           const mn = Math.min(b0, b1, b2);
           if (b0 * k0 < -1.2 || b1 * k1 < -1.2 || b2 * k2 < -1.2) continue;
-          const o = y * W + x, rank = mn >= 0 ? 2 : 1; // (a texel inside one triangle is not overwritten from the margin of its neighbour)
+          const o = y * W + x, rank = mn >= 0 ? 2 : 1; // (a texel inside one triangle is not overwritten from the margin of its neighbor)
           if (done[o] >= rank) continue;
           b0 = Math.max(0, b0); b1 = Math.max(0, b1); b2 = Math.max(0, b2); const s = b0 + b1 + b2; b0 /= s; b1 /= s; b2 /= s;
           const h = near(P[A] * b0 + P[B] * b1 + P[C] * b2, P[A + 1] * b0 + P[B + 1] * b1 + P[C + 1] * b2, P[A + 2] * b0 + P[B + 2] * b1 + P[C + 2] * b2, fn[t * 3], fn[t * 3 + 1], fn[t * 3 + 2], group ? group[T[t * 6 + 3]] : -1);
@@ -171,7 +171,7 @@ export function rebake(m, levels, src, W, H, regions, byBone = false, group = nu
         }
       }
     }
-    // ---- round every patch, a few texels of its own edge colour, then the level's average: nothing foreign bleeds in when the picture is shrunk
+    // ---- round every patch, a few texels of its own edge color, then the level's average: nothing foreign bleeds in when the picture is shrunk
     for (let pass = 0; pass < 6; pass++) {
       const add = [];
       for (let y = RY; y < RY + RH; y++) for (let x = RX; x < RX + RW; x++) {

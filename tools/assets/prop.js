@@ -8,7 +8,7 @@
 // beside it at any zoom. The file is small: 10 bytes a place, 2 an index.
 //
 //   assets/game/<name>-prop.<hash>.bin: "HDP1", uint32 length of a JSON header, the header, then
-//     places x 3 int16 (x, y across; z up; the whole piece in a box 1 high standing on z = 0, centred on its axis),
+//     places x 3 int16 (x, y across; z up; the whole piece in a box 1 high standing on z = 0, centered on its axis),
 //     places x 3 int8 normal, places x 1 uint8 shade (128 = the average), triangles x 3 uint16 (or uint32)
 import fs from 'node:fs';
 import os from 'node:os';
@@ -39,7 +39,7 @@ const np = P.length / 3;
 let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9], mean = 0;
 for (let p = 0; p < np; p++) { for (let e = 0; e < 3; e++) { lo[e] = Math.min(lo[e], P[p * 3 + e]); hi[e] = Math.max(hi[e], P[p * 3 + e]); } L[p] /= C[p]; mean += L[p] / np; }
 // the axis: the middle of the top fifth (a plinth or a buttress may be lopsided; the shaft is not), or for a piece that is
-// no tower ("prop": { "centre": "box" } in its recipe) the middle of its box
+// no tower ("prop": { "center": "box" } in its recipe) the middle of its box
 const recipe = JSON.parse(fs.readFileSync(path.join(here, 'units', `${name}.json`), 'utf8'));
 let ax = 0, az = 0, an = 0; for (let p = 0; p < np; p++) if (P[p * 3 + 1] > lo[1] + 0.6 * (hi[1] - lo[1])) { ax += P[p * 3]; az += P[p * 3 + 2]; an++; }
 ax /= an; az /= an;
