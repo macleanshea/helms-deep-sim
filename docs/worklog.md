@@ -6,6 +6,12 @@ from **Next**.
 
 ## Next
 
+0. **In progress: lashed ladders** (`src/sim/lashed.js`, the ladder case in `Sim._orc`, `_throwCheck` in
+   `src/sim/engines.js`, field `F_RING` in `src/sim/warlord.js`, jump links in `src/sim/flow.js`). Working: ring
+   feet found (19 sections), ladders pair, are lashed, go up, are climbed and thrown down. Not yet enough: with the
+   stand-in commander the horde dies 100-200 m out from the ring before it gets there (machine guns and rifles on
+   the ring walk, kept in ammo by resupply drops). Not yet drawn by the renderer. Check with
+   `node <scratchpad>/keep2.mjs escalade auto 1` (a probe: everyone into the Hornburg at 1 s).
 1. **The keep is a free win** (`npm run checks keep` reports it OPEN). Ordering everyone into the Hornburg in
    the first second wins every challenge for the stand-in commander. Make the horde answer it, then rerun the
    check: catapults onto the crowded court (`_catTarget` in `src/sim/sim.js`), sappers sent for the postern
@@ -50,3 +56,14 @@ from **Next**.
 - Checks: 24 of 25 pass (keep open). Golden hashes re-recorded; they reproduce.
 - Decision: a Build challenge's suggested garrison is the answer key, close to the best found; its
   difficulty is the share of random garrisons that hold (Escalade 19 of 30, Siege Train 12 of 30).
+
+### Part 4 (in progress)
+
+- Asked by the owner: let the attackers lash two ladders together to scale the Hornburg's ring wall, so that an
+  immediate fall-back is not a free win. Built the jump links in the flow solver (inert until used: golden
+  unchanged), ring ladder feet, pairing, raising (14 s, 5 hands), climbing (10 s, one man every 2 s), the lashing
+  giving way under four or more, throw-down that breaks the ladder.
+- Measured: without support calls the horde takes the Hornburg (Escalade seed 1, garrison wiped out at 500 s;
+  two lashed ladders raised and thrown down). With the stand-in commander it does not even reach the walls: most of
+  the horde dies 100-200 m out, to machine guns and rifles on the ring walk. A workflow (keep diagnosis, wire, the
+  renderer's ladders, a code audit, then a critique of the design) is running.

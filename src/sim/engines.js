@@ -178,10 +178,20 @@ export const engineMethods = {
     // the head is held by the horde unless the garrison has twice as many men at it: then the ladder can still be heaved
     // off, with the men at the top cut down or carried with it, though more slowly
     if (att && def < att * 2) { this.cd2[L] = 0; return; }
+    const lashed = this.isLashed[L];
     const loaded = this.time < this.linkT[L] - 0.75 + LADDER_TIME;
-    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? 0.35 : 1) * (att ? 0.5 : 1); // three men, six seconds; far longer with climbers' weight on it
+    // three men, six seconds; far longer with climbers' weight on it. A lashed ladder, long and top-heavy, goes over at a push
+    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? (lashed ? 0.6 : 0.35) : 1) * (att ? 0.5 : 1) * (lashed ? 2 : 1);
     if (this.cd2[L] < 3) return;
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
+    if (lashed) {
+      // it comes down the rock and breaks apart: there is no raising it again
+      this.stats.thrown++; this.stats.lashThrown = (this.stats.lashThrown || 0) + 1;
+      this.fx.dust(x, y, this.map.groundZ(x, y), 4); this.fx.sound('ladder', x, y, 0.8);
+      this._alert('lashDown', 20, 'Lashed ladder thrown down · Hornburg', 'good', x, y);
+      s.ladders--; this.aux2[L] = -1; this._unlink(L); this.kill(L, null, true);
+      return;
+    }
     this.stats.thrown++;
     this.fx.dust(x, y, this.map.groundZ(x, y), 3); this.fx.sound('ladder', x, y, 0.7);
     this._alert('ladDown' + this.segSector(k), 20, `Ladder thrown down · ${this.sectors[this.segSector(k)].short}`, 'good', x, y);

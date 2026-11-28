@@ -24,6 +24,7 @@ const NATURAL = [2, 1, 0];       // the sector each lane faces: low y is the cli
 const OBSERVE = 450;             // how far off the horde can count heads on a wall (m)
 const F_CULVERT = 3, F_HUNT = 4, F_GATE = 9; // field slots (0-2 are the three sectors); F_GATE is the ram's own field
 const F_POST = 5, F_POSTG = 6; // to the back doors: for those who can climb a ladder, and for those who cannot
+const F_RING = 7;              // to the feet of the rock below the ring, for ladders to be lashed (lashed.js)
 const FORM_OFF = 470;            // the forming-up line lies this far short of the works (m): beyond the machine guns' reach
 const FORM_X = LAYOUT.wall.span[0] + 20 - FORM_OFF;
 const SHIELD_FAR = 430;          // shields are locked this far out to begin with (m from the works)
@@ -56,7 +57,7 @@ export const warlordMethods = {
     };
     this.catWary = false;
     this.fields = [];
-    for (let k = 0; k < 7; k++) this.fields.push({ dir: new Uint8Array(NC).fill(255), close: new Uint8Array(NC), ready: false, t: -100, ver: -1, want: -100, queued: false });
+    for (let k = 0; k < 8; k++) this.fields.push({ dir: new Uint8Array(NC).fill(255), close: new Uint8Array(NC), ready: false, t: -100, ver: -1, want: -100, queued: false });
     this.fieldQ = []; this.fCost = null;
   },
 
@@ -434,6 +435,12 @@ export const warlordMethods = {
     if (gone !== wl.abandoned) {
       wl.abandoned = gone;
       if (gone) {
+        // ladder crews still a long way from the Deeping Wall turn for the Hornburg: they will lash their ladders in pairs
+        for (const e of this.engines) {
+          if (this.type[e] !== U.ladder || !this.alive[e] || (this.state[e] !== 1 && this.state[e] !== 5)) continue;
+          const k = this.aux2[e];
+          if (k >= 0 && this.segs[k].group === 0 && Math.hypot(this.segs[k].ox - this.x[e], this.segs[k].oy - this.y[e]) > 100) { this.segs[k].claimed--; this.aux2[e] = -1; }
+        }
         let any = false;
         const ks = this._keepSecs();
         for (const f of wl.forces) { if (f.reserve || f.sector < 0 || this._wlSec(f) >= 3) continue; this._wlSend(f, ks[f.lane]); any = true; }
@@ -743,12 +750,17 @@ export const warlordMethods = {
       // for those on the wall, the door from its walk into the court is the other back door
       const ds = this.segs[this.map.DOOR];
       if (k === F_POST && !ds.breached) src[ns++] = this.map.cellOf(ds.x, ds.y);
+      // and for those who can climb, every lashed ladder standing against the ring is a way in as good as a door
+      if (k === F_POST) for (const L of this.lashed) if (this.alive[L] && ns < src.length) src[ns++] = this.map.cellOf(this.tx[L], this.ty[L]);
+    } else if (k === F_RING) {
+      // the feet of the rock below the ring: where the ladders are carried, to be lashed together
+      for (const f of this.ringFoot) if (f && ns < src.length) src[ns++] = f.c;
     } else for (const c of this.wl.exCells) src[ns++] = c;
     let ok = 0;
     for (let q = 0; q < ns; q++) if (cost[src[q]]) src[ok++] = src[q];
     if (!ok) { fl.ready = false; fl.t = this.time; return; }
     // (the ground path to the postern knows no ladders: it goes through a breach, the culvert first of all)
-    this.solver.solve(cost, src, ok, fl.dir, k === F_POSTG ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null })) : this.navOrc);
+    this.solver.solve(cost, src, ok, fl.dir, k === F_POSTG || k === F_RING ? (this.navGround || (this.navGround = { ...this.navOrc, ladder: null, jump: null })) : this.navOrc);
     // close to the postern the fight itself leads, straight in at the door
     const dist = this.solver.dist, close = fl.close, lim = k === F_HUNT ? 0 : k >= F_POST ? 40 : 150;
     for (let c = 0; c < NC; c++) close[c] = dist[c] < lim ? 1 : 0;

@@ -15,6 +15,7 @@ import { engineMethods } from './engines.js';
 import { postMethods } from './posts.js';
 import { companyMethods } from './company.js';
 import { platoonMethods } from './platoon.js';
+import { lashedMethods, LASHED_GAP, LASHED_HANDS } from './lashed.js';
 import { LAYOUT } from '../layout.js';
 
 const AP = LAYOUT.approach, PO = LAYOUT.posts; // the horde's lines and the garrison's places on this map
@@ -30,7 +31,7 @@ export const FINE_CELL = FINE, FINE_W = FW, FINE_H = FH;
 export const LOSS_CELL = OCS, LOSS_W = OW, LOSS_H = OH;
 
 export const S_IDLE = 0, S_MOVE = 1, S_ACT = 2, S_DONE = 3, S_FLEE = 4, S_WAIT = 5, S_CLIMB = 6;
-export const LADDER_TIME = 4, TOWER_TIME = 5;
+export const LADDER_TIME = 4, TOWER_TIME = 5, LASHED_TIME = 10; // seconds to climb a ladder, a siege tower, a lashed ladder up the Hornburg's ring
 export const WIRE_COST = 70; // what a section of standing wire adds to the cost of a path through its cell (open ground is 10)
 // direction index for a (dy+1)*3+(dx+1) neighbor offset
 const KDIR = [5, 6, 7, 4, -1, 0, 3, 2, 1];
@@ -124,6 +125,7 @@ export class Sim {
     this.navDef = { cz: this.cz, elev: this.elevD, portal: this.portal, step: STEP, way: this.way };
     this.navVeh = { cz: this.cz, elev: this.elevD, portal: this.portal, step: 1.6, way: this.way };
     this.navDirty = true; this.lastNav = -100; this.gateDirty = true;
+    this._initLashed();
     this.orders = []; this.orderSeq = 0;
 
     this.time = 0; this.tick = 0;
@@ -273,8 +275,9 @@ export class Sim {
   unitZ(i) {
     const x = this.x[i], y = this.y[i];
     if (this.state[i] === S_CLIMB) {
-      const L = this.target2[i], u = Math.min(1, (this.time - this.aux[i]) / (L >= 0 && this.type[L] === U.tower ? TOWER_TIME : LADDER_TIME));
-      return this.map.groundZ(this.bx[i], this.by[i]) * (1 - u) + this.segTop[0] * u;
+      const L = this.target2[i], u = Math.min(1, (this.time - this.aux[i]) / this._climbTime(L));
+      const k = L >= 0 && this.alive[L] ? this.aux2[L] : -1; // (the wall it leans on: the Deeping Wall's walk, or the Hornburg's)
+      return this.map.groundZ(this.bx[i], this.by[i]) * (1 - u) + this.segTop[k >= 0 ? k : 0] * u;
     }
     if (this.el[i]) { const s = this.mseg[this.map.cellOf(x, y)]; if (s >= 0) return this.segTop[s]; }
     return this.map.groundZ(x, y);
@@ -731,6 +734,7 @@ export class Sim {
     if (!this.opt.sandbox && this.cp < this.opt.cpCap) { const inc = Math.min(this.opt.cpCap - this.cp, this.opt.cpRate * DT); this.cp += inc; this.cpStats.earned += inc; }
     if (this.tick % 5 === 1) this._buildAux();
     this._buildGrids();
+    if (this.jumpDirty) { this.jumpDirty = false; this._rebuildJumps(); }
     // (with ladders going up and coming down all along the wall, the paths are re-solved at most once a second)
     if ((this.navDirty && this.tick - this.lastNav >= 10) || this.tick - this.lastNav >= 20) this._nav();
     const { alive, team, px, py, x, y } = this;
@@ -802,13 +806,17 @@ export class Sim {
     return -1;
   }
 
+  /** How long a climb up ladder or tower L takes. */
+  _climbTime(L) { return L >= 0 && this.type[L] === U.tower ? TOWER_TIME : L >= 0 && this.isLashed[L] ? LASHED_TIME : LADDER_TIME; }
+
   /** Try to start up the ladder or tower that serves wall cell cw. */
   _startClimb(i, cw) {
     const L = this.ladderAt[cw];
     if (L < 0 || !this.alive[L] || this.state[L] !== S_DONE || this.time < this.linkT[L]) return false;
     const tower = this.type[L] === U.tower;
-    this.linkT[L] = this.time + (tower ? 0.35 : 0.75);
-    this.state[i] = S_CLIMB; this.aux[i] = this.time; this.target2[i] = L;
+    this.linkT[L] = this.time + (tower ? 0.35 : this.isLashed[L] ? LASHED_GAP : 0.75);
+    if (this.isLashed[L]) this._lashedLoad(L);
+    this.state[i] = S_CLIMB; this.aux[i] = this.time; this.target2[i] = L; this.climbLong[i] = this.isLashed[L];
     this.bx[i] = this.x[L]; this.by[i] = this.y[L]; this.tx[i] = this.tx[L]; this.ty[i] = this.ty[L];
     this.vx[i] = this.vy[i] = 0; this.sepx[i] = this.sepy[i] = 0;
     this.rot[i] = Math.atan2(this.ty[L] - this.y[L], this.tx[L] - this.x[L]);
@@ -818,13 +826,14 @@ export class Sim {
   _climb(i) {
     const L = this.target2[i];
     const ok = L >= 0 && this.alive[L] && this.state[L] === S_DONE && (this.type[L] === U.ladder || this.type[L] === U.tower);
-    const u = (this.time - this.aux[i]) / (ok && this.type[L] === U.tower ? TOWER_TIME : LADDER_TIME);
+    const long = this.climbLong[i];
+    const u = (this.time - this.aux[i]) / (ok ? this._climbTime(L) : long ? LASHED_TIME : LADDER_TIME);
     if (!ok) {
-      // the ladder went out from under them
+      // the ladder went out from under them (from a lashed ladder up the Hornburg's rock, a fall of up to 21 m)
       this.state[i] = S_MOVE; this.target2[i] = -1; this.el[i] = 0;
       this.x[i] = this.bx[i] + (this.rand() - 0.5) * 3; this.y[i] = this.by[i] + (this.rand() - 0.5) * 3;
       this.px[i] = this.x[i]; this.py[i] = this.y[i];
-      this.damage(i, 40 + 120 * Math.min(1, u), null);
+      this.damage(i, long ? 60 + 320 * Math.min(1, u) : 40 + 120 * Math.min(1, u), null);
       return;
     }
     if (u >= 1) {
@@ -836,6 +845,7 @@ export class Sim {
   }
 
   _unlink(L) {
+    if (this.isLashed[L]) this.jumpDirty = true; // (its path link from the foot goes with it: see lashed.js)
     const c = this.map.cellOf(this.tx[L], this.ty[L]);
     if (this.ladderAt[c] === L) { this.ladderAt[c] = -1; this.lad[c] = 0; this.navDirty = true; }
   }
@@ -933,7 +943,7 @@ export class Sim {
         let blk = -1;
         if (fm && this.snagT[i] <= this.time) { this._formStep(i, d, g, x, y, speed); return; }
         if (this._flow(x, y, fld)) blk = this._move(i, this.fdx, this.fdy, speed, 0, 0); else this._move(i, 0, 0, 0, 0, 0);
-        if (blk >= 0 && this.lad[blk] && !el) this._startClimb(i, blk);
+        if (blk >= 0 && !el) { if (this.lad[blk]) this._startClimb(i, blk); else this._footClimb(i, c); }
         return;
       }
       case R.MELEE:
@@ -1003,6 +1013,9 @@ export class Sim {
         }
         if (blk >= 0 && this.elev[blk]) {
           if (this.lad[blk] && !d.sz && !el && !shut && !d.cav) { this._startClimb(i, blk); return; }
+        }
+        if (blk >= 0 && !this.elev[blk] && !el && !d.sz && !shut && !d.cav && this._footClimb(i, c)) return;
+        if (blk >= 0 && this.elev[blk]) {
           if (this.cd[i] <= 0) {
             // hack at whatever masonry or timber bars the way
             const k = this.mseg[blk], s = this.segs[k];
@@ -1021,12 +1034,16 @@ export class Sim {
         if (st === S_DONE) { if (d.role === R.TOWER) this._towerUnload(i); else this._throwCheck(i); return; }
         const tower = d.role === R.TOWER;
         let k = this.aux2[i];
+        // the second of two ladders to be lashed together follows the first to the foot of the rock
+        if (!tower && st !== S_ACT && k < 0 && this.lashMate[i] >= 0 && this._mateStep(i, d, speed)) return;
+        const ring = k >= 0 && this.segs[k].group === 1;
         if (st === S_ACT) {
-          if (crewed && !tower && this.crewPts[i] < d.crew.min) { this.aux[i] += DT; return; } // nobody left to heave it up
+          if (crewed && !tower && this.crewPts[i] < (ring ? LASHED_HANDS : d.crew.min)) { this.aux[i] += DT; return; } // nobody left to heave it up
           if (this.time >= this.aux[i]) {
             const s = this.segs[k];
             if (s.breached) { this.state[i] = S_MOVE; s.claimed--; this.aux2[i] = -1; return; }
             this.state[i] = S_DONE; s.ladders++; s.claimed--; this.cd2[i] = 0;
+            if (ring) { this._raiseLashed(i, k); return; }
             if (tower) this.stats.towersUp++; else this.stats.laddersUp++;
             const off = tower ? 4.6 : 2.8;
             this.x[i] = s.x + s.nx * (s.half + off); this.y[i] = s.y + s.ny * (s.half + off);
@@ -1045,11 +1062,18 @@ export class Sim {
         }
         if (k < 0 || this.segs[k].breached) {
           if (k >= 0) this.segs[k].claimed--;
-          // most crews of a wave make for the stretch of wall it has been aimed at
-          const fy = this._forceAimY(g);
-          const aim = fy >= 0 ? (i % 5 < 4 ? fy : y) : this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
-          k = this._pickLadderSeg(aim); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++;
+          if (!tower && this.wl.abandoned) {
+            // the Deeping Wall given up for the Hornburg: two ladders lashed together, up the ring from the valley floor
+            k = this._pickRingSeg(x, y, g); this.aux2[i] = k;
+            if (k >= 0) { this.segs[k].claimed++; this._findMate(i); }
+          } else {
+            // most crews of a wave make for the stretch of wall it has been aimed at
+            const fy = this._forceAimY(g);
+            const aim = fy >= 0 ? (i % 5 < 4 ? fy : y) : this.dir && this.dir.aimY >= 0 && i % 5 < 3 ? this.dir.aimY : y;
+            k = this._pickLadderSeg(aim); this.aux2[i] = k; if (k >= 0) this.segs[k].claimed++;
+          }
         }
+        if (k >= 0 && this.segs[k].group === 1 && !tower) { this._ringLadder(i, d, k, speed, crewed, g); return; }
         if (k < 0) { if (speed > 0 && this._flow(x, y)) this._move(i, this.fdx, this.fdy, speed, d.sz, 0); return; }
         const s = this.segs[k];
         const ax = s.ox + (tower ? s.nx * 2.2 : 0), ay = s.oy + (tower ? s.ny * 2.2 : 0);
@@ -2062,4 +2086,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods, companyMethods, platoonMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods, companyMethods, platoonMethods, lashedMethods);
