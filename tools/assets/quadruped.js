@@ -30,7 +30,7 @@ const move = (x, y, z) => { const m = ident(); m[12] = x; m[13] = y; m[14] = z; 
 const about = (p, r) => mul(move(p[0], p[1], p[2]), mul(r, move(-p[0], -p[1], -p[2]))); // a turn `r` about the point p
 const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-/** @returns {{ mesh, clips, image }} in the shape tools/assets/source.js stores (image: the index of the colour texture's image, or null) */
+/** @returns {{ mesh, clips, image }} in the shape tools/assets/source.js stores (image: the index of the color texture's image, or null) */
 export function quadruped(g, opts = {}) {
   const O = { ...DEFAULTS, ...opts, stride: { ...DEFAULTS.stride, ...(opts.stride || {}) } };
   const { gltf, accessor } = g, prim = gltf.meshes[0].primitives[0];

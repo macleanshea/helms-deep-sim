@@ -60,11 +60,11 @@ export function wallPoint(map, wall, u) {
   let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; }
   return { x: p.x, y: p.y, nx, ny };
 }
-/** How long a stretch of wall walk is, in metres, between two values of `u` (see wallPoint). */
+/** How long a stretch of wall walk is, in meters, between two values of `u` (see wallPoint). */
 export const wallRunLength = (map, wall, a, b) => (wall === 1 ? (Math.abs(b - a) * Math.PI / 180) * KEEP.r : Math.abs(b - a) * map.wallLen);
 
 /**
- * Where the front rank stands, measured out from a wall walk's centre line at (x, y) along its outward normal: a pace
+ * Where the front rank stands, measured out from a wall walk's center line at (x, y) along its outward normal: a pace
  * inside the parapet, and where a bastion swells out from the Hornburg's wall there, a pace inside the bastion's own
  * parapet. Men line the battlements as built, not the line the wall would take without its bastions.
  */
@@ -222,8 +222,8 @@ function alongRing(type, count, a0, a1, r = KEEP.r) {
 // relative weights per unit type.
 export const WAVE_KINDS = {
   probe:    { name: 'Vanguard',      w: { uruk: 0.6, archer: 0.6, berserker: 0.3, warg: 1.5, ladder: 0.3, tower: 0,   troll: 0,   ram: 0,   sapper: 0,   catapult: 0,   chief: 0 } },
-  escalade: { name: 'Escalade',      w: { uruk: 1.0, archer: 1.0, berserker: 1.4, warg: 0.5, ladder: 1.6, tower: 1.0, troll: 0.4, ram: 0.3, sapper: 0.5, catapult: 0.5, chief: 1.0 } },
-  siege:    { name: 'Siege train',   w: { uruk: 1.0, archer: 1.0, berserker: 0.5, warg: 0.3, ladder: 0.5, tower: 1.0, troll: 1.6, ram: 1.5, sapper: 1.5, catapult: 1.5, chief: 1.0 } },
+  escalade: { name: 'Ladder assault', w: { uruk: 1.0, archer: 1.0, berserker: 1.4, warg: 0.5, ladder: 1.6, tower: 1.0, troll: 0.4, ram: 0.3, sapper: 0.5, catapult: 0.5, chief: 1.0 } },
+  siege:    { name: 'Siege assault',  w: { uruk: 1.0, archer: 1.0, berserker: 0.5, warg: 0.3, ladder: 0.5, tower: 1.0, troll: 1.6, ram: 1.5, sapper: 1.5, catapult: 1.5, chief: 1.0 } },
   assault:  { name: 'Main assault',  w: { uruk: 1.0, archer: 1.0, berserker: 1.0, warg: 0.4, ladder: 1.1, tower: 1.0, troll: 1.0, ram: 0.9, sapper: 1.0, catapult: 1.0, chief: 1.0 } },
   final:    { name: 'Final assault', w: { uruk: 1.4, archer: 1.4, berserker: 1.2, warg: 1.2, ladder: 1.0, tower: 0.6, troll: 1.0, ram: 0.6, sapper: 0.8, catapult: 0.8, chief: 1.2 } },
 };
@@ -391,7 +391,7 @@ function garrison(map, scale = 1) {
 export const PRESETS = [
   {
     key: 'first-night', name: 'First Night', level: 'Easy',
-    blurb: 'A company on the centre of the wall and thirty-two hundred coming in three waves, with ladders, a ram and sappers. A short night to learn the siege.',
+    blurb: 'A short night to learn the siege: 3,200 attackers in 3 waves, with ladders, a ram and sappers',
     build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
@@ -408,7 +408,7 @@ export const PRESETS = [
   },
   {
     key: 'garrison', name: 'The Hornburg Garrison', level: 'Medium',
-    blurb: 'Five hundred behind wire and mines, against eighteen thousand Uruk-hai in four waves with towers, trolls and catapults.',
+    blurb: '500 defenders behind wire and mines against 18,000 in 4 waves, with siege towers, trolls and catapults',
     build: (map, sb) => ({
       groups: [...garrison(map, 0.6), makeGroup('tank', 1, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 30), makeGroup('ifv', 2, PO.ifvDeep[0], PO.ifvDeep[1], Math.PI / 2, 50), ...fieldWorks(map),
         ...horde(18000, { waves: sb ? 1 : 4, kinds: ['escalade', 'siege', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1, 1.2], catapults: 12, towers: 4 })],
@@ -417,7 +417,7 @@ export const PRESETS = [
   },
   {
     key: 'three-hundred', name: 'Three Hundred Rifles', level: 'Hard',
-    blurb: 'A lone rifle company with few heavy weapons, and ten thousand at the gate. The shield walls will reach you: how you spend your support and your reserve decides this.',
+    blurb: '300 riflemen with few heavy weapons against 10,000 attackers',
     build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 160, 0.08, 0.88), ...alongWall(map, 'mg', 10, 0.15, 0.85), ...alongWall(map, 'marksman', 8, 0.3, 0.7), ...alongWall(map, 'grenadier', 8, 0.2, 0.8),
@@ -433,7 +433,7 @@ export const PRESETS = [
   // Not offered in the game: the heaviest load there is, for the ?bench run (see render/perf.js).
   {
     key: 'benchmark', name: 'Benchmark: Combined Arms vs. the Host', hidden: true,
-    blurb: 'Armour forward of the wall, guns in the Deep, and thirty thousand coming in six waves.',
+    blurb: 'Armor in front of the wall, guns in the Deep, and 30,000 attackers in 6 waves',
     build: (map, sb) => ({
       groups: [
         ...garrison(map, 1.14),
@@ -445,7 +445,7 @@ export const PRESETS = [
       options: { dawn: 1200, cpStart: 10, cpRate: 3 / 60 },
     }),
   },
-  { key: 'empty', name: 'Blank Map', blurb: 'An empty field. Build both armies from scratch.', build: () => ({ groups: [], options: {} }) },
+  { key: 'empty', name: 'Blank Map', blurb: 'An empty map', build: () => ({ groups: [], options: {} }) },
 ];
 
 /** Requisition cost of the defending side of a setup. */

@@ -1,5 +1,5 @@
 // Flow-field solver on the nav grid (Dial's bucketed Dijkstra over integer costs).
-// A field stores, per cell, the neighbour direction that leads toward the nearest source.
+// A field stores, per cell, the neighbor direction that leads toward the nearest source.
 //
 // Movement rules encoded here (and mirrored by Sim.canEnter):
 //  - ground to ground: only if the walking heights differ by at most `step`

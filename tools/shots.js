@@ -8,7 +8,7 @@
 //
 // It serves the repository itself (server.js on a spare port) and drives headless Chromium through
 // Playwright, which must be installed where Node can find it (`npm i -g playwright`, or NODE_PATH).
-// Rendering is forced onto the software rasteriser so the same code gives the same pixels on any
+// Rendering is forced onto the software rasterizer so the same code gives the same pixels on any
 // machine: the pictures say nothing about speed. The game's clock is held still while shooting, the
 // quality level is pinned, and the battle views are reached by stepping the seeded simulation, so
 // two runs of the same code agree pixel for pixel in the 3D scene.
@@ -25,14 +25,14 @@ const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i
 const out = path.resolve(get('out', path.join(root, 'shots')));
 const [W, H] = get('size', '1280x720').split('x').map(Number);
 const noAssets = flag('no-assets'); // the built-in models only
-const quality = get('quality', 'medium'); // 'high' is four times the work for the software rasteriser: minutes a view
+const quality = get('quality', 'medium'); // 'high' is four times the work for the software rasterizer: minutes a view
 const jpeg = get('jpeg', null), ext = jpeg ? 'jpg' : 'png';
 const only = get('only', '').split(',').filter(Boolean);
 const compare = get('compare', null);
 const port = +get('port', 5187);
 
 /**
- * The views. `at` is [x, y, zoom, yaw?, tilt?] in world metres, px per metre and radians (null: the home view);
+ * The views. `at` is [x, y, zoom, yaw?, tilt?] in world meters, px per meter and radians (null: the home view);
  * `ui` keeps the panels on screen. Battle views are taken `t` seconds into the named preset.
  */
 const YAW = 1.2;

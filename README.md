@@ -2,7 +2,7 @@
 
 An RTS-style battle simulator for the browser: the Battle of the Hornburg, except the
 garrison is a modern combined-arms force. Garrison the fortress within your budget, press
-**Begin Battle**, and hold the Deep until dawn against a horde that comes on in waves — with
+**Begin battle**, and hold the Deep until dawn against a horde that comes on in waves — with
 air strikes, artillery, resupply drops and direct orders — in a challenge the support is paid
 for from a limited pool of Command Points.
 
@@ -28,7 +28,7 @@ serve it as-is with no build step; importing the repository in Vercel is all tha
 
 ## Playing
 
-The battlefield is shown in a 3D view modelled on the film's set: the Hornburg on
+The battlefield is shown in a 3D view modeled on the film's set: the Hornburg on
 its rock against the southern cliff (on your right as you look up the valley), its inner ward
 climbing in terraces to the great tower, the causeway up to the gate, and the Deeping Wall with
 its culvert.
@@ -43,7 +43,7 @@ three, one to a difficulty:
 
 | | Scenario | The night |
 | --- | --- | --- |
-| Easy | **First Night** | A company on the centre of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
+| Easy | **First Night** | A company on the center of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
 | Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
 | Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
 
@@ -53,8 +53,8 @@ guessed: see *Headless runs and balance* below.
 
 
 - The enemy and the battle options are fixed. The garrison is issued at its full
-  **requisition**; open **Advanced** under Order of Battle on the right to see the requisition
-  points (and each unit's cost in the left panel) and rework it. **Begin Battle** is greyed out
+  **requisition**; open **Edit garrison** under Forces on the right to see the requisition
+  points (and each unit's cost in the left panel) and rework it. **Begin battle** is grayed out
   while the garrison costs more than the budget. The order of attack, wave by wave, sits below.
 - Support is paid for from one pool of **Command Points** that refills slowly through the
   night. Killing captains, trolls and siege engines pays a bounty.
@@ -68,14 +68,14 @@ fixed number of calls per kind (four of each to start) instead of Command Points
 seed for sandbox battles is in **Settings**. There are no waves and no relief at
 dawn by default: the whole horde is on the field from the start, and the defenders win when the
 horde gives up with only a remnant left, or lose if the garrison is wiped out. Both win
-conditions (relief at dawn, and when the attackers flee) can be changed. **Automated placement**
+conditions (relief at dawn, and when the attackers flee) can be changed. **Raise a horde**
 (Attackers tab) draws up a whole host of any size with its ladders, engines and captains;
 formations you place yourself take an "advance after" delay. Sandbox battles are not scored.
 
 ### The night
 
-In a challenge the horde attacks in waves: a vanguard that starts on the field, then escalades, the siege
-train and a final assault, which wait beyond the valley mouth and march on in turn. Releases
+In a challenge the horde attacks in waves: a vanguard that starts on the field, then ladder assaults, siege
+assaults and a final assault, which wait beyond the valley mouth and march on in turn. Releases
 are paced so the last wave has time to fight at the wall before dawn; cutting a wave down quickly
 earns a lull (the next may step off up to a minute early). The top bar counts down to the
 next wave, and an alert names the stretch of wall it is aimed at.
@@ -102,12 +102,12 @@ alert; clicking an alert in the feed or a point on the minimap looks there too.
 **Setup.** Pick a mode and a scenario from the top bar. Choose a unit on the left (each card shows the unit's
 range), set how many per placement, then click the map to drop a block or drag to draw a line;
 the dashed ring shows the weapon's reach from that spot, and a dotted one how far a commander
-or captain steadies the troops around them. Point at a wall top and the men lock onto it: a click mans the parapet there, a drag mans it along the wall's curve however far the pointer strays, and they face outward (hold Alt to place freely instead). The Hornburg's bastions, gatehouse platforms and its inner and upper courts can all be manned; a block or line stays on the level it was started on. Under **Field
-works** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
+or captain steadies the troops around them. Point at a wall top and the men lock onto it: a click mans the parapet there, a drag mans it along the wall's curve however far the pointer strays, and they face outward (hold Alt to place freely instead). The Hornburg's bastions, gatehouse platforms and its inner and upper courts can all be manned; a block or line stays on the level it was started on. Under **Obstacles and
+supply** the defenders can lay barbed wire, anti-vehicle obstacles, mines and claymores;
 solid obstacles give cover to whoever is behind them. Click a formation to select it: drag to
-move, `[`/`]` to rotate, `Del` to remove. The right panel shows the order of battle
-(requisition points spent and totals per unit type), the enemy's order of attack wave by wave,
-the battle options, support, and the win conditions. In the sandbox the attackers can be edited
+move, `[`/`]` to rotate, `Del` to remove. The right panel shows the forces
+(requisition points spent and totals per unit type), the waves,
+the options, support, and the victory conditions. In the sandbox the attackers can be edited
 too, and hand-placed attacker formations take an "advance after" delay.
 
 **Battle.**
@@ -115,20 +115,20 @@ too, and hand-placed attacker formations take an "advance after" delay.
 | Input | Action |
 | --- | --- |
 | `Space`, `-`, `+` | Pause / resume, slower, faster (1× to 8×) |
-| **Strike** | |
+| **Fire** | |
 | `1` Air Strike (4 CP) | Click a target, or drag to set the run-in heading |
 | `2` Gunships (6 CP) | Three helicopters orbit the target for 40 s |
-| `T` Target Artillery | Free and unlimited. Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every section that can reach on the point. Each section can also be targeted, held or released on its own |
+| `T` Target Artillery | Free and unlimited. Opens the artillery panel and arms a targeting cursor for your own mortars and howitzers; click to put every battery that can reach on the point. Each battery can also be targeted, held or released on its own |
 | `F` Focus Fire | Drag a circle; every weapon in range concentrates on it, and marksmen pick out any captain inside |
-| **Resupply & reinforce** | |
-| `3` Resupply Drop (4 CP) | Parachuted crates; troops within 60 m re-arm |
-| `4` Air Drop Troops (4 CP) | A helicopter lands a fresh platoon |
-| `R` / `Shift+R` | Selected troops fall back to the keep / general retreat |
+| **Garrison** | |
+| `3` Resupply (4 CP) | Parachuted crates; troops within 60 m re-arm |
+| `4` Reinforce (4 CP) | A helicopter lands a fresh platoon |
+| `R` / `Shift+R` | Selected troops fall back to the Hornburg / everyone falls back |
 | **Overlays** | |
-| `Z` Fire Zones | Where each mortar and howitzer section can land rounds (between minimum and maximum range) |
-| `V` Ranges | How far the rest of the garrison reaches, by weapon (just the selection, if troops are selected) |
+| `Z` Artillery Range | Where each mortar and howitzer battery can land rounds (between minimum and maximum range) |
+| `V` Weapon Range | How far the rest of the garrison reaches, by weapon (just the selection, if troops are selected) |
 | **Command** | |
-| `H` Fire discipline | Selected troops: fire at will, hold to 150 m, hold to 75 m, hold fire |
+| `H` Fire mode | Selected troops: fire at will, hold to 150 m, hold to 75 m, hold fire |
 | `G` | Jump to the latest alert (again for earlier ones) |
 | `L` Losses | Shows where units of each side have been knocked out |
 | Drag, double-click | Box-select defenders; double-click selects every unit of that kind in view |
@@ -151,7 +151,7 @@ Orders can be given while paused. The battle waits while a dialog is open.
 - Machine guns and shellfire **suppress**: a pinned company (▼) slows to a crawl, its archers
   stop shooting and its morale wears away. Berserkers cannot be pinned, and warg riders keep most
   of their pace under fire.
-- Both sides have command units (★). Lose one and nearby companies are briefly disorganised
+- Both sides have command units (★). Lose one and nearby companies are briefly disorganized
   and lose morale. An Uruk captain follows behind his own companies. While he stands they almost
   never rout, and a broken company falls back on the nearest captain and rallies there. He is not
   shot on sight, and the troops pressed around him take most shots aimed at him: thin them with
@@ -225,7 +225,7 @@ blocky stand-ins of about seventy triangles, and the full models (about a thousa
 a soldier, several thousand for a vehicle). The **Graphics quality** level places the ladder:
 full models take over at a zoom proportional to its detail step, dots give way at that step's square
 root (so the whole valley stays cheap), and boxes give way to stand-ins midway between the two on a
-log scale. In screen pixels per metre:
+log scale. In screen pixels per meter:
 
 | Level | Dots below | Boxes below | Stand-ins below (full models from) |
 | --- | --- | --- | --- |
@@ -264,7 +264,7 @@ files, `build.js` to the game's), and `docs/roadmap.md` describes it.
   from files above (`assets.js` loads them, and the skinned path in `renderer.js` draws them).
   - `materials.js` generates the surface textures on the GPU at start-up: sixteen tiling
     materials (dressed stone, flagstones, rock, grass, mud, timber, slate, iron, painted steel,
-    cloth, camouflage, hide and so on), each with colour detail, a normal map, roughness and
+    cloth, camouflage, hide and so on), each with color detail, a normal map, roughness and
     specular strength. Every vertex names its material.
   - `mesh.js` is the model-building kit: boxes and beams, chamfered boxes, extruded outlines,
     and smooth lofted shapes (tubes, limbs, spheres, lathed profiles), with a transform stack
@@ -307,7 +307,7 @@ shells the thickest of the press) within the Command Point budget; `none` gives 
 state hashes match. Each run also reports how the siege went: ladders raised and thrown down,
 engines dropped and picked up again, when the first attacker reached the wall and when the first
 foothold was won, how far from the works each kind of attacker fell, and the cost of the dearest
-ten steps. `tools/matrix.js` runs the lot in parallel and summarises wins, end time
+ten steps. `tools/matrix.js` runs the lot in parallel and summarizes wins, end time
 and survivors per scenario.
 
 **How difficulty is judged.** The yardstick is the stand-in commander, who calls support sensibly
@@ -335,7 +335,7 @@ needs (a ram to the gate, the horde to the wall, the garrison between court, wal
 then prints the map's measurements; `npm run golden` hashes the map, the fortress mesh and whole
 battles against `docs/baseline/golden.json`, so a refactor can prove it changed nothing (a change
 meant to alter the map or the rules re-records them with `-- --update`); and `npm run shots` takes
-fixed-camera screenshots with Playwright on the software rasteriser and can compare them with an
+fixed-camera screenshots with Playwright on the software rasterizer and can compare them with an
 earlier set (`-- --compare docs/baseline/shots`). `docs/roadmap.md` is the plan these guard.
 
 `tools/checks.js` (`npm run checks`) is the other half: it plays instrumented battles and gives a

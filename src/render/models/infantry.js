@@ -38,7 +38,7 @@ function rifle(m, y, z, o = {}) {
 
 /**
  * The soldier under the weapon: camouflage, plate carrier with pouches, belt, pack, knee pads and
- * helmet. o: uni, vest, helm colours; hat ('boonie' | 'beret'); pose; pack: false.
+ * helmet. o: uni, vest, helm colors; hat ('boonie' | 'beret'); pose; pack: false.
  */
 function soldier(m, o = {}) {
   const uni = o.uni || C.uni, vest = o.vest || C.vest, helm = o.helm || C.helm;

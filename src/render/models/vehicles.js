@@ -10,7 +10,7 @@ import { C } from './legacy.js';
 const A = PART.ARM;
 const G = C.veh, GD = C.vehDk, GL = [0.4, 0.43, 0.27], BLACK = [0.07, 0.07, 0.07], RUBBER = [0.09, 0.09, 0.085], STEEL = [0.32, 0.33, 0.34], GLASS = [0.1, 0.16, 0.2];
 
-/** Road wheel or tyre lying across the hull: rim, rounded shoulders and a recessed hub. */
+/** Road wheel or tire lying across the hull: rim, rounded shoulders and a recessed hub. */
 function wheel(m, x, y, z, r, w, tyre = RUBBER, hub = GD, n = 12) {
   const h = w / 2;
   m.withMat(MAT.PLAIN, () => m.lathe([[r * 0.55, -h], [r * 0.9, -h], [r, -h * 0.6], [r, h * 0.6], [r * 0.9, h], [r * 0.55, h]], n, tyre, 0, [x, y, z], 'y', { capA: false, capB: false }));

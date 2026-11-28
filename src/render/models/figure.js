@@ -23,7 +23,7 @@ export const scalePose = (pose, k) => Object.fromEntries(Object.entries(pose).ma
  *   pose   joint overrides            bulk   girth multiplier        n   sides of the torso loft (8 full, 5 light)
  *   col    { legs, torso, arms, skin, boots, hands }                 mat { legs, torso, arms, boots }
  *   parts  { thighL, shinL, thighR, shinR, armL, foreL, armR, foreR } animation part per limb
- *   greaves / bracers  colour of iron shin and forearm guards        bareArms, noHead, noHands, headScale
+ *   greaves / bracers  color of iron shin and forearm guards        bareArms, noHead, noHands, headScale
  * Returns the resolved joints.
  */
 export function figure(m, o = {}) {
@@ -65,7 +65,7 @@ export function figure(m, o = {}) {
 
 /**
  * The blocky stand-in for a figure: legs, body, head, one arm and whatever it carries, about seventy
- * triangles. o: { legs, torso, head, arm } colours, bulk, tall, weapon: { len, thick, col, z, rise, y }.
+ * triangles. o: { legs, torso, head, arm } colors, bulk, tall, weapon: { len, thick, col, z, rise, y }.
  */
 export function blockFigure(m, o) {
   const b = o.bulk || 1, t = o.tall || 1;

@@ -5,7 +5,7 @@
 // The steps, each skipped if it has already been done (the state is kept in assets-src/<unit>/state.json, and every
 // paid task's id is written there the moment it is issued, so running this again never pays for the same thing twice):
 //   1. a concept sheet from tools/assets/concepts/<unit>.prompt.txt and the unit's portrait (OpenAI image API)
-//   2. Meshy: image to 3D, remesh to 10,000 triangles, rigging, and the clips the recipe orders by catalogue id
+//   2. Meshy: image to 3D, remesh to 10,000 triangles, rigging, and the clips the recipe orders by catalog id
 //   3. tools/assets/import.js and tools/assets/build.js
 //
 // It needs the two services reachable and their keys supplied by the environment (in a Claude Code cloud session the
@@ -83,7 +83,7 @@ if (process.argv.includes('--concept-only')) process.exit(0);
 // (a beast or a machine gets no rig from Meshy, which rigs only two-legged figures: its bones are made in the import)
 const fixed = recipe.quadruped ? 'quadruped' : recipe.rigid ? 'rigid' : null;
 if (fromText && !state.tasks.preview) {
-  // text to 3D is two tasks: a shape (preview), then its colours (refine, the task kept as "model")
+  // text to 3D is two tasks: a shape (preview), then its colors (refine, the task kept as "model")
   const r = meshy(['text-to-3d', 'create', '--mode', 'preview', '--prompt', fs.readFileSync(textFile, 'utf8').trim().slice(0, 600), '--async']);
   state.tasks.preview = r.submission.task_id; save();
   log(`text-to-3d preview: issued ${state.tasks.preview}`);

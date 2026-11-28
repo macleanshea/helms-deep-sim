@@ -1,7 +1,7 @@
 // A unit's source, as the repository keeps it: tools/assets/src/<unit>/
 //   model.json   what is in the other files, and where
 //   model.bin    the rigged mesh as the generator made it (its own axes and scale)
-//   colour.jpg   its colour texture
+//   colour.jpg   its color texture
 //   clips.bin    every clip as bone matrices (rest place -> place in that frame), a 4x4 per bone per frame
 // The generator's own files are far larger (each clip repeats the mesh and three textures) and are not kept.
 import fs from 'node:fs';

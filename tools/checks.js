@@ -1,11 +1,11 @@
-// Behaviour checks for the siege rules: things that would look wrong in play, measured headless.
+// Behavior checks for the siege rules: things that would look wrong in play, measured headless.
 //
 //   node tools/checks.js                  every check
 //   node tools/checks.js crews wargs      only the named ones
 //   node tools/checks.js --list           what there is
 //
 // Each check plays one or more battles with instruments attached and prints PASS or FAIL with the
-// numbers behind the verdict. It exits 1 if anything fails. Thresholds are judgement calls about
+// numbers behind the verdict. It exits 1 if anything fails. Thresholds are judgment calls about
 // what would look broken to a player, not laws; they sit beside each verdict so they can be argued with.
 import { pathToFileURL } from 'node:url';
 import { buildMap, KEEP } from '../src/map.js';
@@ -84,7 +84,7 @@ function play(setup, opts = {}) {
     sim.step();
     if (pilot) pilot.step();
     if (opts.tick) opts.tick(sim, P);
-    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/slackening/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.short)) }); }
+    for (const e of sim.events) if (e.type === 'banner' || e.type === 'log') { P.alerts.push({ t: sim.time, text: e.text, banner: e.type === 'banner' }); if (/surging/.test(e.text)) P.surges.push({ t: sim.time, sec: sim.sectors.findIndex((s) => e.text.includes(s.short)) }); }
     sim.events.length = 0;
     // ladders: when each went up
     for (const e of sim.engines) if (sim.alive[e] && sim.type[e] === U.ladder && sim.state[e] === S_DONE) { const k = e * 65536 + sim.gen[e]; if (!P.raised.has(k)) P.raised.set(k, sim.time); }
@@ -280,7 +280,7 @@ const CHECKS = {
       per.push(b.length);
       for (let k = 0; k < b.length; k++) { let n = 0; for (let j = k; j < b.length && b[j].t < b[k].t + 60; j++) n++; if (n > worstMin) worstMin = n; }
       const cnt = {};
-      for (const a of P.alerts) { const key = a.text.replace(/(keep end|centre|cliff end|Hornburg)/gi, 'X'); cnt[key] = (cnt[key] || 0) + 1; if (cnt[key] > worstRep) { worstRep = cnt[key]; worstText = key; } }
+      for (const a of P.alerts) { const key = a.text.replace(/(keep end|center|cliff end|Hornburg)/gi, 'X'); cnt[key] = (cnt[key] || 0) + 1; if (cnt[key] > worstRep) { worstRep = cnt[key]; worstText = key; } }
     }
     verdict('alerts', worstMin <= 8 && worstRep <= 25, `most banners in any one minute: ${worstMin} (limit 8); most repeats of one message in a battle: ${worstRep} (limit 25)`, `banners per battle: ${per.join(', ')} · most repeated: "${worstText}"`);
   }],
@@ -309,7 +309,7 @@ const CHECKS = {
       return picks;
     };
     const seen = pick(), share = seen.filter((v) => v === 2).length / Math.max(1, seen.length);
-    verdict('intel', seen.length >= 3 && share >= 0.6, `with the cliff end of the wall left unmanned, ${pct(share)} of ${seen.length} main efforts went for it (wanted 60% or more)`, `sectors chosen (0 keep end, 1 centre, 2 cliff end): ${seen.join(' ')}`);
+    verdict('intel', seen.length >= 3 && share >= 0.6, `with the cliff end of the wall left unmanned, ${pct(share)} of ${seen.length} main efforts went for it (wanted 60% or more)`, `sectors chosen (0 keep end, 1 center, 2 cliff end): ${seen.join(' ')}`);
   }],
   stuck: ['Nobody is stuck for good, and a rout gets through the ranks behind it', () => {
     let n60 = 0, worst = 0, rn = 0, rr = 0;
@@ -318,14 +318,14 @@ const CHECKS = {
     verdict('routs get through', rn === 0 || rr / rn >= 0.6, `routing troops moved at ${pct(rr / Math.max(1, rn))} of their running pace on average (wanted 60% or more)`, `${rn} router-seconds sampled`);
   }],
   tanks: ['Troops in front of the wall are fought, not walked past', () => {
-    // a thin garrison, four vehicles 200 m in front of the centre of the wall, and three thousand coming straight at them
+    // a thin garrison, four vehicles 200 m in front of the center of the wall, and three thousand coming straight at them
     const mid = map.wallAt(0.5), groups = [];
     for (const t of [0.3, 0.5, 0.7]) { const p = map.wallAt(t); groups.push(makeGroup('rifle', 30, p.x, p.y, p.ang, 60)); }
     groups.push(makeGroup('tank', 2, mid.x - 200, mid.y - 40, Math.PI / 2, 40), makeGroup('ifv', 2, mid.x - 200, mid.y + 50, Math.PI / 2, 40));
     groups.push(...horde(3000, { waves: 1, layout: true, catapults: 0, rams: 0, towers: 0 }));
     const P = play({ groups, options: { sandbox: true, dawn: 0, rout: 0.01, seed: 1 } }, { policy: 'none', max: 420 });
     const dead = P.fwd.filter((f) => f.diedT >= 0), melee = P.fwd.reduce((a, f) => a + (f.hitsBy.smash || 0) + (f.hitsBy.melee || 0), 0);
-    verdict('forward armour', melee >= 20, `four vehicles 200 m in front of the wall took ${melee} blows from the horde's blades and trolls (wanted 20 or more: they were attacked, not walked past)`,
+    verdict('forward armor', melee >= 20, `four vehicles 200 m in front of the wall took ${melee} blows from the horde's blades and trolls (wanted 20 or more: they were attacked, not walked past)`,
       `${dead.length} of ${P.fwd.length} destroyed${dead.length ? ' (' + dead.map((f) => `${f.key} at ${Math.round(f.diedT)} s by ${f.by}`).join(', ') + ')' : ''} · attacker-seconds spent beyond them while they lived: ${P.past}`);
   }],
   lanes: ['Nobody fires through his own side; men find firing places without wandering or fidgeting', () => {

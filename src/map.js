@@ -1,4 +1,4 @@
-// Battlefield geometry, modelled on the film set: the Hornburg on a rock spur against
+// Battlefield geometry, modeled on the film set: the Hornburg on a rock spur against
 // the southern cliff (on the right as the horde comes up the valley), a long causeway
 // curling down from its gate, and the Deeping Wall bowed across the mouth of the gorge
 // to the northern cliff. Inside the curtain wall the rock climbs in terraces to the keep.
@@ -11,7 +11,7 @@ import { WORLD_W, WORLD_H, CELL, GW, GH, T, WALL_H, PLATEAU_Z, RING_TOP, STEP } 
 import { LAYOUT } from './layout.js';
 
 export const MARGIN = 256;                 // rendered terrain beyond the playable world (m)
-export const HM_RES = 2;                   // metres per height texel
+export const HM_RES = 2;                   // meters per height texel
 export const HM_W = (WORLD_W + 2 * MARGIN) / HM_RES;
 export const HM_H = (WORLD_H + 2 * MARGIN) / HM_RES;
 export const GZ_W = WORLD_W / HM_RES;
@@ -167,7 +167,7 @@ export function buildMap() {
     const tx = -Math.sin(a) * dir, ty = Math.cos(a) * dir;
     stairs.push({ x: KEEP.cx + r * Math.cos(a) - tx * 7, y: KEEP.cy + r * Math.sin(a) - ty * 7, dx: tx, dy: ty, len: 14, half: 3, z0: PLATEAU_Z, z1: RING_TOP });
   }
-  // flights that hug the drum of an inner court: an arc about the court's centre, climbing from bearing a0 to a1
+  // flights that hug the drum of an inner court: an arc about the court's center, climbing from bearing a0 to a1
   // (x, y, dx, dy are its foot and the way it sets off, as for a straight flight; `tier` is the court it climbs to)
   const TIERS = [null, KEEP.t1, KEEP.t2];
   for (const [tier, foot, head, from] of L.stairs.tiers) {
@@ -175,7 +175,7 @@ export function buildMap() {
     stairs.push({ arc: true, tier, cx: T1.x, cy: T1.y, r, a0, a1, x: T1.x + r * Math.cos(a0), y: T1.y + r * Math.sin(a0), dx: -Math.sin(a0) * dir, dy: Math.cos(a0) * dir,
       len: Math.abs(a1 - a0) * r, half, z0: from ? KEEP.t1.z : PLATEAU_Z, z1: T1.z });
   }
-  /** How far along a flight a point is (metres from its foot), or -1 if it is not on it. */
+  /** How far along a flight a point is (meters from its foot), or -1 if it is not on it. */
   const alongStair = (s, x, y) => {
     if (s.arc) {
       const rx = x - s.cx, ry = y - s.cy;
@@ -391,7 +391,7 @@ export function buildMap() {
     }
   });
 
-  // links between a wall walk and the stair head or door beside it (bit k = neighbour direction k)
+  // links between a wall walk and the stair head or door beside it (bit k = neighbor direction k)
   const DXk = [1, 1, 0, -1, -1, -1, 0, 1], DYk = [0, 1, 1, 1, 0, -1, -1, -1];
   const portal = new Uint8Array(GW * GH);
   for (let gy = 1; gy < GH - 1; gy++) for (let gx = 1; gx < GW - 1; gx++) {

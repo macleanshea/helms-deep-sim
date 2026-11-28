@@ -13,7 +13,7 @@ function store(m, x, y, z, L, r, col, fins = true) {
   m.withMat(MAT.PAINT, () => m.lathe([[0, 0], [r, L * 0.18], [r, L * 0.75], [r * 0.5, L]], 6, col, 0, [x - L / 2, y, z], 'x'));
   if (fins) m.withMat(MAT.PAINT, () => { m.box(x + L * 0.42, y, z, L * 0.16, r * 3.4, 0.02, GD); m.box(x + L * 0.42, y, z, L * 0.16, 0.02, r * 3.4, GD); });
 }
-/** Four-bladed rotor with a hub, as part `part`, centred at (x, y, z) in the horizontal plane. */
+/** Four-bladed rotor with a hub, as part `part`, centered at (x, y, z) in the horizontal plane. */
 function rotor(m, x, z, R, chord, part = PART.ROTOR) {
   m.withMat(MAT.IRON, () => {
     m.box(x, 0, z, R * 2, chord, 0.05, BLACK, part); m.box(x, 0, z, chord, R * 2, 0.05, BLACK, part);
@@ -48,7 +48,7 @@ export const aircraft = {
       m.loft([ringX(4.0, 0, -0.35, 0.1, 0.1), ringX(3.3, 0, -0.2, 0.4, 0.45), ringX(2.2, 0, 0, 0.56, 0.78), ringX(0.8, 0, 0.05, 0.66, 0.95), ringX(-0.8, 0, 0.05, 0.66, 0.9), ringX(-2.2, 0, 0.2, 0.46, 0.58), ringX(-2.9, 0, 0.3, 0.3, 0.34)], 8, G);
       m.path([[-2.7, 0, 0.32], [-5.4, 0, 0.55], [-7.6, 0, 0.75]], [0.3, 0.2, 0.13], 6, G);
       m.extrudeY([[-6.6, 0.7], [-7.5, 2.3], [-8.1, 2.3], [-7.8, 0.7]], -0.07, 0.07, GD);                    // fin
-      m.box(-7.3, 0, 0.95, 0.7, 2.2, 0.06, GD);                                                           // stabiliser
+      m.box(-7.3, 0, 0.95, 0.7, 2.2, 0.06, GD);                                                           // stabilizer
       m.withMat(MAT.GLASS, () => {                                                                         // tandem canopy
         m.loft([ringX(3.5, 0, 0.2, 0.1, 0.06), ringX(2.9, 0, 0.5, 0.36, 0.34), ringX(2.2, 0, 0.72, 0.42, 0.36), ringX(1.5, 0, 0.98, 0.46, 0.34), ringX(0.9, 0, 0.98, 0.3, 0.16)], 6, GLASS);
       });

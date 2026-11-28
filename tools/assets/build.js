@@ -6,13 +6,13 @@
 // It works from the unit's source in tools/assets/src/<unit>/ (put there by tools/assets/import.js from the
 // generator's files) and its recipe in tools/assets/units/<unit>.json (height, levels of detail, gear). The output, in
 // assets/game/, is what the game loads: one pack per unit holding its levels of detail (finest first) and every clip
-// as bone matrices sampled at a fixed rate, a small WebP of its colours, and a line in manifest.json.
+// as bone matrices sampled at a fixed rate, a small WebP of its colors, and a line in manifest.json.
 // File names carry a hash of their contents, so they can be cached for ever.
 //
 // Needs nothing but Node and, for the texture, Python with Pillow (python3 -c "import PIL").
 //
 // The pack (little-endian): "HDU1", a JSON header's byte length, the header, then the data it points into.
-//   vertices, 28 bytes each: position 3 x float32 (metres; +x forward, +y left, +z up, feet at the origin),
+//   vertices, 28 bytes each: position 3 x float32 (meters; +x forward, +y left, +z up, feet at the origin),
 //     normal 3 x int8 and a pad byte, texture coordinate 2 x uint16, bones 4 x uint8, weights 4 x uint8
 //   indices: uint16
 //   animation: float32, 12 per bone per frame: the top three rows of the matrix that carries a vertex from
@@ -175,7 +175,7 @@ function buildUnit(name) {
   const clipRow = (cname, at) => { const c = clips.find((q) => q.name === cname); if (!c) throw new Error(`${name}: no clip "${cname}"`); return frames[c.start + Math.min(c.frames - 1, Math.floor(at * c.frames))]; };
 
   // ---- gear: plain boxes that ride on one bone each (a blade in the hand, a shield on the forearm). They are added
-  // to every level of detail after it is reduced, and coloured from the swatch strip the texture step appends.
+  // to every level of detail after it is reduced, and colored from the swatch strip the texture step appends.
   const strip = (recipe.gear || []).length > 0, vScale = strip ? 16 / 17 : 1;
   const restOf = (bone) => {
     // where a bone sits in the rest pose: the inverse of its inverse-bind matrix carries the origin there
@@ -186,7 +186,7 @@ function buildUnit(name) {
   };
   const gear = []; // { bone, verts: [[x, y, z, nx, ny, nz]...], tris: [...], swatch }
   const box = (bone, swatch, c, ax, ay, az, far = false) => { // far: kept at the coarsest level of detail too
-    // a box centred at c with half-axes ax, ay, az (vectors in game space)
+    // a box centered at c with half-axes ax, ay, az (vectors in game space)
     const verts = [], tris = [];
     for (const [n, u, v] of [[ax, ay, az], [ay, az, ax], [az, ax, ay]]) for (const sg of [1, -1]) {
       const l = Math.hypot(...n) || 1, nn = n.map((q) => (q / l) * sg), b0 = verts.length;
@@ -198,7 +198,7 @@ function buildUnit(name) {
   };
   // Gear as a model of its own (tools/assets/src/gear-<kind>/, from the generator): set in the hand by a frame in the
   // game's space. `A` runs along its length from the grip end (0) to the tip (1), `B` across it; `size` is its length in
-  // metres (or its height, with fit: 'mid'); `au`, `av` say which point of it sits at `origin` (shares of its length
+  // meters (or its height, with fit: 'mid'); `au`, `av` say which point of it sits at `origin` (shares of its length
   // and of its breadth; `top` instead of av: how far its upper edge stands above the origin). Where there is no such
   // model the boxes stand in at every level of detail; where there is, only at the coarsest.
   const fitted = [];
@@ -208,7 +208,7 @@ function buildUnit(name) {
     return true;
   };
   const SW = { iron: 0, wood: 1, leather: 2, paint: 3 };
-  // (metres, for a man: the grip is in the right hand, the barrel runs forward of it and the stock back to the shoulder)
+  // (meters, for a man: the grip is in the right hand, the barrel runs forward of it and the stock back to the shoulder)
   const FIREARMS = {
     rifle: [['iron', 0.1, 0.07, 0.2, 0.022, 0.035, 1], ['iron', 0.45, 0.085, 0.17, 0.012, 0.012, 1], ['leather', -0.22, 0.05, 0.13, 0.02, 0.04], ['iron', 0.12, -0.04, 0.025, 0.014, 0.07], ['iron', 0.1, 0.125, 0.05, 0.014, 0.014]],
     mg: [['iron', 0.12, 0.07, 0.26, 0.03, 0.045, 1], ['iron', 0.62, 0.085, 0.26, 0.016, 0.016, 1], ['leather', -0.24, 0.05, 0.12, 0.024, 0.05], ['wood', 0.14, -0.06, 0.07, 0.05, 0.06, 1], ['iron', 0.8, -0.06, 0.012, 0.012, 0.12]],
@@ -288,7 +288,7 @@ function buildUnit(name) {
       // carried: stood upright (the tube's lean turned out of it) with its middle behind his upper back
       const spine = jointIndex(/^spine$/i), sr = restOf(spine), mid = pt(L / 2), cs = 0.907, sn = -0.42; // turn about y taking d to straight up
       const R = [cs, 0, sn, 0, 1, 0, -sn, 0, cs], Rm = [0, 1, 2].map((e) => R[e * 3] * mid[0] + R[e * 3 + 1] * mid[1] + R[e * 3 + 2] * mid[2]);
-      const T = [sr[0] - (meshed ? 0.52 : 0.2) - Rm[0], sr[1] - Rm[1], sr[2] - (meshed ? 0.3 : 0.05) - Rm[2]]; // (the modelled mortar is a broad thing: carried well clear of his back)
+      const T = [sr[0] - (meshed ? 0.52 : 0.2) - Rm[0], sr[1] - Rm[1], sr[2] - (meshed ? 0.3 : 0.05) - Rm[2]]; // (the modeled mortar is a broad thing: carried well clear of his back)
       for (const c of clips) for (let f = 0; f < c.frames; f++) {
         const fr = frames[c.start + f], q = P * 12;
         if (c.name === 'walk' || c.name === 'run') {
@@ -300,7 +300,7 @@ function buildUnit(name) {
         } else { fr.fill(0, q, q + 12); fr[q] = fr[q + 5] = fr[q + 10] = 1; }
       }
     } else throw new Error(`${name}: unknown gear "${it.kind}"`);
-    if (meshed) for (let q = g0; q < gear.length; q++) { gear[q].meshed = true; if (gear[q].swatch === SW.wood) gear[q].swatch = SW.leather; } // (its boxes stand in only at the coarsest level, in the darker of the timber colours: the models' wood is old and stained)
+    if (meshed) for (let q = g0; q < gear.length; q++) { gear[q].meshed = true; if (gear[q].swatch === SW.wood) gear[q].swatch = SW.leather; } // (its boxes stand in only at the coarsest level, in the darker of the timber colors: the models' wood is old and stained)
   }
   if (riderArms) {
     // a rider's sword and shield: set by his hands as he sits, and carried by the beast's back like the rest of him
@@ -364,7 +364,7 @@ function buildUnit(name) {
   recipe.lods.forEach((target, level) => {
     const kit = kitOf(level), gearVerts = kit.reduce((a, q) => a + q.verts.length, 0), gearTris = kit.reduce((a, q) => a + q.tris.length / 3, 0);
     const idx = reduced[level];
-    // the level's vertices: each the number of one of the model's, and where in the image it reads its colour
+    // the level's vertices: each the number of one of the model's, and where in the image it reads its color
     let from, uvs, tri;
     if (paint) { const B = paint.levels[level]; from = B.from; uvs = B.uv; tri = B.index; }
     else {
@@ -403,7 +403,7 @@ function buildUnit(name) {
   const anim = Buffer.concat(frames.map((f) => Buffer.from(f.buffer, f.byteOffset, f.byteLength)));
   const animOffset = add(anim);
 
-  // ---- colours
+  // ---- colors
   fs.mkdirSync(OUT, { recursive: true });
   for (const f of fs.readdirSync(OUT)) if (f.startsWith(`${name}.`)) fs.unlinkSync(path.join(OUT, f));
   let texFile = null;

@@ -1,9 +1,9 @@
 // The camera: a perspective view that looks down on a point on the ground, steeply from far off and
-// ever lower as it closes in. World space is x east, y south, z up (metres).
+// ever lower as it closes in. World space is x east, y south, z up (meters).
 //
 // cam = { x, y, zoom, yaw, tilt?, z?, dpr?, ground? }
-//   x, y    the ground point at the centre of the view (z: its height, 0 if absent)
-//   zoom    pixels per metre at that point, in the same pixels as vw and vh. It is still the one number
+//   x, y    the ground point at the center of the view (z: its height, 0 if absent)
+//   zoom    pixels per meter at that point, in the same pixels as vw and vh. It is still the one number
 //           that says how close the view is: the camera's distance is derived from it
 //   yaw     heading, as before: with yaw 0 the view looks north (-y)
 //   tilt    radians added to the pitch the zoom gives (0 if absent)
@@ -21,7 +21,7 @@ const ZOOM_FAR = 1.2, ZOOM_NEAR = 44;  // the CSS zooms between which the pitch 
 const PITCH_MAX = 1.48, PITCH_MIN = 0.16;
 const FAR_REACH = 4200;                // how far beyond the point of interest the view reaches (m)
 
-/** The pitch (radians below the horizon) that goes with a zoom in CSS px per metre. */
+/** The pitch (radians below the horizon) that goes with a zoom in CSS px per meter. */
 export function pitchFor(zoom) {
   let t = Math.log(Math.max(zoom, 1e-3) / ZOOM_FAR) / Math.log(ZOOM_NEAR / ZOOM_FAR);
   t = t < 0 ? 0 : t > 1 ? 1 : t;
@@ -70,7 +70,7 @@ export function camState(cam, vw, vh) {
 
 /**
  * World point -> screen pixels (same units as vw/vh and cam.zoom). out[2] is the scale there, in pixels per
- * metre: it is 0 for a point behind the camera, whose out[0] and out[1] are then far off screen.
+ * meter: it is 0 for a point behind the camera, whose out[0] and out[1] are then far off screen.
  */
 export function toScreen(cam, vw, vh, x, y, z, out) {
   const q = camState(cam, vw, vh), dx = x - q.ex, dy = y - q.ey, dz = z - q.ez;

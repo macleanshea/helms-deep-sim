@@ -1,5 +1,5 @@
 // Triangle reduction for the unit pipeline: quadric-error edge collapse that only ever moves a vertex onto
-// one of its neighbours, so every surviving vertex is an original one and keeps its texture coordinate,
+// one of its neighbors, so every surviving vertex is an original one and keeps its texture coordinate,
 // normal and bone weights untouched.
 //
 // A model's vertices are split along texture seams (two vertices, one place). Collapses are decided per place,

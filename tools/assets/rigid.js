@@ -10,7 +10,7 @@ import { simplify } from './simplify.js';
 
 const TURN = 180; // frames in the turret's full turn: two degrees a frame
 
-/** The first mesh of a file with no skeleton: positions, normals, texture coordinates, triangles, and its colour image. */
+/** The first mesh of a file with no skeleton: positions, normals, texture coordinates, triangles, and its color image. */
 export function staticMesh(g, nose = '+z', scale = null) {
   const { gltf, accessor } = g, prim = gltf.meshes[0].primitives[0];
   const pos = accessor(prim.attributes.POSITION), nrm = accessor(prim.attributes.NORMAL), uv = accessor(prim.attributes.TEXCOORD_0), nv = pos.length / 3;
@@ -152,13 +152,13 @@ export function rigid(g, opts = {}) {
     P = grow(P, 3); N = grow(N, 3); U = grow(U, 2); J = grow(J, 4); Wt = grow(Wt, 4); I = idx;
     for (let q = nv; q < n2; q++) J[q * 4] = 1;
     // The hull has no deck under the turret (the shell was one piece), and it shows when the turret turns. Lay one:
-    // a disc at the height of the cut, as wide as the turret's foot, in the colour of the deck beside it.
+    // a disc at the height of the cut, as wide as the turret's foot, in the color of the deck beside it.
     const pv = pivots[1], cutY = pv[1];
     const foot = [];
     for (let v = 0; v < nv; v++) if (J[v * 4] === 1 && P[v * 3 + 1] < cutY + 0.12 * H && !(P[v * 3 + 2] - pv[2] > 0 && Math.abs(P[v * 3] - pv[0]) < 0.09 * Wd)) foot.push(Math.hypot(P[v * 3] - pv[0], P[v * 3 + 2] - pv[2]));
     foot.sort((a, b) => a - b);
     const rr = Math.min(foot.length ? foot[Math.floor(foot.length * 0.85)] : 0.2 * L, opts.turret.reach ? opts.turret.reach * L : Infinity, 0.36 * Wd); // (never wider than the hull it lies on)
-    let near = -1, nd = 1e9; // the deck's colour: that of the hull vertex nearest the turret's foot, just under the cut
+    let near = -1, nd = 1e9; // the deck's color: that of the hull vertex nearest the turret's foot, just under the cut
     for (let v = 0; v < nv; v++) if (J[v * 4] === 0 && P[v * 3 + 1] > cutY - 0.08 * H) { const d = Math.abs(Math.hypot(P[v * 3] - pv[0], P[v * 3 + 2] - pv[2]) - rr * 1.1); if (d < nd) { nd = d; near = v; } }
     if (near >= 0 && rr > 0 && opts.turret.deck !== false) { // (a rotor has no deck under it: "deck": false)
       const SEG = 14, n3 = P.length / 3, add = SEG + 1, grow2 = (A, w) => { const B = new A.constructor((n3 + add) * w); B.set(A); return B; };

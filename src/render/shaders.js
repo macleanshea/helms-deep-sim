@@ -29,13 +29,13 @@ vec3 rockFace(vec2 q){
 }
 `;
 
-// Lighting. Colours come in and go out in display space; the sums are done in linear light:
+// Lighting. Colors come in and go out in display space; the sums are done in linear light:
 // a sky/ground ambient, the sun or moon with a soft shadow, up to six flash lights, and a specular
 // lobe whose width and strength come from the material. The view direction is taken per fragment
 // from the camera's position.
-// Colours are worked out as they are to be seen. Where the picture is kept in true light values (the renderer's HDR path:
+// Colors are worked out as they are to be seen. Where the picture is kept in true light values (the renderer's HDR path:
 // lights, fire and flashes then add up as light does, and one tone curve at the end brings it all back), each shader
-// hands its colour through scn(): the inverse of that curve. With uHDR off it does nothing.
+// hands its color through scn(): the inverse of that curve. With uHDR off it does nothing.
 const SCENE = `
 uniform float uHDR;
 vec3 scn(vec3 d){ if (uHDR < 0.5) return d; vec3 q = min(d*d, vec3(4.)); return q/(1. - 0.22*q); }
@@ -99,7 +99,7 @@ vec3 fogged(vec3 c, vec3 wp){
 }
 `;
 
-// Material lookup (see materials.js): layer L sampled at q metres along the surface.
+// Material lookup (see materials.js): layer L sampled at q meters along the surface.
 const MATERIAL = `
 uniform mediump sampler2DArray uMatA; uniform mediump sampler2DArray uMatB; uniform float uMatScale[16]; uniform vec3 uMatMean[16];
 vec4 matA(float L, vec2 q, vec2 dx, vec2 dy){ float k = uMatScale[int(L)]; vec4 t = textureGrad(uMatA, vec3(q*k, L), dx*k, dy*k); return vec4(t.rgb/uMatMean[int(L)], t.a); }
@@ -127,7 +127,7 @@ ${NOISE_LITE}${LIGHT}${MATERIAL}
 void main(){
   vec3 n = normalize(vN);
   vec2 uv = (vW.xy - uAlbRect.xy)/uAlbRect.zw;
-  vec3 c = texture(uAlbedo, uv).rgb;                  // broad colour, baked once from the masks
+  vec3 c = texture(uAlbedo, uv).rgb;                  // broad color, baked once from the masks
   vec4 m = texture(uHM, uv);                          // height, rock, dirt, water
   vec3 dpx = dFdx(vW), dpy = dFdy(vW);
   float steep = smoothstep(0.2, 0.5, 1.-n.z);
@@ -193,7 +193,7 @@ void main(){
   vec3 n = normalize(vec3(-hx, -hy, 2.*e*0.9));
   float dif = max(dot(n, normalize(vec3(-0.5,0.4,0.76))),0.);
   float rock = smoothstep(0.3,0.7, m.g + (fbm(w/13.)-.5)*.35);
-  // a high, hard valley under a grey sky: bleached tawny tussock, more straw than green, over pale river gravel
+  // a high, hard valley under a gray sky: bleached tawny tussock, more straw than green, over pale river gravel
   float g1 = fbm(w/90.), g2 = fbm(w/11.+31.), g3 = noise(w*1.9), g4 = fbm(w/3.2+5.);
   vec3 grass = mix(vec3(0.25,0.25,0.2), vec3(0.37,0.35,0.27), smoothstep(0.25,0.75,g1));
   grass = mix(grass, vec3(0.2,0.22,0.19), smoothstep(0.55,0.72,fbm(w/26.+70.))*0.45);
@@ -250,8 +250,8 @@ in vec3 vW; in vec3 vN; in vec3 vC; flat in float vMat; out vec4 o;
 uniform sampler2D uDecal;
 ${NOISE_LITE}${LIGHT}${MATERIAL}
 uniform vec3 uBases;   // the floors walls stand on above the valley's: the court, the inner court, the upper court
-uniform sampler2D uPatina; // a painted layer over the built stone: broad stains, lichen, damp (mid grey = none)
-uniform vec4 uRound[4]; // the round works (horn tower, upper court, inner court, the ring): centre, how far out their faces reach, and the radius their courses are laid at
+uniform sampler2D uPatina; // a painted layer over the built stone: broad stains, lichen, damp (mid gray = none)
+uniform vec4 uRound[4]; // the round works (horn tower, upper court, inner court, the ring): center, how far out their faces reach, and the radius their courses are laid at
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
   float id = floor(vMat + 0.5);
@@ -427,7 +427,7 @@ ${LIGHT}
 void main(){
   if (uShadowPass > 0.5) { o = vec4(0.,0.,0., uHDR > 0.5 ? 0.56 : 0.34); return; }   // (the same darkening, whichever way the picture is kept)
   // the paintings these come from are dark: lift them so a figure reads against the ground at a soldier's size on screen
-  // (far off, a figure is washed toward its side's colour, vC, so the two armies read at a glance: vWash says how far)
+  // (far off, a figure is washed toward its side's color, vC, so the two armies read at a glance: vWash says how far)
   vec3 n = normalize(vN), t = min(texture(uTex, vUV).rgb*1.38 + 0.03, 1.), c = mix(t*vC, vC*(0.45 + 0.9*dot(t, vec3(0.33))), vWash);
   vec3 col = shade(c, n, vW, 0.56, 0.42, 1.);
   col += (c + 0.05)*uLift*(0.9+0.7*n.z);             // keep figures readable at night
@@ -442,16 +442,16 @@ layout(location=1) in vec3 aPos; layout(location=2) in vec4 aSRS; layout(locatio
 uniform mat4 uVP; uniform vec2 uK; uniform float uZoom; uniform float uCols; uniform float uMinPx;
 out vec2 vUV; out vec4 vColor; out float vAdd;
 void main(){
-  // uK: clip units per metre before the perspective divide (2f/vw, 2f/vh); uZoom: the focal length f in pixels
+  // uK: clip units per meter before the perspective divide (2f/vw, 2f/vh); uZoom: the focal length f in pixels
   vec4 c0 = uVP*vec4(aPos,1.);
-  float mn = uMinPx*max(c0.w, 0.)/uZoom;   // the size in metres that is uMinPx pixels at this depth
+  float mn = uMinPx*max(c0.w, 0.)/uZoom;   // the size in meters that is uMinPx pixels at this depth
   if (aAM.y < 0.5) {
     vec2 sz = max(aSRS.xy, vec2(mn));
     float c=cos(aSRS.z), s=sin(aSRS.z); vec2 q = aCorner*sz; q = vec2(q.x*c - q.y*s, q.x*s + q.y*c);
     gl_Position = c0 + vec4(q*uK, 0., 0.);
   } else if (aAM.y < 1.5) {
     vec4 c1 = uVP*vec4(aPos + aAxis,1.);
-    // the streak's run on screen, in metres at its mid depth
+    // the streak's run on screen, in meters at its mid depth
     float wm = max(0.5*(c0.w + c1.w), 1e-3);
     vec2 d = (c1.xy/max(c1.w, 1e-3) - c0.xy/max(c0.w, 1e-3))*wm/uK; float len = length(d); vec2 dir = len > 1e-5 ? d/len : vec2(1.,0.); vec2 nr = vec2(-dir.y, dir.x);
     vec2 q = dir*aCorner.x*max(len, mn*2.) + nr*aCorner.y*max(aSRS.y, mn);
@@ -508,7 +508,7 @@ precision highp float;
 uniform sampler2D uTex; uniform float uHDR; in vec2 vUV; out vec4 o;
 void main(){
   vec3 c = texture(uTex, vUV).rgb;
-  if (uHDR > 0.5) c = sqrt(c/(1. + 0.22*c));       // back to colours as seen: up to twice white where the light was strong
+  if (uHDR > 0.5) c = sqrt(c/(1. + 0.22*c));       // back to colors as seen: up to twice white where the light was strong
   float l = max(c.r, max(c.g, c.b));
   o = vec4(min(c, vec3(1.6))*smoothstep(0.62, 0.95, l)*(uHDR > 0.5 ? 0.625 : 1.), 1.);   // (kept within the 8 bits the glow is blurred in)
 }`;
@@ -523,8 +523,8 @@ void main(){
   o = vec4(c,1.);
 }`;
 
-// The sky behind everything: the haze colour along the horizon (the far ground fades into the same colour),
-// climbing to the colour overhead through slow, broken cloud.
+// The sky behind everything: the haze color along the horizon (the far ground fades into the same color),
+// climbing to the color overhead through slow, broken cloud.
 export const FS_SKY = `#version 300 es
 precision highp float;
 uniform vec3 uCamR; uniform vec3 uCamU; uniform vec3 uCamF; uniform vec2 uTan; uniform vec3 uFog; uniform vec3 uZenith; uniform float uTime;

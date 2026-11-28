@@ -2,7 +2,7 @@
 // courts stepping up to the cliff with the hall and the horn tower, the causeway, stairs, and the wreckage of
 // anything breached. Where things stand is the map's business (src/map.js): nothing is drawn here that the map
 // does not know about, so what looks solid is solid and what looks like a stair can be climbed. It is assembled from independent pieces that are cached, so when a section falls only
-// that section (and its neighbours' torn ends) is rebuilt.
+// that section (and its neighbors' torn ends) is rebuilt.
 //
 // Stone carries MAT.ASHLAR everywhere: the shader lays coursed blocks on upright faces and
 // flagstones on level ones.
@@ -83,7 +83,7 @@ function arcPrism(m, a0, a1, ri, ro, z0, z1, col, caps = true) {
 /**
  * What is left of a fallen stretch of the Deeping Wall: broken stubs standing where it tore away
  * from the intact masonry, and a low jagged ridge of footings and rubble between them.
- * capA / capB: the neighbouring section on that side still stands.
+ * capA / capB: the neighboring section on that side still stands.
  */
 function brokenWall(m, a, b, s, H, BASE, capA, capB) {
   seed = 777 + s.id * 31;
@@ -172,7 +172,7 @@ function wallSection(m, map, segs, k, bound, H, BASE) {
   const prevDown = k > 0 && segs[k - 1].breached, nextDown = k < N_WALL - 1 && segs[k + 1].breached;
   if (s.breached) { brokenWall(m, a, b, s, H, BASE, !segs[k - 1] || !segs[k - 1].breached, !segs[k + 1] || segs[k + 1].kind !== 'wall' || !segs[k + 1].breached); return; }
   const BAT = 1.1, cen = [s.x, s.y, 3], dk = dim(STONE, 0.6);
-  // the outer face leans back from a broad foot; neighbouring sections share the foot line
+  // the outer face leans back from a broad foot; neighboring sections share the foot line
   m.quadC([a.o[0] + a.nx * BAT, a.o[1] + a.ny * BAT, BASE], [b.o[0] + b.nx * BAT, b.o[1] + b.ny * BAT, BASE], [b.o[0], b.o[1], H], [a.o[0], a.o[1], H], cen, dk, dk, STONE, STONE);
   m.wall(a.i, b.i, BASE, H, -s.nx, -s.ny, STONE);
   m.floor(a.i, a.o, b.o, b.i, H, PAVE);
@@ -181,7 +181,7 @@ function wallSection(m, map, segs, k, bound, H, BASE) {
   battlement(m, a.o, b.o, H, [s.nx, s.ny]);
   // a banner every sixth section, on a pole at the walk's inner edge, clear of the parapet's loops (it falls with its section)
   if (k % 6 === 3 && !s.culvert) banner(m, s.x - s.nx * (WALL_HALF - 0.9), s.y - s.ny * (WALL_HALF - 0.9), H, 8.5, 4.4);
-  // low kerb on the inner edge
+  // low curb on the inner edge
   m.frameBox([(a.i[0] + b.i[0]) / 2 + s.nx * 0.25, (a.i[1] + b.i[1]) / 2 + s.ny * 0.25, H + 0.22], [(b.i[0] - a.i[0]) / 2, (b.i[1] - a.i[1]) / 2, 0], [s.nx * 0.25, s.ny * 0.25, 0], [0, 0, 0.22], STONE_LT);
   if (k % 4 === 2) buttress(m, [s.x + s.nx * (WALL_HALF + 0.5), s.y + s.ny * (WALL_HALF + 0.5)], [s.nx, s.ny], [s.tx, s.ty], 3.0, BASE, H - 2.2, 2.6);
   if (s.culvert) {
@@ -289,7 +289,7 @@ function ringSection(m, map, segs, k) {
     arcPrism(m, a0 + step * j, a1 - step * j, ri, ro, lz, top, STONE, false);
     m.floor(P(a0 + step * j, ri), P(a0 + step * j, ro), P(a1 - step * j, ro), P(a1 - step * j, ri), PLATEAU_Z + 0.05, PAVE);
     const hw = s.len * (0.5 - j), th = KEEP.half + 0.62, Z = PLATEAU_Z;
-    const rise = Math.min(2.4, hw * 0.5), Rr = (hw * hw + rise * rise) / (2 * rise), zc = lz - Rr;      // arch circle centre height
+    const rise = Math.min(2.4, hw * 0.5), Rr = (hw * hw + rise * rise) / (2 * rise), zc = lz - Rr;      // arch circle center height
     m.frame([s.x, s.y, 0], [s.nx, s.ny], [s.tx, s.ty], () => {
       // the arch soffit, cut through the whole thickness of the wall
       const NS = 12, zArc = (y) => zc + Math.sqrt(Math.max(0, Rr * Rr - y * y));
@@ -427,7 +427,7 @@ function innerWard(m, map, props) {
 
 /**
  * A sculpted piece (see tools/assets/prop.js) set on its axis at (x, y), standing on z0, `height` tall, its foot
- * reaching `foot` metres out. Only its shape comes from the file: it is laid in the same stone as the walls, each
+ * reaching `foot` meters out. Only its shape comes from the file: it is laid in the same stone as the walls, each
  * place a little lighter or darker as the sculptor shaded it (windows, joints, hollows).
  */
 function sculpted(m, prop, x, y, z0, height, foot) {
@@ -437,9 +437,9 @@ function sculpted(m, prop, x, y, z0, height, foot) {
 
 /**
  * The same, set by a frame: `o` the point its axis stands on, `X` and `Y` the directions on the ground its own depth
- * and breadth run in, `sx`, `sy` metres to one of its stored units along them, `sz` its height in metres. `glow`, if
- * given, is asked of every triangle (its middle in the piece's own metres [depth, breadth, height], and how dark the
- * sculptor painted it, 1 = average): a colour back makes that triangle a lit opening instead of stone.
+ * and breadth run in, `sx`, `sy` meters to one of its stored units along them, `sz` its height in meters. `glow`, if
+ * given, is asked of every triangle (its middle in the piece's own meters [depth, breadth, height], and how dark the
+ * sculptor painted it, 1 = average): a color back makes that triangle a lit opening instead of stone.
  */
 function sculptedAt(m, prop, o, X, Y, sx, sy, sz, glow = null) {
   const { pos, nrm, shade, index } = prop, kz = sz / 32767, flip = X[0] * Y[1] - X[1] * Y[0] < 0;
@@ -521,7 +521,7 @@ function hallArcade(m, map, t, front = null) {
   const am = ((best[0] + best[1]) / 720) * Math.PI, span = Math.min(1.25, ((best[1] - best[0]) / 360) * Math.PI * 0.62);
   const L = 2 * (t.r - 2) * Math.sin(span / 2), H = 13, bays = Math.max(3, Math.round(L / 6.4)), bw = L / bays;
   // the front stands as far forward on the court as it must for the rock to be behind it and none of it before its
-  // arches: step out from the rim until the ground along the whole front, and a few metres before it, is the court's
+  // arches: step out from the rim until the ground along the whole front, and a few meters before it, is the court's
   let d = (t.r - 2) * Math.cos(span / 2) - 1.5;
   const rockBefore = (dd) => { for (let y = -L / 2 - 1; y <= L / 2 + 1; y += 2) for (const x of [0.5, 2.5, 4.5]) { const px = t.x + Math.cos(am) * (dd - x) - Math.sin(am) * -y, py = t.y + Math.sin(am) * (dd - x) + Math.cos(am) * -y; if (map.terrZ(px, py) > t.z - 0.3) return true; } return false; };
   while (d > 4 && rockBefore(d)) d -= 1;
@@ -570,8 +570,8 @@ function hallArcade(m, map, t, front = null) {
       });
     };
     for (let k = 0; k < bays; k++) opening((k + 0.5 - bays / 2) * bw, bw * 0.62, bw, 1.0, H - 6.6 - 1.0 + 1.0, H, k % 3 !== 2);
-    m.box(0.12, 0, H - 0.3, 0.5, L + 3.2, 0.5, STONE_LT);                    // string course between the storeys
-    // the upper storey: a gallery of smaller arches under the eaves
+    m.box(0.12, 0, H - 0.3, 0.5, L + 3.2, 0.5, STONE_LT);                    // string course between the stories
+    // the upper story: a gallery of smaller arches under the eaves
     const nb2 = bays * 2, bw2 = L / nb2;
     for (let k = 0; k < nb2; k++) opening((k + 0.5 - nb2 / 2) * bw2, bw2 * 0.52, bw2, H + 0.6, 3.0, HR0, true);
     m.box(0.3, 0, HR0 + 0.25, 1.3, L + 3.6, 0.5, STONE_LT);                  // cornice

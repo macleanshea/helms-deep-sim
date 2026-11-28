@@ -36,7 +36,7 @@ painted miniature (not kept in the repository). Against them, today's map differ
 | Great hall | an arcade of arches set into the cliff face | free-standing halls on a terrace |
 | Causeway | a short crescent ramp sweeping up to the gate | a 242 m road with a gentle S-bend |
 | Stairs | flights built against the inner wall face | free-standing blocks with slab fins standing out of their sides |
-| Rock and ground | sheer, craggy grey rock; bare stony ground | smooth slopes with a rock pattern; bright grass |
+| Rock and ground | sheer, craggy gray rock; bare stony ground | smooth slopes with a rock pattern; bright grass |
 | Mood | night, rain, mist, torch and fire light | flat moonlight, no sky, no depth haze |
 
 Rules of the game the redesign must keep (from the README and `tools/checks.js`):
@@ -80,7 +80,7 @@ where troops stand), nor a whole valley. Those are code and texture work.
 | 2 | Layout extraction (no visible change) | 2a done; 2b (shapes instead of numbers) still to come: the redesign kept the round Hornburg and the north-south wall, so it was not needed yet |
 | 3 | Perspective camera and engine foundation | camera, per-unit detail, haze and sky done; HDR, depth pre-pass and the frame governor to come |
 | 4 | Simulation decoupled from rendering (still on the main thread) | effects queue done; render records and the order host to come |
-| 5 | Map redesign in greybox, owner signs off | redesigned, lint and balance on target; **the owner's sign-off against the references is wanted** before the layout is frozen |
+| 5 | Map redesign in graybox, owner signs off | redesigned, lint and balance on target; **the owner's sign-off against the references is wanted** before the layout is frozen |
 | 6 | One animated path for every unit | the skinned path exists and the Uruk-hai use it; the built-in models still have their own |
 | 7 | Simulation in a worker | |
 | 8 | Lighting and atmosphere | |
@@ -95,7 +95,7 @@ Budgets are starting targets at 1440p on the owner's machine, to be rebased on t
 
 `tools/shots.js` (fixed-camera screenshots), `tools/maplint.js` (is the map still playable),
 `tools/golden.js` (hashes proving a refactor changed nothing), a copyable `?bench` report with
-long-frame counts, and the baselines in `docs/baseline/`: behaviour checks (24 of 25 pass, the
+long-frame counts, and the baselines in `docs/baseline/`: behavior checks (24 of 25 pass, the
 known-open one being the free win by falling back at once on Easy), the balance matrix over five
 seeds (stand-in commander wins Easy 5/5, Medium 3/5, Hard 2/5; no orders loses all fifteen), the
 map's measurements, and the hashes. Still wanted: a `?bench` table from the owner's machine.
@@ -118,7 +118,7 @@ shape, and must become a question asked of the map rather than arithmetic on the
 
 - the Hornburg as a circle: `KEEP.r` tests for "inside the keep" (`sim.js` `sectorAt`, retreat and
   `_toKeep`; `morale.js`; `warlord.js` `_wlSurvey`; `tools/checks.js`), steering round the ring
-  about its centre (`sim.js` `_def`), `alongRing` in `scenarios.js`, the fall-back slots and keep
+  about its center (`sim.js` `_def`), `alongRing` in `scenarios.js`, the fall-back slots and keep
   sectors binned by bearing, `ringSection` and the terraces in `structures.js`;
 - the wall running north-south with the horde to the west: every `approach` line is an x and every
   lane a y; `sectorAt` splits the wall by y; the warlord's "outside" is `x < wallJoin.x + 12`;
@@ -132,7 +132,7 @@ shape, and must become a question asked of the map rather than arithmetic on the
 **3a, done.** `src/render/camera.js` is a perspective camera whose pitch follows the zoom (about 56
 degrees with the whole valley in view, about 19 with a platoon filling the screen); `zoom` is still
 the state variable, so benchmark and screenshot views carry over. It aims at whatever stands at the
-centre of the view (a wall walk, the court) and lifts itself clear of the mountainsides. Middle-drag
+center of the view (a wall walk, the court) and lifts itself clear of the mountainsides. Middle-drag
 or PgUp/PgDn tips it. The renderer picks each unit's level of detail from its own size on screen,
 culls against the view, and pulls every level in when a view would pass the unit triangle budget;
 far ground fades into a haze that starts beyond the point of interest, under a sky. The overlay's
@@ -174,7 +174,7 @@ of the dying. UI orders go through `src/sim/host.js`. Sim methods stay patchable
 
 Done when: golden hashes unchanged, checks pass, no per-frame allocation in the frame loop.
 
-### 5. Map redesign, greybox
+### 5. Map redesign, graybox
 
 **Done, awaiting the owner's eye.** What changed, with the Deeping Wall's length (382 m) as the yardstick:
 
@@ -189,7 +189,7 @@ Done when: golden hashes unchanged, checks pass, no per-frame allocation in the 
 | Wall over the postern | could not be walked to | a third court stair reaches it |
 | Wall foot on the rock shelf | counted as a place for ladders | not a usable section |
 | Wall half sunk in the cliff | could be stood on, not reached | every ring section is wall from end to end or rock from end to end |
-| Ground | bright pasture | thin grey-green turf with bare stone showing through |
+| Ground | bright pasture | thin gray-green turf with bare stone showing through |
 
 `npm run maplint` passes 8 of 8 with nothing known and open; measurements are in
 `docs/progress/m5-map/maplint.txt` beside the pictures, the balance matrix and the checks. Over five
@@ -225,7 +225,7 @@ parapets. Every one was the same fault: the picture and the rules were made from
 - **Roadways have sides.** Between a roadway cell (the causeway, the rear ramp) and the ground beside it the
   step limit is `WAY_STEP` (0.9 m) instead of 3.3: they are entered at the foot and at the gate. Side crossings
   in a ten-minute battle fell from about 690 to 3.
-- **Openings square to their ramps**: each ramp runs straight out from the wall's face for `lead` metres first.
+- **Openings square to their ramps**: each ramp runs straight out from the wall's face for `lead` meters first.
 - Culvert arch and grate on both faces; the houses are gone; a man beside a stair is drawn on the ground, not
   floating at the stair's height; scraps of court nobody could reach are solid.
 - **Placing troops** (`src/main.js placement()`, `scenarios.js wallPoint/runPositions`): pointing at a wall walk
@@ -235,13 +235,13 @@ parapets. Every one was the same fault: the picture and the rules were made from
 - The scenario list no longer prints the best score after the name; it has its own "Best 198" label.
 
 Measured on these rules (`docs/progress/fortress-rules/`): map lint 8 of 8; stand-in commander wins Easy 4/5,
-Medium 5/5, Hard 2/5, no orders loses all fifteen (the horde wins as fast as before); behaviour checks 24 of
+Medium 5/5, Hard 2/5, no orders loses all fifteen (the horde wins as fast as before); behavior checks 24 of
 25 with `keep` open as before. The `deep` check's head-count was loosened, with the reasoning beside it: with
 walled roadways the southern companies go round the causeway's foot and fewer are in the Deep at one moment.
 
 ### 5c. Fortress art and firelight, first steps
 
-- **Stone.** The ashlar layer is half-metre courses whose blocks each have a length of their own, with ragged
+- **Stone.** The ashlar layer is half-meter courses whose blocks each have a length of their own, with ragged
   joints, knocked corners, the odd replaced stone and broad stains across many blocks; paving is worn
   rectangular flags. Battlements are a plain breast wall with broad merlons under weathered copings whose rhythm
   runs on along the wall; a few are broken. (`src/render/materials.js`, `structures.js battlement()`)
@@ -263,10 +263,10 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   torches together saturate instead of adding without end.
 
 - **Stone round the curve, and shade at the foot.** Round walls (the ring, both inner courts, the horn tower)
-  take their stone by arc length about their own centre (`uRound` in the fortress shader), so courses no longer
+  take their stone by arc length about their own center (`uRound` in the fortress shader), so courses no longer
   stretch and break every eighth of a turn. The watch-fire map's two spare channels now hold how closed in each
   place is by what stands round it and the height of its floor; the shared lighting code dims the sky's light
-  (and a little of the moon's) by it, most at the floor and less with each metre above: wall feet, court corners
+  (and a little of the moon's) by it, most at the floor and less with each meter above: wall feet, court corners
   and stair wells sit in shade. One more texture read a fragment.
 
 - **A sculpted horn tower, in the game's own stone.** The tower is the generator's shape (35 credits), but only
@@ -285,7 +285,7 @@ walled roadways the southern companies go round the causeway's foot and fewer ar
   each flank over the causeway. `structures.js sculptedAt()` sets any such piece by a frame. 70 credits.
 
 - **Painted stone.** The image model painted the stone's patina with no joints in it (broad mottling, damp streaks
-  running down, lichen); `tools/assets/patina.py` makes it tile and levels it to mid grey, and the fortress shader
+  running down, lichen); `tools/assets/patina.py` makes it tile and levels it to mid gray, and the fortress shader
   multiplies the built blocks by it, 21 m to a repeat, along each wall's own length. The blocks and their relief
   stay the game's own, so joints and paint never disagree. 50 KB.
 
@@ -296,7 +296,7 @@ taken out: the game's camera never lifts far enough to show sky.
 ### 6. One animated path for every unit
 
 `src/render/anim.js` and a new unit vertex shader play clips from a baked bone texture. Walking stays
-locked to distance travelled; other clips are timed from sim time. Clips: idle, walk, attack, climb,
+locked to distance traveled; other clips are timed from sim time. Clips: idle, walk, attack, climb,
 die, kneel and prone with getting up, shield-wall advance and hold, carry a ladder, push an engine,
 batter a door, rout. Today's models are ported first (their part ids are already single bones) with
 clips made in code. That gives death animations and capped 3D corpses at once, and stays as the
@@ -320,7 +320,7 @@ loading art: cold rain, mist, fire glow. Budgets: shadows ≤ 1.5 ms, post ≤ 1
 
 **Done since (lighting).** Watch fires and the horde's torches as firelight maps; shade where walls meet floors;
 night mist; rain in the scene; and **HDR**: at High and Medium quality the picture is kept in half-float light
-values until one tone curve in the last pass. Every shader still works its colour out as it is to be seen and
+values until one tone curve in the last pass. Every shader still works its color out as it is to be seen and
 hands it through `scn()`, the inverse of that curve, so solid surfaces look exactly as they did; what changes
 is everything that is added or blended: fire, tracers, flashes and lit windows add up as light and may pass
 white, and feed the glow from there, instead of clipping channel by channel. Falls back to the 8-bit picture
@@ -344,7 +344,7 @@ before it tries again a level that failed (`main.js`, the loop; `app.gfx`).
 2. Meshy, through its CLI: image to 3D (30 credits), remesh to 10,000 triangles (5), rigging (5,
    humanoids only; it comes with walk and run), and clips from its library (3 each).
 3. `node tools/assets/import.js <unit>` takes the downloads (about 16 MB a clip, kept out of the
-   repository in `assets-src/`) into `tools/assets/src/<unit>/`: mesh, colours and bone motion, a few MB.
+   repository in `assets-src/`) into `tools/assets/src/<unit>/`: mesh, colors and bone motion, a few MB.
 4. `tools/assets/units/<unit>.json` is the recipe: height, levels of detail, gear, and where it came from
    (Meshy task ids).
 5. `node tools/assets/build.js <unit>` writes `assets/game/<unit>.<hash>.bin` (four levels of detail,
@@ -366,7 +366,7 @@ against 1,013k at zoom 60, all inside the 2.5 M budget.
 clips, frames interpolated at the closest level.
 
 **In the game so far:** on the horde's side Uruk-hai, crossbow Uruk, berserker, captain, sapper and troll;
-on the garrison's the rifleman, machine gunner, marksman, grenadier, anti-armour gunner and commander. Each
+on the garrison's the rifleman, machine gunner, marksman, grenadier, anti-armor gunner and commander. Each
 comes from its own concept sheet (`tools/assets/concepts/`), generated end to end by `node
 tools/assets/generate.js <unit>` (40 Meshy credits for a rigged model, 3 a clip; about 700 spent in all,
 trials included).
@@ -400,11 +400,11 @@ finest level is the generator's own 10,000 triangles: the reducer scrambles the 
 model (its texture is cut into thousands of islands), which shows close up and not at the lower levels'
 distances. About 810 Meshy credits spent in all so far.
 
-Far off, a soldier's model is washed toward his side's colour (cyan for the garrison, amber when out of
+Far off, a soldier's model is washed toward his side's color (cyan for the garrison, amber when out of
 ammunition, red for the horde, pale steel behind locked shields), as the built-in figures were tinted.
 Pictures of the new models are in `docs/progress/m9-units/`.
 
-**Rough edges since put right:** a machine's lower levels now give each triangle one colour (that of its first
+**Rough edges since put right:** a machine's lower levels now give each triangle one color (that of its first
 corner) instead of smearing the texture across its many small islands, and a deck is laid on the hull under the
 turret so nothing shows through when it turns. **Since:** the warg's rider rides armed: his sword arm is raised (`rider.js`, `raise`), and the sword and shield models are set by his hands and carried by the beast's back with the rest of him. He still does not move of himself. The image
 model refused the first wording of the howitzer's concept and took a plainer one.
@@ -422,7 +422,7 @@ Before and after: `docs/progress/units-repaint/`.
 
 **The side tint is by zoom alone.** It used to follow each unit's own distance from the camera, which in a
 tilted view painted the far half of a block red and left the near half plain. Now one figure for the whole
-view: none closer than 5.5 px per metre, full by 2.6.
+view: none closer than 5.5 px per meter, full by 2.6.
 
 **Trolls take the stairs.** A size rule barred them from every stair and stair head, so they stood at the foot
 of the courts' stairs. Big units now use stairs like anyone (ladders still not); engines and vehicles cannot.
@@ -444,9 +444,9 @@ turning part with no deck under it. The transport was asked for with one rotor s
 is now one choice for the whole view, by zoom, like the tint (taken unit by unit it split a block in a tilted
 view; the triangle budget's bias still moves the change closer in under load); the siege tower keeps 7,000,
 3,500 and 1,200 triangles at its lower levels (its hides fell apart below that); a formation's box and its range
-rings fit where its units actually stand; place names fade out between 4 and 6.5 px per metre; the stream is
+rings fit where its units actually stand; place names fade out between 4 and 6.5 px per meter; the stream is
 gathered to the culvert arch's width at the Deeping Wall; banners stand along the Deeping Wall, every sixth
-section; and the ground is repainted toward the film's valley: bleached tawny tussock over pale grey river
+section; and the ground is repainted toward the film's valley: bleached tawny tussock over pale gray river
 gravel, cooler slate rock, a cooler daylight.
 
 **Battlements as built, and stances held.** Men posted on the Hornburg's wall stand a pace inside the parapet
@@ -466,14 +466,14 @@ the belt and breaks through section by section, about 25 s for the first gaps un
 1,500 and go to an engine's crew (6 a tick) or a troll among them (30). A path through wire costs seven cells
 of open ground, through obstacles (for engines) fifteen. Damaged sections show a small bar. Wire is 5 points a
 section (was 2 for a 3 m piece that only slowed); obstacles stay at 3. A challenge's budget is still exactly
-its garrison's cost. Also: the Advanced button is outlined in the accent colour and filled when open, and
+its garrison's cost. Also: the Advanced button is outlined in the accent color and filled when open, and
 opens itself when a defender is added in a challenge; an air strike is always twelve bombs, laid further
 apart on a longer run.
 With the new wire the stand-in commander won Easy 4 of 5, Medium 5 of 5 and Hard 4 of 5; the Hard garrison's
-belt was cut to the middle of the wall (49 sections for 85), which brought Hard back to 1 of 5. Behaviour
+belt was cut to the middle of the wall (49 sections for 85), which brought Hard back to 1 of 5. Behavior
 checks 24 of 25 (`keep` open as before).
 
-**Weapons and shields as models.** Gear was plain boxes in four flat colours. Each kind is now a generated
+**Weapons and shields as models.** Gear was plain boxes in four flat colors. Each kind is now a generated
 model of its own (`tools/assets/src/gear-*/`: sword, shield, club, crossbow, rifle, machine gun, marksman's
 rifle, launcher, launch tube, mortar; 350 credits). `build.js fit()` sets each in the hand by the frame the
 boxes used (length from grip to tip, breadth, the point that sits in the hand), tells the tip from the shape,
@@ -506,7 +506,7 @@ rise, then the old slope, in bands that wander) with gullies between buttresses.
 only: the battle's ground is the map's, nothing walks up there, and the rock is only ever cut away, so the
 camera (which keeps clear of the map's ground) cannot end up inside it. The valley floor, the Hornburg's
 shelf and the rock within 70 m of the fortress are left alone. Pictures: `docs/progress/m11-cliffs/`.
-The ground's colours were moved from pasture toward thin turf and bare stone with the map redesign.
+The ground's colors were moved from pasture toward thin turf and bare stone with the map redesign.
 
 **To come:** the terrain mesh is a 4 m grid, so crags finer than about 10 m need a denser mesh on the
 faces or real cliff meshes in chunks; CC0 rock, scree and mud layers; distant mountains. Budget: static

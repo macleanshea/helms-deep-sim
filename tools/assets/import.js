@@ -17,7 +17,7 @@ import { quadruped } from './quadruped.js';
 import { rigid } from './rigid.js';
 
 const here = fileURLToPath(new URL('.', import.meta.url)), root = path.resolve(here, '../..'), FPS = 30;
-/** A model's colour texture as a JPEG worth keeping (1024 px at most). */
+/** A model's color texture as a JPEG worth keeping (1024 px at most). */
 function colourOf(g, image) {
   if (image == null) return null;
   const tmp = path.join(os.tmpdir(), `hd-import-${process.pid}`), out = `${tmp}.jpg`;

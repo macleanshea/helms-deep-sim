@@ -66,7 +66,7 @@ export class Fx {
   }
 
   /**
-   * Rain in the air round the place the camera looks at: thin pale streaks that fall on the wind from a few metres up and
+   * Rain in the air round the place the camera looks at: thin pale streaks that fall on the wind from a few meters up and
    * are gone where they reach the ground (the walk of a wall, a court, the valley floor: `heightAt` says which). `amount`
    * 0..1; `dt` is the same step `update` is given, so the fall and the supply keep pace at any battle speed.
    */
@@ -323,7 +323,7 @@ export class Fx {
     }
     if (d.cls === C.VEH || d.cls === C.GUN) {
       this.explosion(x, y, z, 7, 0);
-      // the burnt-out hull stays where it died
+      // the burned-out hull stays where it died
       this.chunk(d.key, x, y, z, 0, 0, 0, d.cls === C.GUN ? 1.15 : 1, 38, 34, 30, 1e9, { resting: 1, yaw: rot, vyaw: 0, vtilt: 0, tilt: d.cls === C.GUN ? 0.25 : 0.04 });
       this.emitters.push({ x, y, z: z + 1, t: 60, rate: 5, acc: 0, size: 3, fire: true });
       this.decal(SPR.scorch, x, y, 14, 0, 255, 255, 255, 180);
