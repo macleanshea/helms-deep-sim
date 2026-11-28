@@ -1,5 +1,22 @@
 # Helm's Deep — notes for working in this repository
 
+## Session continuity
+
+Sessions can fail or be cut off without warning. Work so that nothing is lost when that happens.
+
+- **Open a PR at the start.** As soon as a new session starts, push the working branch and open a
+  draft PR for it, before doing the work itself. If the branch already has an open PR, use that one.
+- **Commit and push often.** Commit after every meaningful step (a fix, a passing check, a finished
+  piece of a larger change), not only at the end. Push each commit to the PR right away. Uncommitted
+  work is lost work.
+- **Keep a log in the PR.** The PR description holds a running record of the work: the goal, what
+  has been done, what was tried and dropped and why, decisions made, open questions, and the exact
+  next steps. Update it with every push.
+- **Leave it ready to hand over.** At any point, a new session should be able to read the PR (its
+  description, commits and comments) and pick up exactly where the last one stopped, without
+  asking. When picking up someone else's work, read the PR log first and continue from its next
+  steps.
+
 ## UI text conventions
 
 These apply to every string a player reads: labels, buttons, tooltips, toasts, alerts, banners, help,
