@@ -330,17 +330,18 @@ button.mini.open .chev { transform: rotate(90deg); }
 
 /* ---------- loading screen ----------
    The painting is pinned to the bottom-left and sized by its height (--P), so it is never cropped. Its outer edges fade into
-   the gradient behind it, which carries the mist on across wider or taller windows; the gradient stops are sampled from the
+   the gradient behind it, which carries the night sky on across wider or taller windows; the gradient stops are sampled from the
    picture (assets/splash/loading-*.webp) and must change with it. --u is 1% of the visible height. */
-#loading { --u: 1vh; --P: calc(100 * var(--u)); position: absolute; inset: 0; z-index: 50; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #30404c; color: #f2f4f5; transition: opacity 0.5s; }
+#loading { --u: 1vh; --P: calc(100 * var(--u)); position: absolute; inset: 0; z-index: 50; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #0d1017; color: #f2f4f5; transition: opacity 0.5s; }
 @supports (height: 1dvh) { #loading { --u: 1dvh; } }
 #loading.done { opacity: 0; pointer-events: none; }
 #loading > span { position: relative; max-width: 80vw; text-align: center; letter-spacing: 0.08em; } /* the "needs WebGL2" message */
-.ld-art { position: absolute; left: 0; right: 0; bottom: 0; height: var(--P); background: linear-gradient(#405564 0%, #4d6475 21.9%, #587183 39.3%, #566f81 51.4%, #556d7e 58.4%, #495e6d 65.3%, #3f4e5b 72.2%, #37424b 82.7%, #2b3136 100%); }
+.ld-art { position: absolute; left: 0; right: 0; bottom: 0; height: var(--P); background: linear-gradient(#1a2736 0%, #1e2c3c 14%, #223142 28%, #263648 42%, #2a3a4d 54%, #2b3a4d 64%, #2e3c4f 73%, #2d3b4e 82%, #2d3c4e 91%, #2b394b 100%); }
 .ld-art img { position: absolute; left: 0; bottom: 0; height: 100%; width: auto; max-width: none; opacity: 0; transition: opacity 0.6s; }
 #loading.art-in .ld-art img { opacity: 1; }
 .ld-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(6, 10, 16, 0) 38%, rgba(6, 10, 16, 0.5)); }
-.ld-text { position: absolute; left: clamp(calc(88 * var(--u)), 57vw, calc(112 * var(--u))); top: 50%; transform: translateY(-50%); }
+/* the title never starts left of 100u: the muzzle flash in the painting ends about 90u in */
+.ld-text { position: absolute; left: clamp(calc(100 * var(--u)), 57vw, calc(112 * var(--u))); top: 50%; transform: translateY(-50%); }
 .ld-title { margin: 0; font-size: calc(10.7 * var(--u)); font-weight: 800; letter-spacing: 0.02em; line-height: 1; }
 .ld-sub { display: block; margin-top: calc(3.1 * var(--u)); font-size: max(10px, calc(1.95 * var(--u))); font-weight: 600; letter-spacing: 0.32em; text-transform: uppercase; white-space: nowrap; color: var(--accent); }
 .ld-bar { margin-top: calc(4.8 * var(--u)); width: max(180px, calc(43.5 * var(--u))); height: max(3px, calc(0.46 * var(--u))); border-radius: 3px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
@@ -349,7 +350,7 @@ button.mini.open .chev { transform: rotate(90deg); }
 /* narrower than 3:2: the painting drops to the lower part of the window and the title goes in the sky above it */
 @media (max-aspect-ratio: 3/2) {
   #loading { --P: min(calc(70 * var(--u)), 120vw); }
-  .ld-art { height: calc(var(--P) * 1.734375); background: linear-gradient(#30404c 0%, #374a58 20%, #3e5261 40%, #4d6475 55%, #587183 65%, #566f81 72%, #556d7e 76%, #495e6d 80%, #3f4e5b 84%, #37424b 90%, #2b3136 100%); }
+  .ld-art { height: calc(var(--P) * 1.734375); background: linear-gradient(#0d1017 0%, #0c121b 14%, #101823 28%, #141e2b 42%, #192533 54%, #1f2c3c 64%, #283547 73%, #4b3f46 82%, #3a3740 91%, #2e313b 100%); }
   .ld-art::after { background: none; }
   .ld-text { left: 0; right: 0; top: calc((100 * var(--u) - var(--P)) / 2); text-align: center; }
   .ld-title { font-size: clamp(30px, 9vmin, 72px); }
