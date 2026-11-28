@@ -318,6 +318,16 @@ occlusion on the fortress; a night sky with moon and lightning; GPU rain. The mo
 loading art: cold rain, mist, fire glow. Budgets: shadows ≤ 1.5 ms, post ≤ 1.5 ms, total GPU
 ≤ 11 ms at high quality with 300 torches on screen.
 
+**Done since (lighting).** Watch fires and the horde's torches as firelight maps; shade where walls meet floors;
+night mist; rain in the scene; and **HDR**: at High and Medium quality the picture is kept in half-float light
+values until one tone curve in the last pass. Every shader still works its colour out as it is to be seen and
+hands it through `scn()`, the inverse of that curve, so solid surfaces look exactly as they did; what changes
+is everything that is added or blended: fire, tracers, flashes and lit windows add up as light and may pass
+white, and feed the glow from there, instead of clipping channel by channel. Falls back to the 8-bit picture
+where float buffers are missing or refuse; `?hdr=0` turns it off; Low quality never uses it. Lightning already
+lights by direction. Unmeasured for frame rate here (half-float multisampled buffers cost fill rate): the
+owner's `?bench` with and without `?hdr=0` decides whether Medium keeps it.
+
 ### 9. Asset pipeline and unit production
 
 **The pipeline, done.** How a unit gets from an idea into the game:

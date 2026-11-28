@@ -69,7 +69,10 @@ export class Renderer {
     const gl = canvas.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' });
     if (!gl) throw new Error('WebGL2 is required');
     this.gl = gl;
-    gl.getExtension('EXT_color_buffer_float');
+    // HDR: the picture kept in true light values (half floats) until one tone curve at the end. Needs float colour buffers;
+    // ?hdr=0 turns it off; the 'low' quality draws straight to the screen and never uses it.
+    this.hdrOK = !!gl.getExtension('EXT_color_buffer_float') && !/[?&]hdr=0\b/.test(typeof location !== 'undefined' ? location.search : '');
+    this._hdr = -1;
     this.pTerrain = compile(gl, SH.VS_TERRAIN, SH.FS_TERRAIN);
     this.pStruct = compile(gl, SH.VS_STRUCT, SH.FS_STRUCT);
     this.pDepth = compile(gl, SH.VS_DEPTH, SH.FS_DEPTH);
@@ -625,34 +628,49 @@ export class Renderer {
   }
 
   _ensurePost(w, h, want) {
-    const gl = this.gl;
-    if (this.post && this.post.w === w && this.post.h === h && this.post.want === want) return this.post;
+    const gl = this.gl, hdr = this.hdrOK;
+    if (this.post && this.post.w === w && this.post.h === h && this.post.want === want && this.post.hdr === hdr) return this.post;
     if (this.post) {
       const p = this.post;
       gl.deleteFramebuffer(p.msFbo); gl.deleteRenderbuffer(p.msColor); gl.deleteRenderbuffer(p.msDepth); gl.deleteFramebuffer(p.resFbo); gl.deleteTexture(p.resTex);
       for (const b of p.bloom) { gl.deleteFramebuffer(b.fbo); gl.deleteTexture(b.tex); }
     }
     const samples = Math.min(want, gl.getParameter(gl.MAX_SAMPLES));
-    const p = { w, h, want };
+    const p = { w, h, want, hdr };
     p.msFbo = gl.createFramebuffer(); p.msColor = gl.createRenderbuffer(); p.msDepth = gl.createRenderbuffer();
-    gl.bindRenderbuffer(gl.RENDERBUFFER, p.msColor); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.RGBA8, w, h);
+    gl.bindRenderbuffer(gl.RENDERBUFFER, p.msColor); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, hdr ? gl.RGBA16F : gl.RGBA8, w, h);
     gl.bindRenderbuffer(gl.RENDERBUFFER, p.msDepth); gl.renderbufferStorageMultisample(gl.RENDERBUFFER, samples, gl.DEPTH_COMPONENT24, w, h);
     gl.bindFramebuffer(gl.FRAMEBUFFER, p.msFbo);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.RENDERBUFFER, p.msColor);
     gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, p.msDepth);
-    const target = (tw, th) => {
+    const target = (tw, th, float = false) => {
       const tex = this._tex(gl.LINEAR);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      if (float) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, tw, th, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, tw, th, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
       const fbo = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
       return { fbo, tex, w: tw, h: th };
     };
-    const res = target(w, h); p.resFbo = res.fbo; p.resTex = res.tex;
+    const res = target(w, h, hdr); p.resFbo = res.fbo; p.resTex = res.tex;
+    if (hdr) {
+      // (a card that says it can and cannot: fall back to the 8-bit picture for good)
+      let ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, p.msFbo); ok = ok && gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      if (!ok) { this.hdrOK = false; this.post = p; return this._ensurePost(w, h, want); }
+    }
     const bw = Math.max(2, w >> 2), bh = Math.max(2, h >> 2);
     p.bloom = [target(bw, bh), target(bw, bh)];
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return (this.post = p);
+  }
+
+  /** Tell every shader whether the picture is being kept in light values (see shaders.js SCENE). */
+  _setHDR(on) {
+    if (this._hdr === (on ? 1 : 0)) return;
+    this._hdr = on ? 1 : 0;
+    const gl = this.gl;
+    for (const pr of [this.pTerrain, this.pStruct, this.pUnit, this.pPart, this.pSky, this.pBright, this.pComp, this.pSkin[1], this.pSkin[2], this.pSkin[4]]) if (pr.u.uHDR) { gl.useProgram(pr.p); gl.uniform1f(pr.u.uHDR, this._hdr); }
   }
 
   _pass(prog, tex, target, setup) {
@@ -854,6 +872,7 @@ export class Renderer {
 
     const q = this.quality;
     const post = q === 'low' ? null : this._ensurePost(vw, vh, q === 'high' ? 4 : 2);
+    this._setHDR(!!(post && post.hdr));
     gl.bindFramebuffer(gl.FRAMEBUFFER, post ? post.msFbo : null);
     gl.viewport(0, 0, vw, vh);
     gl.depthMask(true);
@@ -1156,6 +1175,7 @@ export class Renderer {
 
   /** Small top-down RGBA snapshot of terrain and fortress for the minimap. */
   terrainThumb(w, h, sim) {
+    this._setHDR(false); // (a plain 8-bit snapshot)
     const gl = this.gl;
     if (sim && sim.structVersion !== this.structVersion) { this.structVersion = sim.structVersion; this._updateStructures(sim); }
     const tex = this._tex(gl.LINEAR);

@@ -33,7 +33,14 @@ vec3 rockFace(vec2 q){
 // a sky/ground ambient, the sun or moon with a soft shadow, up to six flash lights, and a specular
 // lobe whose width and strength come from the material. The view direction is taken per fragment
 // from the camera's position.
-const LIGHT = `
+// Colours are worked out as they are to be seen. Where the picture is kept in true light values (the renderer's HDR path:
+// lights, fire and flashes then add up as light does, and one tone curve at the end brings it all back), each shader
+// hands its colour through scn(): the inverse of that curve. With uHDR off it does nothing.
+const SCENE = `
+uniform float uHDR;
+vec3 scn(vec3 d){ if (uHDR < 0.5) return d; vec3 q = min(d*d, vec3(4.)); return q/(1. - 0.22*q); }
+`;
+const LIGHT = `${SCENE}
 uniform vec3 uSun; uniform vec3 uSunCol; uniform vec3 uAmb; uniform vec3 uEye; uniform float uWet; uniform float uExposure;
 uniform mat4 uShadowVP; uniform highp sampler2DShadow uShadow; uniform float uShadowOn; uniform float uShadowTexel;
 uniform vec4 uLPos[6]; uniform vec3 uLCol[6];
@@ -170,7 +177,7 @@ void main(){
     rough = mix(rough, 0.1, w); spec = mix(spec, 1., w);
   }
   if (vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; rough = mix(rough, 0.85, d.a); }
-  o = vec4(fogged(shade(c, nd, vW, rough, spec, 1.), vW), 1.);
+  o = vec4(scn(fogged(shade(c, nd, vW, rough, spec, 1.), vW)), 1.);
 }`;
 
 export const FS_BAKE = `#version 300 es
@@ -248,7 +255,7 @@ uniform vec4 uRound[4]; // the round works (horn tower, upper court, inner court
 void main(){
   vec3 n = normalize(vN); vec3 c = vC;
   float id = floor(vMat + 0.5);
-  if (id == 16.) { o = vec4(c, 1.); return; }
+  if (id == 16.) { o = vec4(scn(c)*(1. + 1.6*uHDR), 1.); return; }   // (a lit opening: brighter than the tone curve's white where there is room for it)
   float L = id > 16.5 ? 7. : id;
   vec3 an = abs(n), dpx = dFdx(vW), dpy = dFdy(vW);
   bool top = an.z > (L == 8. ? 0.96 : 0.6);
@@ -294,7 +301,7 @@ void main(){
     c *= 1. - 0.2*wet; rough = mix(rough, rough*0.45, wet); spec = mix(spec, max(spec, 0.45), wet);
   }
   if (vN.z > 0.7 && vW.x > 0. && vW.y > 0. && vW.x < uWorld.x && vW.y < uWorld.y) { vec4 d = texture(uDecal, vW.xy/uWorld.xy); c = c*(1.-d.a) + d.rgb; }
-  o = vec4(fogged(shade(c, n, vW, rough, spec, 1.), vW), 1.);
+  o = vec4(scn(fogged(shade(c, n, vW, rough, spec, 1.), vW)), 1.);
 }`;
 
 export const VS_DEPTH = `#version 300 es
@@ -360,10 +367,10 @@ in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; in vec3 vO; in vec3 vNo; fl
 uniform float uShadowPass; uniform float uLift; uniform float uMatOn;
 ${LIGHT}${MATERIAL}
 void main(){
-  if (uShadowPass > 0.5) { o = vec4(0.,0.,0.,0.34); return; }
+  if (uShadowPass > 0.5) { o = vec4(0.,0.,0., uHDR > 0.5 ? 0.56 : 0.34); return; }   // (the same darkening, whichever way the picture is kept)
   vec3 n = normalize(vN), c = vC;
   float id = floor(vMat + 0.5), rough = 0.8, spec = 0.12;
-  if (id == 16.) { o = vec4(mix(c*1.4, vec3(1.), vFlash*0.8), 1.); return; }
+  if (id == 16.) { o = vec4(scn(mix(c*1.4, vec3(1.), vFlash*0.8))*(1. + 1.2*uHDR), 1.); return; }
   if (uMatOn > 0.5) {
     // textured in the model's own space, so the pattern stays put on a moving limb
     float L = id > 16.5 ? 7. : id;
@@ -382,7 +389,7 @@ void main(){
   vec3 col = shade(c, n, vW, rough, spec, 1.);
   col += vC*uLift*(0.55+0.45*n.z);                   // keep figures readable at night
   col = mix(col, vec3(1.), vFlash*0.8);
-  o = vec4(fogged(col, vW), 1.);
+  o = vec4(scn(fogged(col, vW)), 1.);
 }`;
 
 // Units built from model files (see tools/assets/build.js): each vertex follows up to four bones, whose matrices for
@@ -418,14 +425,14 @@ in vec3 vW; in vec3 vN; in vec3 vC; in float vFlash; in vec2 vUV; in float vWash
 uniform sampler2D uTex; uniform float uShadowPass; uniform float uLift;
 ${LIGHT}
 void main(){
-  if (uShadowPass > 0.5) { o = vec4(0.,0.,0.,0.34); return; }
+  if (uShadowPass > 0.5) { o = vec4(0.,0.,0., uHDR > 0.5 ? 0.56 : 0.34); return; }   // (the same darkening, whichever way the picture is kept)
   // the paintings these come from are dark: lift them so a figure reads against the ground at a soldier's size on screen
   // (far off, a figure is washed toward its side's colour, vC, so the two armies read at a glance: vWash says how far)
   vec3 n = normalize(vN), t = min(texture(uTex, vUV).rgb*1.38 + 0.03, 1.), c = mix(t*vC, vC*(0.45 + 0.9*dot(t, vec3(0.33))), vWash);
   vec3 col = shade(c, n, vW, 0.56, 0.42, 1.);
   col += (c + 0.05)*uLift*(0.9+0.7*n.z);             // keep figures readable at night
   col = mix(col, vec3(1.), vFlash*0.8);
-  o = vec4(fogged(col, vW), 1.);
+  o = vec4(scn(fogged(col, vW)), 1.);
 }`;
 
 // billboards (mode 0), streaks stretched along a world axis (1) and ground-hugging quads (2)
@@ -464,12 +471,17 @@ precision highp float;
 uniform sampler2D uAtlas; uniform vec3 uTint;
 in vec2 vUV; in vec4 vColor; in float vAdd;
 out vec4 o;
+${SCENE}
 void main(){
   vec4 t = texture(uAtlas, vUV);
   float a = t.a*vColor.a;
   if (a < 0.003) discard;
   vec3 rgb = vColor.rgb * mix(uTint, vec3(1.), vAdd);
-  o = vec4(rgb*a, a*(1.-vAdd));
+  if (uHDR > 0.5) {
+    // in light values: what glows adds as light (and may pass white: the glow of fire), what covers covers as much as it did
+    float aa = a*(1.-vAdd), a2 = 1. - (1.-aa)*(1.-aa);
+    o = vec4(mix(scn(rgb)*a2, scn(rgb*a)*1.5, vAdd), a2);
+  } else o = vec4(rgb*a, a*(1.-vAdd));
 }`;
 
 // flat top-down sprite stamp, used to burn decals into the ground texture
@@ -493,8 +505,13 @@ void main(){ vec4 t = texture(uAtlas, vUV); o = vec4(t.rgb*vColor.rgb, t.a)*vCol
 
 export const FS_BRIGHT = `#version 300 es
 precision highp float;
-uniform sampler2D uTex; in vec2 vUV; out vec4 o;
-void main(){ vec3 c = texture(uTex, vUV).rgb; float l = max(c.r, max(c.g, c.b)); o = vec4(c*smoothstep(0.62, 0.95, l), 1.); }`;
+uniform sampler2D uTex; uniform float uHDR; in vec2 vUV; out vec4 o;
+void main(){
+  vec3 c = texture(uTex, vUV).rgb;
+  if (uHDR > 0.5) c = sqrt(c/(1. + 0.22*c));       // back to colours as seen: up to twice white where the light was strong
+  float l = max(c.r, max(c.g, c.b));
+  o = vec4(min(c, vec3(1.6))*smoothstep(0.62, 0.95, l)*(uHDR > 0.5 ? 0.625 : 1.), 1.);   // (kept within the 8 bits the glow is blurred in)
+}`;
 
 export const FS_BLUR = `#version 300 es
 precision highp float;
@@ -512,7 +529,7 @@ export const FS_SKY = `#version 300 es
 precision highp float;
 uniform vec3 uCamR; uniform vec3 uCamU; uniform vec3 uCamF; uniform vec2 uTan; uniform vec3 uFog; uniform vec3 uZenith; uniform float uTime;
 in vec2 vUV; out vec4 o;
-${NOISE_LITE}
+${NOISE_LITE}${SCENE}
 void main(){
   vec2 q = vUV*2.-1.;
   vec3 d = normalize(uCamF + uCamR*(q.x*uTan.x) + uCamU*(q.y*uTan.y));
@@ -524,15 +541,17 @@ void main(){
     vec3 sky = uZenith*(0.72 + 0.6*cloud);
     c = mix(uFog, sky, smoothstep(0.01, 0.3, e));
   }
-  o = vec4(c, 1.);
+  o = vec4(scn(c), 1.);
 }`;
 
 export const FS_COMPOSITE = `#version 300 es
 precision highp float;
-uniform sampler2D uTex; uniform sampler2D uBloom; uniform float uBloomK; uniform float uFlash;
+uniform sampler2D uTex; uniform sampler2D uBloom; uniform float uBloomK; uniform float uFlash; uniform float uHDR;
 in vec2 vUV; out vec4 o;
 void main(){
-  vec3 c = texture(uTex, vUV).rgb + texture(uBloom, vUV).rgb*uBloomK;
+  vec3 c = texture(uTex, vUV).rgb;
+  if (uHDR > 0.5) c = min(sqrt(c/(1. + 0.22*c)), vec3(1.));   // the one tone curve, for the whole picture
+  c += texture(uBloom, vUV).rgb*uBloomK*(uHDR > 0.5 ? 1.6 : 1.);
   c = mix(c, c*c*(3.-2.*c), 0.22);                 // a touch more contrast
   vec2 q = vUV-0.5; c *= 1. - dot(q,q)*0.55;       // vignette
   c += uFlash;
