@@ -355,6 +355,9 @@ Siege Train it did, by far (about 90% alive against 10%), and on Medium a little
   same seeds, it wins every night, at least as often as holding the wall, and with a quarter or more of the
   garrison more left.
 
+In the browser (`docs/lab/lashed-near.jpg`, `lashed-mid.jpg`): the lashed ladder stands from the valley floor to
+the ring's parapet, the lashing at the joint, the men climbing on its rails.
+
 **Measured** (stand-in commander, seeds 1-3, the garrison ordered into the Hornburg at 1 s, against the same
 garrison holding the wall; `scratchpad` runner equivalent to `npm run checks keep`):
 

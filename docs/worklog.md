@@ -9,9 +9,8 @@ from **Next**.
 1. **Checks after part 4**: `npm run checks` (full), then `npm run matrix` (about 25 minutes). Golden was moved by
    the station-keeping tie-break (`src/sim/company.js`); re-record with `node tools/golden.js --write` only once the
    checks and the matrix are sound, and log why. The keep check should now report no FREE row.
-2. **A browser look** at the lashed ladders (`npm start`, the Siege Train or the Hornburg Garrison, order everyone
-   into the Hornburg): the ladder drawn from the valley floor to the parapet, climbers on its rails, and the alerts
-   "Lashed ladders up · Hornburg", "Ladder crews approaching · Hornburg" not wrapping.
+2. **Alerts on screen**: the lashed ladder itself was looked at in the browser (`docs/lab/lashed-near.jpg`); the
+   alerts "Lashed ladders up · Hornburg" and "Ladder crews approaching · Hornburg" have not been seen wrapping or not.
 3. **A search for the Flood**: `node tools/lab.js --search flood --n 30 --seeds 2 --tag search3 --md docs/lab/search3.md`
    (about 25 minutes on four cores), then set its suggested garrison and size as was done for the other two.
 4. **Re-run the unit lab** on the final code (`node tools/lab.js --tag after2 --md docs/lab/after2.md`, about
