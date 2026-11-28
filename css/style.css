@@ -132,6 +132,8 @@ h3 { margin: 0 0 8px; }
 .req .bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin: 4px 0 3px; }
 .req .bar i { display: block; height: 100%; background: var(--accent); }
 .req small { text-transform: none; letter-spacing: 0; font-size: 11px; font-weight: 500; }
+.suggest { width: 100%; margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); background: rgba(240, 179, 74, 0.06); border: 1px dashed rgba(240, 179, 74, 0.45); cursor: pointer; }
+.suggest:hover { background: rgba(240, 179, 74, 0.14); }
 .req.over { border-color: var(--orc); background: rgba(232, 87, 61, 0.1); } .req.over b, .req.over small { color: #ff8b73; } .req.over .bar i { background: var(--orc); }
 .modesw { display: flex; gap: 0; }
 .modesw button { flex: 1; border-radius: 0; height: 30px; padding: 0 12px; font-weight: 600; color: var(--dim); }

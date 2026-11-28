@@ -184,7 +184,11 @@ export const supportMethods = {
             const ux = a.cx + Math.cos(ang) * rr, uy = a.cy + Math.sin(ang) * rr;
             if (canPlace(this.map, d, ux, uy, null)) { const j = this.spawn(ti, ux, uy, Math.PI, a.grp); if (j >= 0) { this.fx.dust(ux, uy, this.unitZ(j), 1.5); a.dropped++; this.stats.reinforced = (this.stats.reinforced || 0) + 1; } }
           }
-          if (a.kind === 'helo' ? this.time >= a.until : a.dropped >= 30 || a.tries >= 90) a.st = 2;
+          if (a.kind === 'helo' ? this.time >= a.until : a.dropped >= 30 || a.tries >= 90) {
+            a.st = 2;
+            // the platoon off the helicopter forms its line where it landed, facing the nearest of the enemy
+            if (a.kind === 'transport') { const ids = []; for (let i = 0; i < this.n; i++) if (this.alive[i] && this.grp[i] === a.grp) ids.push(i); if (ids.length) { const f = this._threatDir(ids); this._deploy(a.grp, ids, f[0], f[1], null, null, false); } }
+          }
         } else {
           fly(WORLD_W + 400, a.cy - 100);
           keep = a.x < WORLD_W + 300;

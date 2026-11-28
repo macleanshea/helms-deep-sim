@@ -150,6 +150,7 @@ app.isSandbox = () => !!(app.setup && app.setup.options.sandbox);
 app.loadPreset = (key, sandbox = app.isSandbox(), quiet = false) => {
   app.setup = buildPreset(map, key, sandbox);
   app.presetKey = key;
+  if (app.setup.design && !sandbox) app.oobOpen = true; // (a garrison to build: its costs are shown from the start)
   app.selGroup = null; app.tool = null;
   ui.refreshPresetList(); ui.setPreset(key); ui.refreshRoster(); ui.refreshOptions(); ui.refreshInspector(); ui.refreshPalette(); ui.hint(null);
   rebuildPreview();
@@ -201,6 +202,14 @@ app.setTypeCount = (type, n) => {
   }
   if (app.selGroup && !app.setup.groups.includes(app.selGroup)) app.selGroup = null;
   groupsChanged();
+};
+/** A design challenge: replace the garrison with the one the challenge was measured with. */
+app.useSuggested = () => {
+  const ref = buildPreset(map, app.presetKey, false, 'ref').groups.filter((g) => g.team === DEF);
+  let id = 0; for (const g of app.setup.groups) if (g.id > id) id = g.id;
+  for (const g of ref) g.id = ++id; // (a fresh build numbers its groups from 1 again)
+  app.setup.groups = app.setup.groups.filter((g) => g.team !== DEF).concat(ref);
+  app.selGroup = null; groupsChanged(); ui.refreshPalette();
 };
 app.clearTeam = (team) => { app.setup.groups = app.setup.groups.filter((g) => g.team !== team); app.selGroup = null; groupsChanged(); };
 app.editGroup = (g, patch) => { Object.assign(g, patch); if (patch.ang != null && !g.w) g.w = groupBounds(g).hw * 2 - UNITS[U[g.type]].spacing * 2; groupsChanged(); };
@@ -358,6 +367,14 @@ app.cycleStance = () => {
   const nx = STANCES[(STANCES.findIndex((q) => q[0] === cur) + 1) % STANCES.length];
   app.sim.setStance(app.selection, nx[0]);
   audio.play('click'); ui.toast(`Fire mode: ${nx[1].toLowerCase()}`, nx[0] ? 'warn' : 'good');
+  ui.updateHud();
+};
+/** Auto or manual for the selected platoons: the opposite of what most of them are now. */
+app.toggleAuto = () => {
+  if (app.mode !== 'battle' || app.sim.result || !app.selection.length) return;
+  const sim = app.sim, on = app.selection.filter((i) => sim.gAuto[sim.grp[i]]).length * 2 < app.selection.length;
+  sim.setAuto(app.selection, on);
+  audio.play('click'); ui.toast(on ? 'Auto · platoons act on their own' : 'Manual · platoons hold until ordered', on ? 'good' : 'warn');
   ui.updateHud();
 };
 const liveGroup = (key) => (app.groups[key] || []).filter((u) => app.sim.alive[u.i] && app.sim.gen[u.i] === u.g && app.sim.team[u.i] === DEF);
@@ -601,7 +618,12 @@ overlay.addEventListener('pointerup', (e) => {
           const p = S(sim.x[i], sim.y[i], sim.unitZ(i) + 1);
           if (p[0] >= 0 && p[1] >= 54 && p[0] <= vw && p[1] <= vh) ids.push(i);
         }
-      } else ids.push(best);
+      } else {
+        // a click picks out the man's whole platoon (a vehicle, gun or lone specialist is its own)
+        const g = sim.grp[best];
+        if (!sim.gExempt[g] && g !== sim.miscGroup[DEF]) { for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.grp[i] === g && sim.team[i] === DEF) ids.push(i); }
+        else ids.push(best);
+      }
       app.lastClick = { t: app.clock, type: ty };
     }
     app.selection = d.add ? [...new Set([...app.selection, ...ids])] : ids;
@@ -653,6 +675,7 @@ window.addEventListener('keydown', (e) => {
   else if (k === 'z') app.toggleOverlay('zones');
   else if (k === 'v') app.toggleOverlay('ranges');
   else if (k === 'h') app.cycleStance();
+  else if (k === 'm') app.toggleAuto();
   else if (k === 'r') app.retreat(!e.shiftKey);
   else if (k === 'l') app.toggleLosses();
   else if (k === 'g') app.jumpAlert();

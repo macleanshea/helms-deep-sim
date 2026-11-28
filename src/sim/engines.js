@@ -10,7 +10,9 @@
 // Also here: defenders throwing a raised ladder back off the wall.
 
 import { WORLD_W, WORLD_H, DT, ORC, UNITS, U, R, C, T } from '../config.js';
-import { S_MOVE, S_WAIT, S_DONE, S_FLEE, LADDER_TIME, LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH, FINE_CELL as FINE, FINE_W as FW, FINE_H as FH } from './sim.js';
+import { S_MOVE, S_WAIT, S_DONE, S_FLEE, LADDER_TIME, LASHED_TIME, LOSS_CELL as OCS, LOSS_W as OW, LOSS_H as OH, FINE_CELL as FINE, FINE_W as FW, FINE_H as FH } from './sim.js';
+
+import { LASHED_GAP } from './lashed.js';
 
 const DCS = 8, DW = WORLD_W / DCS, DH = WORLD_H / DCS; // the defender grid (must match sim.js)
 const DRAFT_R2 = 45 * 45;
@@ -40,8 +42,9 @@ export const engineMethods = {
     this.eEver[i] |= pts >= cr.need ? 5 : 1; this.eIdle[i] = 0;
     if (this.time < this.eHalt[i]) return 0;
     let v = speed * Math.min(1, pts / cr.need);
-    // carried among locked shields, it keeps to their pace
-    if (this.stuck[i]) { this.stuck[i]--; if (v > 3.36) v = 3.36; }
+    // carried among locked shields, it keeps to their pace; the ladders make a run for it over the last stretch
+    const rush = d.role === R.LADDER && this._fortDist(this.x[i], this.y[i]) < 250;
+    if (this.stuck[i]) { this.stuck[i]--; if (v > 3.36 && !rush) v = 3.36; }
     return v;
   },
 
@@ -84,7 +87,7 @@ export const engineMethods = {
       if (this.eIdle[e] > 0) this.eIdle[e] = this.time; // a fresh party gets its chance to take hold
       if (this.state[j] === S_WAIT) { this.state[j] = S_MOVE; this.linkT[j] = this.time; }
       // a replacement has to run in and take hold: the engine waits for him
-      if (this.eEver[e] & 4) this.eHalt[e] = Math.max(this.eHalt[e], this.time + 2.5);
+      if (this.eEver[e] & 4) this.eHalt[e] = Math.max(this.eHalt[e], this.time + (d.role === R.LADDER && this._fortDist(x, y) < 250 ? 1.2 : 2.5));
     }
   },
 
@@ -166,17 +169,33 @@ export const engineMethods = {
     }
     if (!def) { if (this.cd2[L] > 0) this.cd2[L] = Math.max(0, this.cd2[L] - 0.25); return; }
     const fx = (hx / FINE) | 0, fy = (hy / FINE) | 0;
+    let att = 0;
     for (let yy = Math.max(0, fy - 3); yy <= Math.min(FH - 1, fy + 3); yy++) for (let xx = Math.max(0, fx - 3); xx <= Math.min(FW - 1, fx + 3); xx++) {
       for (let j = this.head[yy * FW + xx]; j >= 0; j = this.next[j]) {
         if (this.team[j] !== ORC || !this.el[j] || !this.alive[j]) continue;
         const dx = this.x[j] - hx, dy = this.y[j] - hy;
-        if (dx * dx + dy * dy < 36) { this.cd2[L] = 0; return; } // the head is held
+        if (dx * dx + dy * dy < 36) att++;
       }
     }
-    const loaded = this.time < this.linkT[L] - 0.75 + LADDER_TIME;
-    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? 0.35 : 1); // three men, six seconds; far longer with climbers' weight on it
+    // the head is held by the horde unless the garrison has twice as many men at it: then the ladder can still be heaved
+    // off, with the men at the top cut down or carried with it, though more slowly
+    if (att && def < att * 2) { this.cd2[L] = 0; return; }
+    const lashed = this.isLashed[L];
+    // (someone is on it: the last man started up less than a climb ago)
+    const loaded = this.time < this.linkT[L] - (lashed ? LASHED_GAP : 0.75) + (lashed ? LASHED_TIME : LADDER_TIME);
+    // three men, six seconds; far longer with climbers' weight on it. A lashed ladder, 24 m of timber leaning at 60 degrees
+    // with its hooks over the parapet, cannot be pushed out past upright: it has to be levered off them sideways, slowly
+    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? (lashed ? 0.6 : 0.35) : 1) * (att ? 0.5 : 1) * (lashed ? 0.5 : 1);
     if (this.cd2[L] < 3) return;
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
+    if (lashed) {
+      // it comes down the rock and breaks apart: there is no raising it again
+      this.stats.lashThrown++; // (counted apart from the ladders against the Deeping Wall)
+      this.fx.dust(x, y, this.map.groundZ(x, y), 4); this.fx.sound('ladder', x, y, 0.8);
+      this._alert('lashDown', 20, 'Lashed ladder thrown down · Hornburg', 'good', x, y);
+      s.ladders--; this.aux2[L] = -1; this._unlink(L); this.kill(L, null, true);
+      return;
+    }
     this.stats.thrown++;
     this.fx.dust(x, y, this.map.groundZ(x, y), 3); this.fx.sound('ladder', x, y, 0.7);
     this._alert('ladDown' + this.segSector(k), 20, `Ladder thrown down · ${this.sectors[this.segSector(k)].short}`, 'good', x, y);

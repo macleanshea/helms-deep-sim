@@ -21,6 +21,7 @@ const EDGE = AP.edge;    // where they appear (m from the west edge)
 const WARN = 35;         // notice given before a wave steps off (s)
 const MIN_GAP = 90;      // least time between two releases (s)
 const EARLY = 60;        // how far ahead of schedule a wave may be sent in when the last is spent (s)
+const CALL_UP = 30;      // with the Deeping Wall seen given up, the warlord calls up a waiting wave this often (s)
 const SPENT = 0.25;      // a wave is spent when this fraction of it is still in the fight
 const APPROACH = 4.6;    // typical pace up the valley, for contact estimates (m/s)
 
@@ -81,7 +82,9 @@ export const directorMethods = {
     if (!next) return;
     const allIn = this.wl.allIn; // the final effort: everything still waiting comes on at once
     if (next.state === PENDING) {
-      const early = spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY);
+      // a wave is sent in early when the last is spent, or when the wall is seen given up: the warlord at the front
+      // sends runners back to his reserves (he knows nothing more of the garrison than what his men have seen)
+      const early = (spent && this.time >= Math.max(last.relT + MIN_GAP, next.rel - EARLY)) || (this.wl.abandoned && this.time >= (last.relT || 0) + CALL_UP);
       if (early || allIn || this.time >= next.rel - WARN) {
         next.state = FORMING;
         next.relT = allIn ? this.time + 3 : early ? this.time + WARN * 0.6 : next.rel;
@@ -99,10 +102,9 @@ export const directorMethods = {
       const groups = this._wlEscorts(next.groups);
       // each rank comes over the edge when it would have marched that far; the warlord also holds the
       // quicker formations back so that the wave reaches the wall together
-      let hold = null;
-      if (!allIn) hold = this._wlStagger(groups.map((g) => ({ type: g.type, x: EDGE, y: g.y, lane: g.y < AP.split[0] ? 0 : g.y < AP.split[1] ? 1 : 2, esc: g.esc })), this.wl.plans[next.k]);
-      next.pend = groups.map((g, k) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH + (hold ? hold[k] : 0) })).sort((a, b) => b.t - a.t);
-      next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (hold ? hold.slice().sort((a, b) => a - b)[hold.length >> 1] : 0);
+      // (the wave closes up again at its forming-up line and goes in from there together: warlord.js _wlForm)
+      next.pend = groups.map((g) => ({ g, t: this.time + Math.max(0, -(g.x + (g.hd || 0))) / MARCH })).sort((a, b) => b.t - a.t);
+      next.contactT = this.time + Math.max(20, (this.defBox[0] - 240 - EDGE) / APPROACH) + (allIn ? 0 : 30);
       this._alert(null, 0, `Wave ${next.k + 1} of ${d.W} · ${next.name}`, 'bad', AP.alertX, AP.centre, true);
     }
   },
@@ -124,6 +126,7 @@ export const directorMethods = {
    * have been falling — and not where the last wave was cut down.
    */
   _weakSector() {
+    if (this.opt.aimSector != null && this.opt.aimSector >= 0) return this.opt.aimSector; // test battles can pin the main effort
     const d = this.dir, held = [0, 0, 0], dmg = [0, 0, 0], nseg = [0, 0, 0], fell = [0, 0, 0], bled = [0, 0, 0];
     const open = [0, 0, 0];
     for (let k = 0; k < this.segs.length; k++) {
@@ -155,10 +158,10 @@ export const directorMethods = {
       }
     }
     const mx = (a) => Math.max(1, a[0], a[1], a[2]);
-    const mh = mx(held), mf = mx(fell), mb = mx(bled);
+    const mh = mx(held), mf = mx(fell), mb = mx(bled), mw = mx(this.wl.wireSeen);
     let best = 0, bs = -1e9;
     for (let k = 0; k < 3; k++) {
-      const sc = 1.0 * (1 - held[k] / mh) + 0.8 * (dmg[k] / Math.max(1, nseg[k])) + 0.5 * (fell[k] / mf) - 0.6 * (bled[k] / mb) + 0.15 * this.rand2() + open[k];
+      const sc = 1.0 * (1 - held[k] / mh) + 0.8 * (dmg[k] / Math.max(1, nseg[k])) + 0.5 * (fell[k] / mf) - 0.6 * (bled[k] / mb) - 0.4 * (this.wl.wireSeen[k] / mw) + 0.15 * this.rand2() + open[k];
       if (sc > bs) { bs = sc; best = k; }
     }
     return best;

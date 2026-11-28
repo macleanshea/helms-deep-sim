@@ -1,0 +1,51 @@
+....................................
+preset         policy  seed result end         defenders   horde left   gate   ammo  score  cp            ladders     wall  foothold on wall tick ms
+first-night    none    1    loss   590 (0.98)  0/91        2373/4165    507    18%   239    0/22.2        7/14 -0     255   303      131     3.01 / 61.3 / 179.8
+first-night    none    2    WIN    600 (1.00)  15/91       2445/4165    515    8%    449    0/22.2        5/14 -0     330   506      95      3.2 / 53.1 / 150.9
+first-night    none    3    loss   569 (0.95)  0/91        2869/4165    507    37%   221    0/20          12/14 -0    210   451      56      3.49 / 65.1 / 172.5
+first-night    auto    1    WIN    600 (1.00)  83/91       2143/4165    —      54%   874    42/44.4       0/14 -0     395   —        1       2.51 / 44.9 / 145.3
+first-night    auto    2    loss   586 (0.98)  0/91        2288/4165    —      62%   239    42/43.7       5/14 -0     225   498      89      3.34 / 48.4 / 209.3
+first-night    auto    3    WIN    600 (1.00)  80/91       1826/4165    —      51%   764    42/44.4       2/14 -0     325   —        9       3.62 / 116.5 / 212.7
+garrison       none    1    loss   1066 (0.89) 0/497       7189/18106   1045   28%   237    0/23.3        45/111 -1   765   825      189     7.36 / 90.3 / 475.2
+garrison       none    2    loss   1060 (0.88) 0/497       7415/18106   —      1%    235    0/24.3        51/111 -1   545   814      144     7.88 / 133.6 / 587.8
+garrison       none    3    loss   1062 (0.88) 0/497       7278/18106   1043   0%    235    0/23.9        52/111 -2   745   793      243     7.92 / 152.3 / 576.7
+garrison       auto    1    loss   1189 (0.99) 0/497       4959/18106   1029   32%   268    46/50.9       48/111 -0   755   887      293     7.02 / 135.1 / 604.3
+garrison       auto    2    WIN    1200 (1.00) 244/497     3138/18106   —      36%   647    50/53.8       22/111 -0   785   815      211     6.66 / 90.7 / 401.5
+garrison       auto    3    WIN    1200 (1.00) 204/497     2731/18106   —      35%   623    50/52.8       17/111 -0   810   1098     94      5.33 / 118.5 / 414
+three-hundred  none    1    loss   657 (0.73)  0/309       6554/10098   563    7%    180    0/20.1        33/59 -7    270   570      263     5.88 / 205.1 / 343.9
+three-hundred  none    2    loss   732 (0.81)  0/309       6495/10098   —      5%    198    0/20.3        27/59 -1    310   343      331     6.31 / 251 / 565.3
+three-hundred  none    3    loss   749 (0.83)  0/309       6550/10098   —      30%   200    0/20.6        36/59 -2    280   554      313     6.56 / 89.8 / 394
+three-hundred  auto    1    WIN    900 (1.00)  133/309     4099/10098   —      44%   629    42/42.2       21/59 -0    270   577      67      5.87 / 96 / 319.4
+three-hundred  auto    2    WIN    900 (1.00)  97/309      4710/10098   —      33%   594    38/40.8       24/59 -2    335   578      100     6.47 / 87.8 / 298.3
+three-hundred  auto    3    WIN    900 (1.00)  117/309     4141/10098   —      39%   614    38/41.1       26/59 -0    285   559      113     5.72 / 81.7 / 387.8
+escalade       none    1    loss   669 (0.93)  0/146       4715/7508    —      3%    222    0/20.8        25/30 -2    330   594      63      4.29 / 87.7 / 248.6
+escalade       none    2    loss   675 (0.94)  0/146       4762/7508    —      0%    224    0/20          22/30 -1    470   625      39      3.87 / 81.8 / 254.2
+escalade       none    3    loss   692 (0.96)  0/146       4685/7508    —      6%    229    0/20.8        17/30 -2    275   619      104     4.12 / 78 / 302.5
+escalade       auto    1    WIN    720 (1.00)  146/146     2729/7508    —      20%   918    30/32         0/30 -0     685   —        0       2.85 / 105.7 / 266.1
+escalade       auto    2    WIN    720 (1.00)  146/146     2819/7508    —      41%   918    30/32         0/30 -0     720   —        0       2.47 / 77.7 / 251.7
+escalade       auto    3    WIN    720 (1.00)  146/146     3046/7508    —      37%   918    30/32         0/30 -0     710   —        0       2.47 / 64.7 / 196.9
+siege-train    none    1    loss   879 (0.98)  0/145       4904/9140    —      0%    240    0/21.6        18/25 -0    525   549      77      4.03 / 65.5 / 242.9
+siege-train    none    2    WIN    900 (1.00)  2/145       5092/9140    —      4%    519    0/21.6        18/25 -2    565   666      75      3.39 / 54.3 / 209.2
+siege-train    none    3    loss   816 (0.91)  0/145       4860/9140    —      0%    227    0/21.6        15/25 -0    525   600      104     3.04 / 102.3 / 245.3
+siege-train    auto    1    WIN    900 (1.00)  78/145      2666/9140    —      52%   676    42/43.1       4/25 -0     525   852      87      2.86 / 67.8 / 232.4
+siege-train    auto    2    loss   876 (0.97)  0/145       3873/9140    —      10%   250    38/42.7       10/25 -0    570   667      67      3.04 / 65.8 / 264.5
+siege-train    auto    3    WIN    900 (1.00)  14/145      3250/9140    —      51%   644    42/43         4/25 -0     535   857      54      2.88 / 86.2 / 234.8
+flood          none    1    loss   697 (0.77)  0/206       7204/11574   —      2%    191    0/20.7        25/60 -0    450   497      306     4.8 / 89.2 / 325.9
+flood          none    2    loss   773 (0.86)  0/206       7165/11574   735    0%    209    0/20.1        30/60 -3    560   601      255     4.94 / 69.9 / 232.1
+flood          none    3    loss   796 (0.88)  0/206       6834/11574   735    0%    217    0/20.1        31/60 -0    450   538      328     3.62 / 44.1 / 194.6
+flood          auto    1    loss   883 (0.98)  0/206       4909/11574   —      19%   252    38/39.2       26/60 -0    465   692      374     4.03 / 65.6 / 228.9
+flood          auto    2    WIN    900 (1.00)  68/206      4594/11574   —      29%   635    38/41.2       15/60 -0    445   490      187     4.45 / 50.5 / 183.4
+flood          auto    3    WIN    900 (1.00)  79/206      4158/11574   —      38%   651    38/39.4       15/60 -2    450   490      185     3.14 / 54 / 204.4
+
+first-night    none    wins 1/3   median end 590s (0.98 of dawn)   median survivors 0%   ladders raised 50%   first at the wall 0.42 of dawn
+first-night    auto    wins 2/3   median end 600s (1.00 of dawn)   median survivors 88%   ladders raised 14%   first at the wall 0.54 of dawn
+garrison       none    wins 0/3   median end 1062s (0.88 of dawn)   median survivors 0%   ladders raised 46%   first at the wall 0.62 of dawn
+garrison       auto    wins 2/3   median end 1200s (1.00 of dawn)   median survivors 41%   ladders raised 20%   first at the wall 0.65 of dawn
+three-hundred  none    wins 0/3   median end 732s (0.81 of dawn)   median survivors 0%   ladders raised 56%   first at the wall 0.31 of dawn
+three-hundred  auto    wins 3/3   median end 900s (1.00 of dawn)   median survivors 38%   ladders raised 41%   first at the wall 0.32 of dawn
+escalade       none    wins 0/3   median end 675s (0.94 of dawn)   median survivors 0%   ladders raised 73%   first at the wall 0.46 of dawn
+escalade       auto    wins 3/3   median end 720s (1.00 of dawn)   median survivors 100%   ladders raised 0%   first at the wall 0.99 of dawn
+siege-train    none    wins 1/3   median end 879s (0.98 of dawn)   median survivors 0%   ladders raised 72%   first at the wall 0.58 of dawn
+siege-train    auto    wins 2/3   median end 900s (1.00 of dawn)   median survivors 10%   ladders raised 16%   first at the wall 0.59 of dawn
+flood          none    wins 0/3   median end 773s (0.86 of dawn)   median survivors 0%   ladders raised 50%   first at the wall 0.50 of dawn
+flood          auto    wins 2/3   median end 900s (1.00 of dawn)   median survivors 33%   ladders raised 25%   first at the wall 0.50 of dawn

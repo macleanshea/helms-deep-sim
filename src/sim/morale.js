@@ -40,6 +40,7 @@ export const moraleMethods = {
     const g = this.ng < MAXG - 1 ? this.ng++ : MAXG - 1;
     this.gTeam[g] = team; this.gExempt[g] = exempt ? 1 : 0; this.gState[g] = G_OK; this.gMorale[g] = 100;
     this.gSup[g] = 0; this.gPin[g] = 0; this.gFearless[g] = 0;
+    this.gForm[g] = 0; this.gFree[g] = 0; this.gWaitT[g] = 0; this.gAimX[g] = -1; this.gAimU[g] = -1;
     this.gForce[g] = -1; this.gOrder[g] = 0; this.gField[g] = 0; this.gShield[g] = 0; this.gShieldT[g] = 0; this.gOpen[g] = 0; this.gCapX[g] = 1e9; this.gRallyX[g] = -1;
     return g;
   },
@@ -117,7 +118,7 @@ export const moraleMethods = {
       for (let h = 0; h < this.ng; h++) {
         if (h === g || this.gTeam[h] !== ORC || this.gExempt[h] || this.gState[h] >= G_ROUT) continue;
         const dx = this.gCx[h] - this.gCx[g], dy = this.gCy[h] - this.gCy[g];
-        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8));
+        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8) * Math.min(1, cnt / Math.max(1, this.gAlive[h]))); // (a small party running shakes a big company less)
       }
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {

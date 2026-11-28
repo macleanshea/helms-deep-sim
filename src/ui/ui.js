@@ -83,7 +83,7 @@ export function buildUI(app, portraits) {
     for (const p of sb ? [blank, ...rest] : rest) {
       const b = !sb && bestScores[p.key];
       // (the best score won on it is shown beside the list, labeled: tacked onto the name it read as part of the name)
-      const o = el('option', null, p.name + (p.level ? ` (${p.level})` : '') + (b && b.medal ? '  ★' : ''));
+      const o = el('option', null, p.name + (p.level ? ` (${p.design ? 'Build · ' : ''}${p.level})` : '') + (b && b.medal ? '  ★' : ''));
       o.value = p.key; preset.append(o);
     }
     preset.value = cur;
@@ -211,8 +211,15 @@ export function buildUI(app, portraits) {
         const spent = forceCost(app.setup.groups), budget = app.setup.budget, over = spent > budget;
         const req = el('div', 'req' + (over ? ' over' : ''), `<div><span>Requisition</span><b>${fmt(spent)} / ${fmt(budget)} pts</b></div><div class="bar"><i style="width:${Math.min(100, (100 * spent) / Math.max(1, budget))}%"></i></div>${over ? `<small>Over by ${fmt(spent - budget)} pts. Remove units to begin.</small>` : `<small>${spent >= budget ? 'All spent' : `${fmt(budget - spent)} pts left. Unspent points add to your score.`}</small>`}`);
         roster.append(req);
+        // a design challenge: the garrison is the player's to build; the one its difficulty was measured with is to hand
+        if (app.setup.design) {
+          const sg = el('button', 'suggest', 'Load suggested garrison');
+          sg.addEventListener('click', () => { app.useSuggested(); sg.blur(); });
+          bindTip(sg, 'Suggested garrison', 'The garrison this challenge was measured with. It replaces yours.');
+          roster.append(sg);
+        }
       }
-      if (!byType.size) roster.append(el('div', 'empty', team === DEF ? 'No defenders yet. Pick a unit to place.' : 'No attackers yet. Open the Attackers tab.'));
+      if (!byType.size) roster.append(el('div', 'empty', team === DEF ? (app.setup.design && !sandbox ? 'Build the garrison. Pick a unit on the left and place it on the map.' : 'No defenders yet. Pick a unit to place.') : 'No attackers yet. Open the Attackers tab.'));
       for (const d of UNITS) {
         if (!byType.has(d.key)) continue;
         const row = el('div', 'rrow ' + (team === DEF ? 'def' : 'orc'));
@@ -489,7 +496,9 @@ export function buildUI(app, portraits) {
     html += `<div class="line"><span>Ammo</span><span>${an ? Math.round(100 * am2 / an) + '%' : '—'}</span></div><div class="line"><span>Health</span><span>${Math.round(100 * hp / sel.length)}%</span></div><div class="line"><span>Morale</span><span>${Math.round(mo / sel.length)}%</span></div><div class="line"><span>Range</span><span>${reach.size === 1 ? [...reach][0] : 'Mixed'}</span></div>`;
     const st = sim.holdR[sel[0]], mixed = sel.some((i) => sim.holdR[i] !== st);
     html += `<div class="line"><span>Fire mode</span><span class="${st && !mixed ? 'held' : ''}">${mixed ? 'Mixed' : app.stanceName(st)}</span></div>`;
-    html += '<p class="tip"><b>Right-click</b> move · <b>H</b> fire mode · <b>R</b> fall back · <b>X</b> halt</p>';
+    const au = sim.gAuto[sim.grp[sel[0]]], amix = sel.some((i) => sim.gAuto[sim.grp[i]] !== au);
+    html += `<div class="line"><span>Mode</span><span class="${!au && !amix ? 'held' : ''}">${amix ? 'Mixed' : au ? 'Auto' : 'Manual'}</span></div>`;
+    html += '<p class="tip"><b>Right-click</b> move · <b>H</b> fire mode · <b>M</b> auto · <b>R</b> fall back · <b>X</b> halt</p>';
     selinfo.innerHTML = html; selinfo.hidden = false;
   };
 
@@ -526,9 +535,10 @@ export function buildUI(app, portraits) {
         [k('Enter'), 'Begin the battle'],
       ])}
       <h4>Orders</h4>${rows([
-        [`${k('Drag')} · ${k('Double-click')}`, 'Select troops · select every unit of that type in view'],
+        [`${k('Click')} · ${k('Drag')} · ${k('Double-click')}`, 'Select a platoon · select troops · select every unit of that type in view'],
         [`${k('Right-click')} · ${k('X')}`, 'Move · halt'],
         [k('H'), 'Fire mode: at will, hold to 150 m, hold to 75 m, hold fire. Closer shots hit more often and save ammo'],
+        [k('M'), 'Auto or manual. On auto a platoon turns to face a flank, shifts along its wall, engages a foothold, and fetches ammo'],
         [`${k('R')} · ${k('Shift+R')}`, 'Selected troops fall back to the Hornburg · everyone falls back'],
         [`${k('Shift+6')}…${k('0')}`, 'Set a control group. Press its number to select it, twice to jump to it'],
       ])}
@@ -553,6 +563,7 @@ export function buildUI(app, portraits) {
         ['Dead ground', 'Troops on a wall can barely hit attackers at its foot. Grenades and guns on the Hornburg can.'],
         ['The postern', 'The gate behind the Hornburg is weak. If the Deeping Wall falls, the horde reaches it through the Deep.'],
         ['The wall door', 'Where the wall joins the Hornburg, a door leads into the court. Attackers holding that end of the wall can break it down.'],
+        ['Lashed ladders', 'Once the wall is given up, attackers lash two ladders together to scale the Hornburg. Slow to raise and to climb, and they can collapse.'],
         ['Pinned ▼', 'Machine guns and shellfire pin companies: they slow down and stop shooting. Crossbows and catapults pin your platoons the same way.'],
         ['Shield wall ▣', 'Within small-arms range, Uruk-hai lock shields that stop most bullets from the front. Use explosives or flanking fire.'],
         ['Captains ★', 'Companies near a captain rarely rout, and nearby troops absorb shots aimed at the captain. Thin the escort, then use Focus Fire.'],
@@ -617,7 +628,8 @@ export function buildUI(app, portraits) {
     coached.add(kind);
     coachBody.innerHTML = kind === 'sandbox'
       ? '<b>Both armies are yours to edit</b><p>Pick a scenario here to load its armies, or <b>Blank Map</b> to start empty.</p>'
-      : '<b>The garrison is ready</b><p>Press <b>Begin battle</b>, or pick another scenario here.</p>';
+      : app.setup && app.setup.design ? '<b>Build the garrison</b><p>The horde is listed on the right. Spend the requisition, then press <b>Begin battle</b>.</p>'
+      : '<b>The garrison is ready</b><p>Press <b>Begin battle</b>, or pick another scenario here. The scenarios marked Build start with none.</p>';
     coach.hidden = false;
     placeCoach();
   };

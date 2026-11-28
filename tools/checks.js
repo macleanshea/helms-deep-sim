@@ -39,7 +39,7 @@ function play(setup, opts = {}) {
   const N = sim.x.length, px = new Float32Array(N), py = new Float32Array(N), pg = new Uint16Array(N);
   // where each defender was posted, and whether anything but his own search for a firing place has moved him since
   const x0 = Float32Array.from(sim.x), y0 = Float32Array.from(sim.y), g0 = Uint16Array.from(sim.gen), moved = new Uint8Array(N);
-  const om = sim.orderMove.bind(sim); sim.orderMove = (ids, x, y) => { for (const i of ids) moved[i] = 1; return om(ids, x, y); };
+  const om = sim.orderMove.bind(sim); sim.orderMove = (ids, x, y, ...rest) => { for (const i of ids) moved[i] = 1; return om(ids, x, y, ...rest); }; // (facing and the auto flag passed on: a platoon's own move is not an order)
   const tk = sim._toKeep.bind(sim); sim._toKeep = (list) => { for (const [, i] of list) moved[i] = 1; return tk(list); };
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.team[i] === DEF && UNITS[sim.type[i]].cls === C.INF) P.lanes.def0++;
   for (let i = 0; i < sim.n; i++) if (sim.alive[i] && sim.type[i] === U.rifle) P.rifles0++;
@@ -92,7 +92,7 @@ function play(setup, opts = {}) {
     const t = sim.time;
     P.shotLog.push(P.sectorShots.slice());
     // forces sent round to the postern while the Deeping Wall is still manned (there should be none)
-    if (!sim.wl.abandoned && sim.wl.forces.some((f) => f.sector === 4)) P.postWrong = (P.postWrong || 0) + 1;
+    if (!sim.wl.abandoned && sim.wl.forces.some((f) => f.sector === 4 || f.sector === 5)) P.postWrong = (P.postWrong || 0) + 1; // (or up the ring by lashed ladders)
     // --- engines and their crews
     for (const e of sim.engines) {
       if (!sim.alive[e]) continue;
@@ -125,7 +125,8 @@ function play(setup, opts = {}) {
         if (t % 10 < 0.05 && FOOT(d)) {
           const k = i, moved = pg[i] === sim.gen[i] ? Math.hypot(sim.x[i] - px[i], sim.y[i] - py[i]) : 99;
           px[i] = sim.x[i]; py[i] = sim.y[i]; pg[i] = sim.gen[i];
-          const free = sim.state[i] === S_MOVE && !sim.gOrder[g] && sim.crewOf[i] < 0 && !sim.el[i] && sim.gState[g] < 2 && sim.gPin[g] < 2 && !d.cmd && d.role !== 1
+          // (waiting on purpose is not being stuck: closing up at the forming-up line, or a company's own step-off delay)
+          const free = sim.state[i] === S_MOVE && !sim.gOrder[g] && !sim._forming(g) && !sim.gHold[g] && sim.gWaitT[g] <= sim.time && sim.crewOf[i] < 0 && !sim.el[i] && sim.gState[g] < 2 && sim.gPin[g] < 2 && !d.cmd && d.role !== 1
             && sim._fortDist(sim.x[i], sim.y[i]) > 14 && sim.x[i] < AP.wallLine && sim._nearDef(i, sim.x[i], sim.y[i], 0) < 0 && !crowded(sim, i);
           if (free && moved < 1.5) { const v = (P.stuck.run.get(k) || 0) + 10; P.stuck.run.set(k, v); if (v > P.stuck.worst) P.stuck.worst = v; if (v === 60) P.stuck.n60++; }
           else P.stuck.run.delete(k);
@@ -170,7 +171,7 @@ function crowded(sim, i) {
   return full >= 2;
 }
 
-const preset = (key, seed, sandbox = false) => { const s = buildPreset(map, key, sandbox); s.options.seed = seed; return s; };
+const preset = (key, seed, sandbox = false) => { const s = buildPreset(map, key, sandbox, 'ref'); s.options.seed = seed; return s; }; // (a Build challenge with its suggested garrison)
 const results = [];
 /** `open`: a known, unsolved problem. It is reported as OPEN and does not fail the run. */
 function verdict(name, ok, what, detail, open = false) { results.push({ name, ok, open }); console.log(`${ok ? 'PASS' : open ? 'OPEN' : 'FAIL'}  ${name}: ${what}\n      ${detail}`); }
@@ -219,8 +220,9 @@ const CHECKS = {
   }],
   catapults: ['Catapults hurt, but are not most of what kills the garrison', () => {
     const share = [];
-    for (const { P } of battles()) { const by = P.sim.stats.defLostBy; let tot = 0; for (const k in by) tot += by[k]; share.push(tot ? (by.rock || 0) / tot : 0); }
-    verdict('catapults', Math.max(...share) <= 0.5, `share of defender losses to catapult rocks: ${share.map(pct).join(', ')} (limit 50%)`, each((P) => `rocks ${P.sim.stats.defLostBy.rock || 0}, catapults lost ${P.sim.stats.lostOrc.catapult || 0}/${P.sim.stats.startOrc.catapult || 0}`));
+    // (a battle in which the garrison lost fewer than twenty men says nothing about what kills it)
+    for (const { P } of battles()) { const by = P.sim.stats.defLostBy; let tot = 0; for (const k in by) tot += by[k]; share.push(tot >= 20 ? (by.rock || 0) / tot : 0); }
+    verdict('catapults', Math.max(...share) <= 0.5, `share of defender losses to catapult rocks, where the garrison lost twenty or more: ${share.map(pct).join(', ')} (limit 50%)`, each((P) => `rocks ${P.sim.stats.defLostBy.rock || 0}, catapults lost ${P.sim.stats.lostOrc.catapult || 0}/${P.sim.stats.startOrc.catapult || 0}`));
   }],
   captains: ['Captains can be killed by a commander who goes after them, and do not clump when placed in a heap', () => {
     // a hunter: marks any captain inside 300 m with focus fire, and spends air strikes on the nearest
@@ -348,12 +350,19 @@ const CHECKS = {
     verdict('lanes: a packed wall', M.lanes.noLane === 0, `300 rifles massed on 110 m of wall: ${pct(M.lanes.blocked / Math.max(1, M.lanes.inReach))} of their time in reach was spent with no line of fire (frontage for about 180 at the parapet, more as they spread along it), and none fired without one`,
       `most in one 2 m cell ${M.lanes.maxCell} · furthest from post ${Math.round(M.lanes.wander)} m · moves per man per minute ${(M.sim.stats.reposts / 300 / Math.max(1, M.sim.time / 60)).toFixed(2)}`);
   }],
-  keep: ['Abandoning the wall for the Hornburg at once is not a free win (a known, open problem)', () => {
-    // the stand-in commander, who also orders everyone into the keep in the first second
+  keep: ['Abandoning the wall for the Hornburg at once is not a free win: no better than holding the wall', () => {
+    // the stand-in commander, who also orders everyone into the keep in the first second, against the same commander
+    // holding the wall as laid out, on the same seeds. Falling back is a free win where it is clearly better: it wins
+    // every night, at least as often as holding the wall, and with a quarter or more of the garrison more left.
     const rows = [], doors = [];
     let free = 0;
     for (const p of PRESETS.filter((q) => q.key !== 'empty' && !q.hidden)) {
-      let wins = 0; const left = [];
+      let wins = 0, held = 0; const left = [], heldLeft = [];
+      for (const seed of [1, 2, 3]) {
+        const H = play(preset(p.key, seed), { policy: 'auto' });
+        if (H.sim.result && H.sim.result.win) held++;
+        heldLeft.push(H.sim.defCombat / H.sim.initial[0]);
+      }
       for (const seed of [1, 2, 3]) {
         let deep = 0;
         const P = play(preset(p.key, seed), { policy: 'auto', tick: (sim) => {
@@ -370,11 +379,12 @@ const CHECKS = {
         const dr = P.sim.segs[map.DOOR];
         doors.push({ deep, post: ps.breached ? 'broken' : ps.hp < ps.maxHp ? 'battered' : 'untouched', gate: gs.breached ? 'down' : `${pct(gs.hp / gs.maxHp)}`, door: dr.breached ? 'broken' : dr.hp < dr.maxHp ? 'battered' : 'untouched' });
       }
-      if (wins === 3 && median(left) > 0.5) free++;
-      rows.push(`${p.level || p.key}: won ${wins} of 3 with ${pct(median(left))} left`);
+      const isFree = wins === 3 && wins >= held && median(left) > median(heldLeft) + 0.25;
+      if (isFree) free++;
+      rows.push(`${p.name}: fell back ${wins}/3, ${pct(median(left))} left; held the wall ${held}/3, ${pct(median(heldLeft))} left${isFree ? ' (FREE)' : ''}`);
     }
     keepDoors = doors;
-    verdict('keep', free === 0, `falling back into the Hornburg in the first second: ${rows.join(' · ')} (a win every time with over half the garrison left makes a scenario trivial)`,
+    verdict('keep', free === 0, `falling back into the Hornburg in the first second, against holding the wall: ${rows.join(' · ')}`,
       `the horde comes round through the Deep for the postern: most attackers in the Deep at once ${doors.map((d) => d.deep).join(', ')} · postern ${doors.map((d) => d.post).join(', ')} · gate ${doors.map((d) => d.gate).join(', ')} · door ${doors.map((d) => d.door).join(', ')}`, true);
   }],
   deep: ['Given an empty wall, the horde comes round through the Deep; while the wall is manned it does not', () => {
