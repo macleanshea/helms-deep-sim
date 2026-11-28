@@ -13,9 +13,11 @@ import { directorMethods } from './director.js';
 import { warlordMethods } from './warlord.js';
 import { engineMethods } from './engines.js';
 import { postMethods } from './posts.js';
+import { companyMethods } from './company.js';
 import { LAYOUT } from '../layout.js';
 
 const AP = LAYOUT.approach, PO = LAYOUT.posts; // the horde's lines and the garrison's places on this map
+const FAR_X = LAYOUT.wall.span[0] - 200;       // west of this an attacker is beyond effective rifle range of the wall
 export const MAX_UNITS = 1 << 16;
 const FINE = 2, FW = WORLD_W / FINE, FH = WORLD_H / FINE; // separation / blast grid
 const OCS = 16, OW = WORLD_W / OCS, OH = WORLD_H / OCS;   // coarse grid of attackers
@@ -143,6 +145,7 @@ export class Sim {
     this.defBox = [0, 0, 0, 0]; this.orcMaxX = 0;
     this.linkT = new Float32Array(N);
     this._bx = NaN; this._by = 0; this._bp = 0;
+    this._initCompanies();
     this._initMorale();
     this.miscGroup = [this.newGroup(DEF, true), this.newGroup(ORC, true)];
     // the defense is reported on by sector: three stretches of the Deeping Wall and the Hornburg
@@ -179,19 +182,32 @@ export class Sim {
     const n = Math.min(g.count, pos.length / 2);
     if (d.cls === C.OBST) { for (let k = 0; k < n; k++) this._addWork(d.ob, pos[k * 2], pos[k * 2 + 1], g.ang); return n; }
     if (!n) return 0;
-    const gid = this.newGroup(d.team, n < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
-    if (d.fearless) this.gFearless[gid] = 1;
-    this.gType[gid] = ti; this.gWave[gid] = g.phase || 0;
-    if (d.team === ORC) this._wlAdd(gid, g);
+    // the horde's foot and cavalry are drawn up by company: a large formation is several, side by side and in depth
+    const gx = atX === undefined ? g.x : atX;
+    const parts = this._formable(d) && n >= 8 ? this._companySplit(d, pos, n, Math.cos(g.ang), Math.sin(g.ang), gx, g.y) : [null];
     const face = d.team === DEF ? Math.PI : 0;
     let made = 0;
-    for (let k = 0; k < n; k++) {
-      // (a man put on a wall walk looks out over its parapet, whichever way that stretch of wall faces)
-      const sg = d.team === DEF ? this.mseg[this.map.cellOf(pos[k * 2], pos[k * 2 + 1])] : -1, out = sg >= 0 ? Math.atan2(this.segs[sg].ny, this.segs[sg].nx) : face;
-      const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], out + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
-      if (i < 0) break;
-      made++;
-      if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; if (d.crew) { this.cd2[i] = 0; this.eIdle[i] = this.time; } }
+    for (const part of parts) {
+      const cnt = part ? part.length : n;
+      const gid = this.newGroup(d.team, cnt < 5 || d.sz > 0 || d.cmd || (d.team === DEF && d.cls !== C.INF));
+      if (d.fearless) this.gFearless[gid] = 1;
+      this.gType[gid] = ti; this.gWave[gid] = g.phase || 0;
+      if (d.team === ORC) {
+        let cy = g.y;
+        if (part && parts.length > 1) { cy = 0; for (const k of part) cy += pos[k * 2 + 1]; cy /= cnt; }
+        this._wlAdd(gid, part && parts.length > 1 ? { ...g, y: cy, count: cnt } : g);
+      }
+      const list = [];
+      for (let q = 0; q < cnt; q++) {
+        const k = part ? part[q] : q;
+        // (a man put on a wall walk looks out over its parapet, whichever way that stretch of wall faces)
+        const sg = d.team === DEF ? this.mseg[this.map.cellOf(pos[k * 2], pos[k * 2 + 1])] : -1, out = sg >= 0 ? Math.atan2(this.segs[sg].ny, this.segs[sg].nx) : face;
+        const i = this.spawn(ti, pos[k * 2], pos[k * 2 + 1], out + (marching ? 0 : (this.rand() - 0.5) * 0.3), gid);
+        if (i < 0) break;
+        made++; list.push(i);
+        if (d.team === ORC) { this.state[i] = !marching && g.delay > 0 ? S_WAIT : S_MOVE; this.aux[i] = marching ? 0 : g.delay || 0; this.linkT[i] = this.time; if (d.crew) { this.cd2[i] = 0; this.eIdle[i] = this.time; } }
+      }
+      if (part) { this._formCompany(gid, list, 1, 0); this.gWaitT[gid] = !marching && g.delay > 0 ? g.delay : 0; }
     }
     return made;
   }
@@ -285,6 +301,7 @@ export class Sim {
     }
     if (team === ORC) {
       if (!silent) {
+        if (w && x < FAR_X) this.wl.lossFar[w.acc !== undefined ? 0 : 1]++; // what is hurting the horde out beyond rifle range: bullets, or blast
         this.stats.kills[key] = (this.stats.kills[key] || 0) + 1;
         this.stats.lostOrc[d.key] = (this.stats.lostOrc[d.key] || 0) + 1;
         if (this.bountyUnit && BOUNTY[d.key]) {
@@ -344,12 +361,13 @@ export class Sim {
     }
   }
 
-  canEnter(cf, ct, sz, orc) {
+  canEnter(cf, ct, sz, orc, raw) {
     const mt = this.mtype[ct];
     if (mt === T.CLIFF) return false;
     let et, ef;
-    // (standing wire bars the horde, whatever its size, until a way is cut; the garrison knows the paths through its own)
-    if (orc) { if (this.orcBlock[ct] || ((this.ob[ct] & OB.WIRE) && !(this.ob[cf] & OB.WIRE))) return false; et = this.elev[ct]; ef = this.elev[cf]; } else { et = this.elevD[ct]; ef = this.elevD[cf]; }
+    // (standing wire bars the horde, whatever its size, until a way is cut; the garrison knows the paths through its own.
+    // `raw`: the lie of the ground alone, as if the wire were not there)
+    if (orc) { if (this.orcBlock[ct] || (!raw && (this.ob[ct] & OB.WIRE) && !(this.ob[cf] & OB.WIRE))) return false; et = this.elev[ct]; ef = this.elev[cf]; } else { et = this.elevD[ct]; ef = this.elevD[cf]; }
     if (et === ef) {
       if (et) return true;
       const dz = this.cz[ct] - this.cz[cf];
@@ -398,7 +416,7 @@ export class Sim {
     if ((ph & 1) === 0 && ((ph & 2) === 0 || this.sepx[i] !== 0 || this.sepy[i] !== 0)) {
       let sx = 0, sy = 0, cnt = 0;
       const ri = this.rad[i], head = this.head, next = this.next, X = this.x, Y = this.y, RAD = this.rad, EL = this.el, ei = EL[i];
-      const gap = this.gOpen[this.grp[i]] && !ei ? 1.5 : 0.42; // a company in open order keeps wide intervals
+      const gi = this.grp[i], gap = ei ? 0.42 : this.gOpen[gi] ? 1.5 : this.gShield[gi] ? 0.26 : 0.42; // a company in open order keeps wide intervals; behind locked shields it stands close
       const y0 = fy > 0 ? fy - 1 : 0, y1 = fy < FH - 1 ? fy + 1 : FH - 1, x0 = fx > 0 ? fx - 1 : 0, x1 = fx < FW - 1 ? fx + 1 : FW - 1;
       for (let cy = y0; cy <= y1 && cnt < 26; cy++) {
         for (let cx = x0; cx <= x1; cx++) {
@@ -707,6 +725,7 @@ export class Sim {
     if ((this.navDirty && this.tick - this.lastNav >= 10) || this.tick - this.lastNav >= 20) this._nav();
     const { alive, team, px, py, x, y } = this;
     this._crewTick();
+    this._companies();
     for (let i = 0, n = this.n; i < n; i++) {
       if (!alive[i]) continue;
       px[i] = x[i]; py[i] = y[i];
@@ -856,23 +875,29 @@ export class Sim {
       else { this.vx[i] *= 0.6; this.vy[i] *= 0.6; }
       return;
     }
+    // closing up at the forming-up line: whoever is not in a company's ranks (ladder crews, trolls, sappers) waits there
+    // with them. Towers, rams and catapults roll on: they are the slow ones the rest are waiting for.
+    if (!el && st === S_MOVE && !this.gForm[g] && x >= this.wl.formX - (i % 5) * 3 && x < this.wl.formX + 50 && this._forming(g) && d.role !== R.TOWER && d.role !== R.RAM && d.role !== R.CATAPULT && !d.cmd && !d.cav) { this.vx[i] *= 0.5; this.vy[i] *= 0.5; return; }
     const shut = this.gShield[g] !== 0 || this.time < this.gShieldT[g]; // shields locked, or still coming down
     if (this.gShield[g]) speed *= 0.7;
     else if (x > this.gCapX[g] && speed > 3.3) speed = 3.3; // keeping behind the shield wall
     if (d.cmd && !el && this._captain(i, d, g, x, y, speed)) return;
     // (on a wall walk the fight there leads, except for those coming round to the postern: they go down into the Deep)
     const fld = this.gField[g] && (!el || this._viaDeep(g)) ? this._fieldFor(g, c, d.sz > 0) : this.orcDir;
+    // in ranks: 1 on the march, 3 halted at a stand-off (see company.js); 0 when every man acts for himself
+    const fm = el || this.gFree[g] || this.gForm[g] === 2 ? 0 : this.gForm[g];
     switch (d.role) {
       case R.ARCHER: {
         let t = this.target[i];
         const w = d.wdef;
+        if (fm === 1) t = this.target[i] = -1; // on the march nobody stops to shoot
         if (t >= 0) {
           if (this.alive[t] && this.team[t] === DEF) {
             const dx = this.x[t] - x, dy = this.y[t] - y, d2 = dx * dx + dy * dy;
             if (d2 <= w.range * w.range) {
               this.vx[i] *= 0.5; this.vy[i] *= 0.5;
               if (this.cd[i] <= 0 && pin < 2) {
-                this.cd[i] = w.reload * (0.8 + 0.4 * this.rand()); this.fireT[i] = this.time;
+                this.cd[i] = w.reload * (0.8 + 0.4 * this.rand()); this.fireT[i] = this.time; this.gFireT[g] = this.time;
                 this.rot[i] = Math.atan2(dy, dx);
                 let acc = w.acc; if (this.el[t] && !el) acc *= 0.22;
                 { const pt = this.gPin[this.grp[t]]; if (pt) acc *= pt === 2 ? 0.25 : 0.5; } // men keeping their heads down are hard to hit
@@ -887,7 +912,7 @@ export class Sim {
           }
           this.target[i] = t = -1;
         }
-        if ((this.tick + i) % 12 === 0) {
+        if (fm !== 1 && (this.tick + i) % 12 === 0) {
           const b = this.defBox, rg = w.range;
           if (x > b[0] - rg && x < b[2] + rg && y > b[1] - rg && y < b[3] + rg) {
             t = this._findDefInRange(x, y, rg * 0.92, el);
@@ -895,6 +920,7 @@ export class Sim {
           }
         }
         let blk = -1;
+        if (fm && this.snagT[i] <= this.time) { this._formStep(i, d, g, x, y, speed); return; }
         if (this._flow(x, y, fld)) blk = this._move(i, this.fdx, this.fdy, speed, 0, 0); else this._move(i, 0, 0, 0, 0, 0);
         if (blk >= 0 && this.lad[blk] && !el) this._startClimb(i, blk);
         return;
@@ -923,6 +949,7 @@ export class Sim {
             if (d2 < (7 + tr) * (7 + tr)) { const l = Math.sqrt(d2); dirx = dx / l; diry = dy / l; direct = true; }
           }
         }
+        if (fm && !direct && this.snagT[i] <= this.time) { this._formStep(i, d, g, x, y, speed); return; }
         if (!el && !d.sz && ((this.tick + i) & 63) === 0) {
           // a man who has got nowhere in six seconds, with nobody to fight, has lost the way: for a while
           // he makes straight for where his force is bound instead of following the path
@@ -1991,4 +2018,4 @@ export class Sim {
   }
 }
 
-Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods);
+Object.assign(Sim.prototype, supportMethods, moraleMethods, directorMethods, warlordMethods, engineMethods, postMethods, companyMethods);

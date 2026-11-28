@@ -40,6 +40,7 @@ export const moraleMethods = {
     const g = this.ng < MAXG - 1 ? this.ng++ : MAXG - 1;
     this.gTeam[g] = team; this.gExempt[g] = exempt ? 1 : 0; this.gState[g] = G_OK; this.gMorale[g] = 100;
     this.gSup[g] = 0; this.gPin[g] = 0; this.gFearless[g] = 0;
+    this.gForm[g] = 0; this.gFree[g] = 0; this.gWaitT[g] = 0; this.gAimX[g] = -1; this.gAimU[g] = -1;
     this.gForce[g] = -1; this.gOrder[g] = 0; this.gField[g] = 0; this.gShield[g] = 0; this.gShieldT[g] = 0; this.gOpen[g] = 0; this.gCapX[g] = 1e9; this.gRallyX[g] = -1;
     return g;
   },
