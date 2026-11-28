@@ -25,7 +25,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { buildMap } from '../src/map.js';
-import { groupPositions } from '../src/scenarios.js';
+import { groupPositions, buildPreset, makeGroup, PRESETS, forceCost } from '../src/scenarios.js';
+import { autopilot } from './autopilot.js';
+import { mulberry } from '../src/rng.js';
+import { LAYOUT } from '../src/layout.js';
 import { Sim } from '../src/sim/sim.js';
 import { DEF, ORC, UNITS, U, C, DEFAULT_OPTIONS } from '../src/config.js';
 
@@ -66,8 +69,8 @@ export function experiments(sets, seeds) {
   }
   if (sets.includes('marginal')) {
     for (const p of ['escalade', 'siege']) {
-      push({ set: 'marginal', setting: 'wall', def: BASE, orc: pack(p, 3000), pack: p, key: 'base' });
-      for (const a of ADD) push({ set: 'marginal', setting: 'wall', def: [...BASE, [a, Math.max(1, Math.round(400 / UNITS[U[a]].cost))]], orc: pack(p, 3000), pack: p, key: a });
+      push({ set: 'marginal', setting: 'wall', def: BASE, orc: pack(p, 5500), pack: p, key: 'base' });
+      for (const a of ADD) push({ set: 'marginal', setting: 'wall', def: [...BASE, [a, Math.max(1, Math.round(400 / UNITS[U[a]].cost))]], orc: pack(p, 5500), pack: p, key: a });
     }
   }
   if (sets.includes('scale')) {
@@ -206,7 +209,7 @@ export function summarize(rows) {
   }
   const marg = rows.filter((r) => r.set === 'marginal');
   if (marg.length) {
-    L.push('## Marginal: a balanced 1,470 pt garrison on the wall, plus 400 pts of one thing', '', 'Against 3,000 threat points. Change from the garrison alone.', '', '| added | attack | held | stopped | survived | change in stopped | change in survived |', '| --- | --- | --- | --- | --- | --- | --- |');
+    L.push('## Marginal: a balanced 1,510 pt garrison on the wall, plus 400 pts of one thing', '', 'Against 5,500 threat points. Change from the garrison alone.', '', '| added | attack | held | stopped | survived | change in stopped | change in survived |', '| --- | --- | --- | --- | --- | --- | --- |');
     for (const p of [...new Set(marg.map((r) => r.pack))]) {
       const base = marg.filter((r) => r.pack === p && r.key === 'base'), b0 = mean(base.map((r) => r.stop)), s0 = mean(base.map((r) => r.surv));
       for (const k of [...new Set(marg.filter((r) => r.pack === p).map((r) => r.key))]) {
@@ -235,9 +238,94 @@ export function summarize(rows) {
   return L.join('\n');
 }
 
+// --------------------------------------------------------- garrison search
+// A Build challenge played many times, each with a garrison drawn at random within its budget: how much of the
+// budget goes to each kind, where the wall troops stand, and what is laid in front. Each is fought by the stand-in
+// commander (tools/autopilot.js) on two seeds. What the strong garrisons have in common is the answer to "does the mix
+// matter, and which mix?".
+const SEARCH_TYPES = ['rifle', 'mg', 'grenadier', 'marksman', 'at', 'mortar', 'howitzer', 'ifv', 'tank', 'cache', 'cmd', 'wire', 'mine', 'claymore', 'hedgehog'];
+
+/** A random garrison for a challenge within `budget`: { shares, groups }. */
+export function randomGarrison(key, budget, seed) {
+  if (!map) map = buildMap();
+  const r = mulberry(seed * 7919 + 17), PO = LAYOUT.posts, V = Math.PI / 2;
+  // weights: riflemen always; each other kind in about half of all garrisons
+  const w = {};
+  for (const t of SEARCH_TYPES) w[t] = t === 'rifle' ? 1 + r() * 3 : r() < 0.5 ? r() * 1.5 : 0;
+  const sum = Object.values(w).reduce((a, b) => a + b, 0), count = {};
+  let left = budget;
+  for (const t of SEARCH_TYPES) { const c = UNITS[U[t]].cost, n = Math.floor((budget * w[t]) / sum / c); count[t] = n; left -= n * c; }
+  count.rifle += Math.floor(left / UNITS[U.rifle].cost);
+  const groups = [], spread = 0.25 + r() * 0.2; // how far either side of the middle of the wall the wall troops stand
+  const run = (t, n, a, b) => { if (n > 0) groups.push(makeGroup(t, n, map.wallAt((a + b) / 2).x, map.wallAt((a + b) / 2).y, V, 0, { run: { wall: 0, a, b } })); };
+  const reserve = Math.floor(count.rifle * r() * 0.3);
+  for (const t of ['rifle', 'mg', 'grenadier', 'marksman', 'at']) {
+    const n = t === 'rifle' ? count.rifle - reserve : count[t];
+    // split into three stretches along the wall, so the line is not one heap
+    for (let k = 0; k < 3; k++) { const a = 0.5 - spread + (k * 2 * spread) / 3, b = a + (2 * spread) / 3; run(t, Math.round((n * (k + 1)) / 3) - Math.round((n * k) / 3), a, b); }
+  }
+  if (reserve) groups.push(makeGroup('rifle', reserve, PO.reserve[0], PO.reserve[1], V, 30));
+  if (count.mortar) groups.push(makeGroup('mortar', count.mortar, PO.deepMortars[0], PO.deepMortars[1], V, 60));
+  if (count.howitzer) groups.push(makeGroup('howitzer', count.howitzer, PO.deepHowitzers[0], PO.deepHowitzers[1], V, 40));
+  if (count.ifv) groups.push(makeGroup('ifv', count.ifv, PO.ifvDeep[0], PO.ifvDeep[1], V, 30));
+  if (count.tank) groups.push(makeGroup('tank', count.tank, PO.tankDeep[0], PO.tankDeep[1], V, 30));
+  for (let k = 0; k < count.cache; k++) { const p = map.wallAt(0.25 + (0.5 * (k + 0.5)) / count.cache); groups.push(makeGroup('cache', 1, p.x + 26, p.y)); }
+  for (let k = 0; k < count.cmd; k++) { const p = map.wallAt(0.3 + (0.4 * (k + 0.5)) / count.cmd); groups.push(makeGroup('cmd', 1, p.x, p.y)); }
+  const front = (t, n, off) => { if (n <= 0) return; const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } groups.push(makeGroup(t, n, p.x + nx * off, p.y + ny * off, p.ang, 0, {})); };
+  if (count.wire) { const g = makeGroup('wire', 1e4, 0, 0, 0, 0); const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } Object.assign(g, { x: p.x + nx * 60, y: p.y + ny * 60, ang: p.ang, w: Math.min(360, count.wire * 4) }); g.count = groupPositions(map, g).length / 2; groups.push(g); }
+  if (count.hedgehog) { const g = makeGroup('hedgehog', 1e4, 0, 0, 0, 0); const p = map.wallAt(0.5); let nx = p.ty, ny = -p.tx; if (nx > 0) { nx = -nx; ny = -ny; } Object.assign(g, { x: p.x + nx * 40, y: p.y + ny * 40, ang: p.ang, w: Math.min(360, count.hedgehog * 4) }); g.count = groupPositions(map, g).length / 2; groups.push(g); }
+  front('mine', count.mine, 92); front('claymore', count.claymore, 28);
+  // obstacle lines are paid for as laid: trim riflemen if that ran over
+  let over = forceCost(groups) - budget;
+  for (const g of groups) { if (over <= 0) break; if (g.type !== 'rifle') continue; const cut = Math.min(g.count - 1, Math.ceil(over / 10)); g.count -= cut; over -= cut * 10; }
+  const spent = forceCost(groups), shares = {};
+  for (const g of groups) shares[g.type] = (shares[g.type] || 0) + (UNITS[U[g.type]].cost * g.count) / spent;
+  return { shares, groups, spread, reserve };
+}
+
+/** Fight one searched garrison on one seed with the stand-in commander. */
+export function runSearch(e) {
+  if (!map) map = buildMap();
+  const setup = buildPreset(map, e.preset, false, 'empty');
+  const gar = randomGarrison(e.preset, setup.budget, e.g);
+  setup.groups = setup.groups.concat(gar.groups);
+  setup.options.seed = e.seed;
+  const sim = new Sim(map, setup, null), pilot = autopilot(sim, 'auto');
+  while (!sim.result) { sim.step(); pilot.step(); sim.events.length = 0; }
+  return { preset: e.preset, g: e.g, seed: e.seed, win: sim.result.win ? 1 : 0, t: Math.round(sim.time), surv: +(sim.defCombat / Math.max(1, sim.initial[0])).toFixed(3), spent: forceCost(gar.groups), shares: gar.shares, spread: +gar.spread.toFixed(2), reserve: gar.reserve };
+}
+
+/** Markdown summary of a garrison search. */
+export function summarizeSearch(rows) {
+  const by = new Map();
+  for (const r of rows) { const k = r.preset + '/' + r.g; (by.get(k) || by.set(k, []).get(k)).push(r); }
+  const gs = [...by.values()].map((q) => ({ preset: q[0].preset, g: q[0].g, shares: q[0].shares, spread: q[0].spread, win: q.reduce((a, r) => a + r.win, 0) / q.length, surv: q.reduce((a, r) => a + r.surv, 0) / q.length, t: q.reduce((a, r) => a + r.t, 0) / q.length }));
+  const L = [];
+  for (const preset of [...new Set(gs.map((g) => g.preset))]) {
+    const list = gs.filter((g) => g.preset === preset).sort((a, b) => b.win - a.win || b.surv - a.surv || b.t - a.t);
+    const score = (g) => g.win + g.surv * 0.5 + g.t / 2000;
+    L.push(`## ${preset}: ${list.length} garrisons`, '', `Held: ${list.filter((g) => g.win >= 0.5).length} of ${list.length}.`, '');
+    const fmtShares = (sh) => Object.entries(sh).sort((a, b) => b[1] - a[1]).map(([t, v]) => `${t} ${Math.round(v * 100)}`).join(', ');
+    L.push('| rank | held | left | lasted (s) | budget share by kind (%) |', '| --- | --- | --- | --- | --- |');
+    list.forEach((g, k) => { if (k < 8 || k >= list.length - 4) L.push(`| ${k + 1} | ${Math.round(g.win * 100)}% | ${Math.round(g.surv * 100)}% | ${Math.round(g.t)} | ${fmtShares(g.shares)} |`); });
+    // what the share of each kind does: correlation of share with the outcome
+    L.push('', '| kind | in garrisons | correlation of its share with the outcome |', '| --- | --- | --- |');
+    const ys = list.map(score), my = ys.reduce((a, b) => a + b, 0) / ys.length;
+    for (const t of SEARCH_TYPES) {
+      const xs = list.map((g) => g.shares[t] || 0), mx = xs.reduce((a, b) => a + b, 0) / xs.length;
+      let sxy = 0, sxx = 0, syy = 0;
+      for (let k = 0; k < xs.length; k++) { sxy += (xs[k] - mx) * (ys[k] - my); sxx += (xs[k] - mx) ** 2; syy += (ys[k] - my) ** 2; }
+      const c = sxx && syy ? sxy / Math.sqrt(sxx * syy) : 0;
+      L.push(`| ${t} | ${xs.filter((x) => x > 0).length} | ${c >= 0 ? '+' : ''}${c.toFixed(2)} |`);
+    }
+    L.push('');
+  }
+  return L.join('\n');
+}
+
 // ----------------------------------------------------------------------- main
 if (!isMainThread) {
-  parentPort.on('message', (e) => { try { parentPort.postMessage({ ok: true, r: runExperiment(e) }); } catch (err) { parentPort.postMessage({ ok: false, err: String(err && err.stack || err), e }); } });
+  parentPort.on('message', (e) => { try { parentPort.postMessage({ ok: true, r: e.search ? runSearch(e) : runExperiment(e) }); } catch (err) { parentPort.postMessage({ ok: false, err: String(err && err.stack || err), e }); } });
 } else if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const args = process.argv.slice(2), get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
   const one = get('one', null);
@@ -254,7 +342,9 @@ if (!isMainThread) {
     console.log(runExperiment(e, shoot));
   } else {
     const sets = get('sets', 'duel,marginal,scale,threat').split(','), seeds = +get('seeds', 3), tag = get('tag', 'lab'), filter = get('filter', null);
-    let jobs = experiments(sets, seeds);
+    const search = get('search', null);
+    let jobs = search ? [] : experiments(sets, seeds);
+    if (search) for (const pk of search.split(',')) for (let g = 1; g <= +get('n', 40); g++) for (let sd = 1; sd <= +get('seeds', 2); sd++) jobs.push({ search: true, preset: pk, g, seed: sd });
     if (filter) jobs = jobs.filter((e) => JSON.stringify(e).includes(filter));
     if (args.includes('--list')) { const c = {}; for (const e of jobs) c[e.set] = (c[e.set] || 0) + 1; console.log(c, 'total', jobs.length); process.exit(0); }
     const N = Math.max(1, Math.min(+get('jobs', os.cpus().length), jobs.length)), rows = [], t0 = Date.now();
@@ -268,10 +358,10 @@ if (!isMainThread) {
       }
     });
     process.stderr.write('\n');
-    rows.sort((a, b) => JSON.stringify([a.set, a.setting, a.key, a.pack, a.k, a.n, a.tp, a.seed]).localeCompare(JSON.stringify([b.set, b.setting, b.key, b.pack, b.k, b.n, b.tp, b.seed])));
+    rows.sort((a, b) => JSON.stringify([a.set, a.setting, a.key, a.pack, a.k, a.n, a.tp, a.preset, a.g, a.seed]).localeCompare(JSON.stringify([b.set, b.setting, b.key, b.pack, b.k, b.n, b.tp, b.preset, b.g, b.seed])));
     fs.mkdirSync('lab-out', { recursive: true });
     fs.writeFileSync(path.join('lab-out', `${tag}.json`), JSON.stringify(rows));
-    const md = `# Lab results: ${tag}\n\n${rows.length} experiments (${failed} failed) in ${Math.round((Date.now() - t0) / 1000)} s.\n\n${summarize(rows)}`;
+    const md = `# Lab results: ${tag}\n\n${rows.length} experiments (${failed} failed) in ${Math.round((Date.now() - t0) / 1000)} s.\n\n${search ? summarizeSearch(rows) : summarize(rows)}`;
     const mdFile = get('md', null);
     if (mdFile) { fs.mkdirSync(path.dirname(mdFile), { recursive: true }); fs.writeFileSync(mdFile, md + '\n'); }
     console.log(md);

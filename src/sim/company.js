@@ -34,7 +34,7 @@ export const companyMethods = {
     this.gAx = f(); this.gAy = f(); this.gHx = f().fill(1); this.gHy = f(); this.gDx = f().fill(1); this.gDy = f();
     this.gHalfW = f(); this.gHalfW0 = f(); this.gDepth = f(); this.gDepth0 = f(); this.gWLim = f().fill(1e9); this.gShift = f();
     this.gAimX = f().fill(-1); this.gAimY = f(); this.gAimU = f().fill(-1); this.gStand = f(); this.gSpd = f(); this.gPace = f().fill(1); this.gDress = f().fill(1); this.gSeenD = f().fill(1e9);
-    this.gWaitT = f(); this.gFormT = f(); this.gFireT = f(); this.gSeenT = f().fill(-100); this.gHold = new Uint8Array(MAXG);
+    this.gWaitT = f(); this.gFormT = f(); this.gFireT = f(); this.gSeenT = f().fill(-100); this.gHold = new Uint8Array(MAXG); this.gStallT = f().fill(-1);
     // roll-call of the men in ranks: how far behind their places they are, on average (this tick / last tick)
     this.fAcc = f(); this.fN = new Int32Array(MAXG); this.fAccF = f(); this.fNF = new Int32Array(MAXG); this.gLag = f();
     this.fu = new Float32Array(this.alive.length); this.fv = new Float32Array(this.alive.length);
@@ -266,20 +266,26 @@ export const companyMethods = {
     // frontage the ground allows
     const s = this._boxScale(g), want = this.gHalfW0[g] * s * (this.gOpen[g] ? 1.2 : this.gShield[g] ? 0.8 : 1);
     this._companyWidth(g, want);
-    // keep station: not treading on the heels of a company marching ahead
+    // keep station: not treading on the heels of a company marching ahead. A follower closes to a few paces and then
+    // keeps the leader's pace; it never stops dead behind a company that is moving. Crossbows and berserkers, who are
+    // told to keep behind the leading shields, never hold up the companies that lead them.
     let pace = 1;
-    const Hx = this.gHx[g], Hy = this.gHy[g];
+    const Hx = this.gHx[g], Hy = this.gHy[g], tg = this.gType[g], myV = Math.max(1, d.speed);
     for (let h = 0; h < this.ng; h++) {
       if (h === g || this.gForm[h] !== F_MARCH || !this.gAlive[h] || this.gFree[h]) continue;
+      if (this.gCapX[h] < 1e8 && this.gCapX[g] > 1e8) continue;
       const ox = this.gAx[h] - x, oy = this.gAy[h] - y, al = ox * Hx + oy * Hy;
       if (al < 2 || al > this.gDepth[h] + 14) continue;
       const lat = Math.abs(-ox * Hy + oy * Hx);
       if (lat > (this.gHalfW[g] + this.gHalfW[h]) * 0.7) continue;
       if (this.gHx[h] * Hx + this.gHy[h] * Hy < 0.5) continue;
       const gap = al - this.gDepth[h]; // from my front rank to its rear rank
-      const p = gap < 2 ? 0.25 : gap < 12 ? 0.25 + 0.75 * (gap - 2) / 10 : 1;
+      if (gap > 10) continue;
+      const lead = Math.max(0.15, (this.gSpd[h] + (gap > 4 ? 0.4 : 0)) / myV);
+      const p = gap < 1 ? Math.min(lead, 0.2) : lead;
       if (p < pace) pace = p;
     }
+    void tg;
     this.gPace[g] = pace;
   },
 
@@ -289,16 +295,35 @@ export const companyMethods = {
     const wl = this.wl;
     // --- dressing: the leading companies of a force keep abreast of each other
     if (this.tick % 10 === 5) {
+      // the rearmost crewed ladder of each force, still on its way in (one pass over the engines)
+      const ladOf = this._ladOf || (this._ladOf = new Float32Array(4096));
+      ladOf.fill(-1, 0, wl.forces.length);
+      const lmin = UNITS[U.ladder].crew.min;
+      for (const e of this.engines) {
+        if (this.type[e] !== U.ladder || !this.alive[e] || this.state[e] !== 1 || this.crewPts[e] < lmin) continue;
+        const k = this.aux2[e], fi = this.gForce[this.grp[e]];
+        if (k < 0 || fi < 0) continue;
+        const r = Math.hypot(this.segs[k].ox - this.x[e], this.segs[k].oy - this.y[e]);
+        if (r > 260 && r > ladOf[fi]) ladOf[fi] = r; // (over the last stretch the ladders run, and keep up)
+      }
       for (const f of wl.forces) {
         if (f.reserve) continue;
         let sum = 0, n = 0;
         for (const g of f.groups) if (this.gForm[g] === F_MARCH && !this.gFree[g] && this.gType[g] === U.uruk && this.gAimX[g] >= 0 && this.gAlive[g] && this.time >= this.gWaitT[g]) { sum += Math.hypot(this.gAimX[g] - this.gAx[g], this.gAimY[g] - this.gAy[g]); n++; }
-        if (n < 2) { for (const g of f.groups) this.gDress[g] = 1; continue; }
-        const mean = sum / n;
+        // the ladders are carried inside the body of the force: the companies do not draw ahead of the last ladder that
+        // still has hands to carry it (one that has fallen far behind, or lies abandoned, is left to the next wave), once
+        // the wave has stepped off from its forming-up line
+        const off = wl.waveGo[f.wave] !== undefined && wl.waveGo[f.wave] >= 0;
+        let lad = off ? ladOf[f.id] : -1;
+        if (n && lad > sum / n + 150) lad = -1;
+        const mean = n ? sum / n : 0;
         for (const g of f.groups) {
-          if (this.gForm[g] !== F_MARCH || this.gType[g] !== U.uruk || this.gAimX[g] < 0) continue;
-          const rem = Math.hypot(this.gAimX[g] - this.gAx[g], this.gAimY[g] - this.gAy[g]), k = 1 + (rem - mean) / 90;
-          this.gDress[g] = k < 0.7 ? 0.7 : k > 1.12 ? 1.12 : k;
+          if (this.gForm[g] !== F_MARCH || this.gType[g] !== U.uruk || this.gAimX[g] < 0) { this.gDress[g] = 1; continue; }
+          const rem = Math.hypot(this.gAimX[g] - this.gAx[g], this.gAimY[g] - this.gAy[g]);
+          let k = n >= 2 ? 1 + (rem - mean) / 90 : 1;
+          k = k < 0.7 ? 0.7 : k > 1.12 ? 1.12 : k;
+          if (lad > 0 && rem < lad - 20 && rem > LOOSE_AT + 20) k = Math.min(k, Math.max(0.15, 1 - (lad - 20 - rem) / 25));
+          this.gDress[g] = k;
         }
       }
     }
@@ -344,6 +369,9 @@ export const companyMethods = {
       v *= this.gPace[g] * this.gDress[g] * turn;
       const lag = gLag[g];
       if (lag > 1.5) v *= lag > 6 ? 0 : 1 - (lag - 1.5) / 4.5;
+      // held up for long (at wire, in a crush): the ranks dissolve and every man works his own way through
+      if (lag > 4) { if (this.gStallT[g] < 0) this.gStallT[g] = this.time; else if (this.time - this.gStallT[g] > 15) { this.gForm[g] = F_LOOSE; this.gFormT[g] = this.time; this.gStallT[g] = -1; continue; } }
+      else this.gStallT[g] = -1;
       this.gSpd[g] += Math.max(-0.5, Math.min(0.25, v - this.gSpd[g]));
       v = this.gSpd[g];
       // --- step

@@ -594,8 +594,9 @@ export const warlordMethods = {
       if (!any) continue;
       if (at > 0 && wl.waveLineT[w] < 0) wl.waveLineT[w] = this.time;
       const since = wl.waveLineT[w] < 0 ? 0 : this.time - wl.waveLineT[w];
-      const up = !all || at >= 0.8 * all || since > 70;
-      const engines = slow <= body + 8 || since > 150;
+      // (a wave waits for its stragglers a minute at most, and for slow engines under a minute: they come up behind it)
+      const up = !all || at >= 0.8 * all || since > 50;
+      const engines = slow <= body + 8 || since > 45;
       if (up && engines) {
         wl.waveGo[w] = this.time;
         const plan = wl.plans[w], k = plan && plan.main >= 0 ? plan.main : -1;

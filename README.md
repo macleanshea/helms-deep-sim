@@ -38,18 +38,26 @@ its culvert.
 The welcome screen offers two ways to play; the **Sandbox / Challenge** switch in the top bar
 changes between them at any time.
 
-A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first). There are
-three, one to a difficulty:
+A **challenge** plays a scenario as designed (the Hornburg Garrison is loaded first). There are two
+kinds. In the first three the garrison is laid out for you, to learn the siege on; in the three marked
+**Build** the garrison starts empty and choosing it is the game: the horde is known in full (every
+wave and what is in it is listed on the right), the requisition budget is fixed, and what to bring
+and where to put it is yours to work out. **Load suggested garrison** puts down the garrison each
+Build challenge was measured with, to start from or to beat.
 
 | | Scenario | The night |
 | --- | --- | --- |
-| Easy | **First Night** | A company on the center of the wall against 3,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
+| Easy | **First Night** | A company on the center of the wall against 4,200 in three waves: ladders, a ram, sappers, one catapult. Ten minutes. |
 | Medium | **The Hornburg Garrison** | Five hundred behind wire and mines against 18,000 in four waves, with towers, trolls and catapults. Twenty minutes. |
 | Hard | **Three Hundred Rifles** | A rifle company with few heavy weapons against 10,000 in three waves. Fifteen minutes. |
+| Build · Medium | **The Escalade** | 6,500 in three waves with 30 ladders and many berserkers, and no engines. 2,600 pts. Twelve minutes. |
+| Build · Hard | **The Siege Train** | 8,000 with siege towers, rams, trolls, catapults and sappers. 4,100 pts. Fifteen minutes. |
+| Build · Hard | **The Flood** | 11,500 in four waves, nearly all on foot, with 60 ladders. 4,200 pts. Fifteen minutes. |
 
-In each the first wave is a real assault, not a probe, so the fight reaches the wall early, and a
-platoon is kept below the wall where the enemy cannot count it. Difficulty is measured, not
-guessed: see *Headless runs and balance* below.
+In each the first wave is a real assault, not a probe, so the fight reaches the wall early. Difficulty
+is measured, not guessed: see *Headless runs and balance* below. A Build challenge is tuned so that
+its suggested garrison holds with a careful commander about half the nights or more, while the
+same points spent on riflemen alone do not.
 
 
 - The enemy and the battle options are fixed. The garrison is issued at its full
@@ -80,6 +88,16 @@ are paced so the last wave has time to fight at the wall before dawn; cutting a 
 earns a lull (the next may step off up to a minute early). The top bar counts down to the
 next wave, and an alert names the stretch of wall it is aimed at.
 
+**The horde marches as a host.** Its foot and cavalry are drawn up in companies of about a hundred,
+and a company crosses the field as a block in ranks, not as a stream of men following one path: it
+wheels no faster than its outer flank can run, narrows into a column through a gap and opens out
+again, closes up behind locked shields and spreads out under shellfire, waits for men held up at the
+wire, and keeps station on the company ahead. The companies bound for one stretch of wall share it
+out between them, so they come on across a front. A wave halts at a forming-up line out of
+machine-gun range until it is all up, and goes in together. Close to the wall, or with an enemy at
+hand, the ranks break and every man fights for himself. The ladders are carried inside the body of
+the force and rushed over the last stretch.
+
 **The horde has a plan.** Each wave is split into task forces by lane, each with a captain and an
 objective: a third of the Deeping Wall, or the gate. Two forces of three go in against whichever
 sector looks weakest *from what the horde has seen* (heads counted on the wall once it is close
@@ -88,7 +106,24 @@ surprise, and the vanguard is a real probe. A force steps off together, with slo
 head start. Warg riders are held out of range until there is a breach, a fallen gate, or infantry
 caught outside the walls. A force that is spent before it has closed pulls back and comes on again
 with the next wave. A foothold on the wall, or a sector whose fire dies away, draws in whoever has
-not yet committed. Shortly before dawn everything left comes on at once.
+not yet committed. Orders are not instant: a force hears of a change of plan through its captains
+some seconds later, and a force that has lost its captains hears of it late. The horde learns, too:
+where shellfire has done most of the killing, the next wave comes on in open order and locks shields
+only once it is close; a stretch of wall it has seen wired is less likely to be the main effort.
+Shortly before dawn everything left comes on at once.
+
+**Your platoons.** Formations you put down side by side on the same level are one platoon (ten
+riflemen placed one by one along a wall are a section, not ten men); a platoon shares its morale and
+is selected with one click. On open ground or in a court it stands in a firing line facing the horde,
+up to three ranks deep, each rank offset so every man has a clear lane past the men in front. Sent
+somewhere, it forms the line again at the far end, facing the way it went; sent onto a wall walk, it
+lines the parapet. A platoon is on **auto** unless set to manual (`M`): on auto it turns its line to
+face attackers who have come round its flank, shifts along its wall to a stretch under attack when
+its own has gone quiet, goes up against a foothold or into the face of a breach when it is idle in
+reserve, walks back to the nearest ammo when nearly out and returns after, and holds its fire for
+closer, surer shots as its ammo runs down. On manual it holds the ground it was given and moves
+only when ordered. The remnant of a platoon that has lost three men in four joins the platoon beside
+it, and reinforcements landed by helicopter are one mixed platoon that forms a line on landing.
 
 Win by holding until the relief column arrives at dawn, or by breaking the horde (the white
 mark on its bar).
@@ -131,7 +166,8 @@ too, and hand-placed attacker formations take an "advance after" delay.
 | `H` Fire mode | Selected troops: fire at will, hold to 150 m, hold to 75 m, hold fire |
 | `G` | Jump to the latest alert (again for earlier ones) |
 | `L` Losses | Shows where units of each side have been knocked out |
-| Drag, double-click | Box-select defenders; double-click selects every unit of that kind in view |
+| Click, drag, double-click | Select a platoon; box-select defenders; double-click selects every unit of that kind in view |
+| `M` Auto or manual | Selected platoons act on their own, or hold until ordered |
 | Right-click, `X` | Move the selection; halt it |
 | `Shift+6`…`0`, `6`…`0` | Assign a control group; recall it (tap twice to look at it) |
 
@@ -298,8 +334,10 @@ npm run matrix                                        # every challenge x policy
 npm run checks                                        # does the siege behave? pass or fail, with numbers
 ```
 
-Presets are `first-night`, `garrison`, `three-hundred` and `empty`, plus `benchmark` (thirty
-thousand against a reinforced garrison, not offered in the game; `?bench` uses it). `--policy auto` plays
+Presets are `first-night`, `garrison`, `three-hundred`, the Build challenges `escalade`, `siege-train` and
+`flood` (played with their suggested garrison; `--garrison rifles` spends the budget on riflemen alone,
+`--garrison empty` brings nobody), and `empty`, plus `benchmark` (thirty thousand against a reinforced
+garrison, not offered in the game; `?bench` uses it). `--policy auto` plays
 a careful commander (resupplies dry sectors, strikes siege engines before they reach the wall,
 shells the thickest of the press) within the Command Point budget; `none` gives no orders.
 `--opt key=value` overrides any battle option (`sandbox=true` switches to per-kind support uses),
@@ -328,6 +366,22 @@ breaks the postern and the door from the wall, and pours into the court from two
 battles it loses Medium two nights in three and wins Hard with only a twentieth of the garrison
 left. Easy is still won with nearly everyone alive (its horde is too small to force the doors in
 time), so `npm run checks` still reports this as OPEN.
+
+**The lab.** `tools/lab.js` runs many small battles in parallel, each on the real map with nobody
+giving orders, to learn what each unit is worth against what and where: one kind of defender against
+one kind of attack on open ground, behind wire, at the head of the causeway and on the wall
+(`duel`); a balanced garrison plus 400 pts of one thing (`marginal`); 1 to 250 of one kind as a block
+or a line (`scale`); and the balanced garrison against equal "threat points" of each kind of attack
+(`threat`). 1,320 experiments take about ten minutes on four cores; the summaries are kept in
+`docs/lab/`. `tools/plot.js` draws a headless battle from above at chosen times, by unit, company or
+morale state, which is the quickest way to see how the two sides move.
+
+```bash
+node tools/lab.js --sets duel,marginal --seeds 3 --md docs/lab/run.md
+node tools/lab.js --one '{"setting":"open","def":[["rifle",120]],"orc":[["uruk",400]]}' --plot out --by company
+node tools/plot.js --preset garrison --at 60,120,240 --out out --by state
+node tools/headless.js --preset siege-train --garrison rifles --policy auto   # a Build challenge with the budget all in riflemen
+```
 
 **Guarding a change.** Three quicker tools say whether a change did what it meant to and nothing
 else: `npm run maplint` stands every preset's armies on the map and solves the paths the battle

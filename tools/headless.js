@@ -22,7 +22,7 @@ export function runBattle(cfg = {}) {
   const { preset = 'garrison', seed = 1, max = 2400, policy = 'none', opts = {}, hordeN = 0, log = null } = cfg;
   if (!PRESETS.some((p) => p.key === preset)) throw new Error(`unknown preset "${preset}" (try ${PRESETS.map((p) => p.key).join(', ')})`);
   const map = sharedMap || (sharedMap = buildMap());
-  const setup = buildPreset(map, preset, false);
+  const setup = buildPreset(map, preset, false, cfg.garrison || 'ref');
   if (hordeN) setup.groups = setup.groups.filter((g) => g.team === DEF).concat(horde(hordeN));
   setup.options.seed = seed;
   for (const [k, v] of Object.entries(opts)) {
@@ -115,6 +115,7 @@ function parseArgs(argv) {
     else if (k === 'seed') cfg.seed = +v;
     else if (k === 'max') cfg.max = +v;
     else if (k === 'horde') cfg.hordeN = +v;
+    else if (k === 'garrison') cfg.garrison = v;
     else throw new Error(`unknown flag --${k}`);
   }
   if (pos[0]) cfg.preset = pos[0];

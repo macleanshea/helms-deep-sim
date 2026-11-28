@@ -124,66 +124,126 @@ New module, mixed into `Sim.prototype`.
 - **Wire the horde has seen** counts against a sector when the main effort is chosen.
 - Shield walls also form against troops the company can see in the open, not only near the walls.
 
-## 5. Measurements of the current code
+## 5. Fixes to the first pass
 
-### Behavior checks (`npm run checks`), run with the formation layer before the command changes
+The first pass (PR part 1) left the horde reaching the wall far too late. Traced with `tools/plot.js` and
+small probes of company state:
 
-21 of 25 pass. Failing:
+- **Station-keeping jammed the column.** Uruk companies slowed for the crossbow and berserker companies
+  ahead of them, which were themselves held behind the leading Uruk; the whole force crept at 30–40% pace.
+  Now companies that are told to trail never hold up the ones they trail, and a follower matches the speed
+  of the company ahead instead of stopping behind it.
+- **Waves waited for their rams.** The forming-up line waited until towers and rams could arrive with the
+  body; a ram is slow, so waves sat for 90 s. The wait is now capped at 45 s (50 s for stragglers): engines
+  come up behind.
+- **Ladders and their escort deadlocked.** The ladders waited at the forming-up line for the companies, and
+  the companies would not get ahead of the ladders. The escort now applies only once the wave has stepped
+  off.
+- **Ladder crews were shot to pieces at a crawl.** Each replacement carrier held the ladder up 2.5 s.
+  Ladders now rush the last 250 m (no shield-wall pace cap, 1.2 s to take hold), and the escort no longer
+  holds companies back for a ladder that is rushing.
+- **Companies stood at the wire for minutes.** A company held up for 15 s now breaks ranks and its men
+  work through on their own (the old `stuck` failure).
+- **Rout cascades.** With about four times as many companies, the shock a breaking company gave every
+  neighbor (−8 morale within 140 m) swept whole waves away. It is now scaled by the size of the broken
+  company against its neighbor.
 
-- **catapults**: share of defender losses to catapult rocks 58% and 52% in two Medium/Hard battles (limit
-  50%). Slower contact means the catapults have longer to work before the foot arrives.
-- **stuck**: 126 foot soldiers stood still a minute or more with a clear way (limit 150, passes), but the
-  longest was 200 s (limit 120). All in the Medium battles: companies waiting on men caught at the wire.
-- **deep**: after an immediate fall-back to the keep, 3 of 9 battles never sent a force round for the
-  postern. The forces now take the order late.
-- **keep** (already open before this work): falling back at once is now an easy win on all three levels.
+## 6. Defenders: platoons (`src/sim/platoon.js`, new)
 
-### Challenge matrix on the current code (`node tools/matrix.js --seeds 2`)
+- **Platoons.** At the start of a battle, formations of direct-fire foot placed within 4 m of each other on
+  the same level (and the same court of the Hornburg) are joined, up to 80 men. Mortars stay in their
+  batteries; commanders stay alone. A platoon shares morale, and a click on any man selects all of it.
+- **Firing lines.** A platoon on open ground or in a court is drawn up (before the battle, so the setup
+  view shows it) in a line facing the nearest mass of attackers, or down the valley: up to three ranks,
+  1.6 m files, each rank offset a third of a file, so every man has a clear lane past the men in front
+  (the existing lines-of-fire rules in `posts.js` then give prone, kneeling and standing). 250 riflemen make
+  a line about 130 m long rather than a square in which most cannot fire.
+- **Moving.** `orderMove` now forms the same line at the destination facing the way the platoon went, or,
+  when the point is on a wall walk, lines the parapet nearest the click (front rank first). Men are matched
+  to places in order along the line, so nobody crosses his neighbors. Vehicles still form a block.
+- **Auto and manual** (`M`, shown in the selection panel). On auto, a platoon:
+  - turns its line to face attackers who have come round its flank;
+  - on a wall, with nothing to shoot for 10 s, shifts along the wall (25–110 m) to the stretch with the
+    most attackers and ladders at its foot and the fewest defenders;
+  - in reserve on the ground and idle, moves to a firing position 50 m short of attackers who have got
+    inside the works (a foothold, a breach) within 250 m (alert "Reserve moving to engage");
+  - below 15% ammo, walks to within re-arming reach of the nearest cache within 300 m, and returns to its
+    post when above 80% (alert "Platoon going back for ammo");
+  - keeps fire discipline by itself: holds to 150 m below 60% ammo and to 75 m below 30% (the player's
+    own fire mode still applies, and the closer of the two wins);
+  - goes back to its post after 30 s with nothing to shoot.
+  Auto moves cost a path solve each, so the whole garrison is limited to two a second. On manual, a
+  platoon holds the ground it was given.
+- **Remnants** of a platoon that has lost three men in four join the nearest platoon on their level
+  within 30 m.
+- **Reinforcements** landed by helicopter are one mixed platoon that forms a firing line on landing.
 
-| | No orders | Stand-in commander |
+## 7. Rebalance
+
+From the baseline lab, then checked with `docs/lab/after1.md` (run part-way through these changes) and
+the challenge matrix:
+
+| Unit | Change | Why |
 | --- | --- | --- |
-| Easy | **won 2/2** (was 0/5), 81% left | won 2/2, 100% left |
-| Medium | lost 2/2 | **won 2/2** (was 3/5), 79% left |
-| Hard | lost 2/2 | **won 2/2** (was 2/5), 57% left |
+| Anti-Armor Gunner | With no troll or engine in reach, fires a high-explosive rocket (300 damage, 4.5 m) into a cell of 7+ attackers; 10 rockets instead of 8 | Never paid for itself: 0.05–0.41 threat stopped per point, wiped out in two thirds of its duels. After: 1.3–1.6 (measured with the full warhead, since reduced) |
+| Rifleman | Hit chance 0.6 close (was 0.55), 0.21 at full range (was 0.18) | The weakest infantry per point (about 1.1). After: 1.04–1.60 |
+| Marksman | 35 pts (was 25); reach 300 m (was 360); 35% at full range (was 75%) | The best value of all, and four of them killed 207 ladder carriers in one battle, out to 400 m at night |
+| Wire | A man on foot tears at it two ticks in five, and not at all while his company is pinned | Companies now meet wire on a frontage, many men at once: wire bought nothing |
+| Ammo Cache | unchanged | It flips the marginal set from loss to win (+48 to +52 stopped): ammo is the garrison's real limit, and the challenges reward bringing it |
 
-First contact at the wall moved from about 0.28 to 0.80 of the night on Easy, and from 0.55 to 0.93 on
-Medium with the stand-in. **The challenges are now too easy**: the waves spend too long forming up and
-the wall is reached too late. This is the first thing to fix (section 6). Golden hashes are expected to
-differ: the rules changed on purpose and have not been re-recorded.
+The `marginal` set now uses 5,500 threat points (at 3,000 the base garrison always won, so every
+addition read +0).
 
-### Tools added
+## 8. Challenges
 
-- `tools/plot.js`: top-down PNGs of a headless battle at chosen times, colored by unit type, company or
-  morale state, with wire, ladders and breaches. No browser, no dependencies (writes PNG itself).
-- `tools/lab.js`: section 2.
+- The three laid-out challenges stay as the way in (First Night is the tutorial). First Night's horde is
+  4,200 (was 3,200): with the new movement the old one was won with no orders given.
+- Three **Build** challenges are new: the garrison starts empty, the requisition budget is fixed, and the
+  horde is known in full (the order of attack is listed wave by wave). Each has a suggested garrison
+  (**Load suggested garrison**) that its difficulty was measured with.
+  - **The Escalade** (Medium): 6,500 with 30 ladders and many berserkers, no engines. 2,600 pts.
+  - **The Siege Train** (Hard): 8,000 with 4 towers, 2 rams, 14 trolls, 8 catapults, 8 sappers. 4,100 pts.
+  - **The Flood** (Hard): 11,500 in 4 waves, nearly all on foot, 60 ladders. 4,200 pts.
+- `tools/headless.js --garrison ref|rifles|empty` plays a Build challenge with its suggested garrison, the
+  whole budget in riflemen, or nobody; `tools/matrix.js` runs all six challenges and passes `--garrison` on.
 
-## 6. Planned next, and open problems
+### Challenge matrix (`node tools/matrix.js --seeds 3`)
 
-Horde:
+| Challenge | No orders | Stand-in commander |
+| --- | --- | --- |
+| First Night (Easy) | won 1/3, late; 0% left | won 3/3, 88% left |
+| The Hornburg Garrison (Medium) | lost 3/3 | won 2/3, 42% left |
+| Three Hundred Rifles (Hard) | lost 3/3 | won 2/3, 19% left |
+| The Escalade (Build · Medium) | lost 3/3 | won 3/3, 7% left |
+| The Siege Train (Build · Hard) | won 1/3, 0% left | won 2/3, 16% left |
+| The Flood (Build · Hard) | lost 3/3 | won 2/3, 6% left |
 
-- Shorten the forming-up halt (a time limit tied to the director's schedule, so the last wave still
-  lands before dawn) and re-tune wave release so first contact returns to roughly a quarter of the night.
-- Wire: companies held at a belt should cut on a frontage (several men abreast) rather than a few, and
-  give up their places to the cutters; fixes the 200 s stuck case.
-- Crossbows should give real covering fire on the wall while the ladders go up, timed to the assault.
-- Feints and a visible reserve; sallies answered.
+First contact at the wall is back to 0.30–0.65 of the night (it had slipped to 0.80–0.93).
 
-Defenders (not started):
+### Does the mix matter? (`--garrison rifles`, the stand-in commander, 2 seeds)
 
-- **Platoons**: adjacent placements of the same kind merge into a platoon; a platoon deploys into a
-  firing line where every man has a line of fire (on the flat, a two- or three-rank line along the
-  threat axis; on a wall, the parapet first), and keeps it when moved.
-- **Auto and manual modes**: in auto, a platoon chooses its own targets and shifts along a wall or a
-  line to cover a threat, plugs a gap, re-arms at the nearest cache, and falls back under a set rule; in
-  manual, it holds its ground and fires on what is in its arc.
-- Reinforcements land as a **mixed platoon** that forms a line on landing.
+| Challenge | Suggested garrison | The same budget in riflemen alone |
+| --- | --- | --- |
+| The Escalade | won 3/3, 7% left | won 1/2, 29% left |
+| The Siege Train | won 2/3, 16% left | won 1/2, 13% left |
+| The Flood | won 2/3, 6% left | lost 2/2 |
 
-Balance (from the lab): make the anti-armor gunner a general-purpose rocket team (high explosive at
-foot when no armor is in range) or fold it into the grenadier; raise the rifleman's value (cheaper, or
-more accurate at mid range); bring the marksman down; re-size the `marginal` set so it discriminates;
-then run the lab again (1,000+ experiments) and record `docs/lab/after.md`.
+Only the Flood clearly punishes a garrison of riflemen alone. On the Escalade and the Siege Train the
+suggested garrisons are no better than riflemen. Either the suggested garrisons are far from the best
+(likely: they were written by hand, and the Siege Train's spends 860 pts on a tank and two howitzers),
+or the rifle buff went too far, or both. The next step is to search for strong garrisons with the lab
+(many permutations per challenge) and set each challenge so that a good mix wins clearly and a naive
+one does not.
 
-Challenges: let the player design the garrison against a known horde with a budget (the stock layout
-kept as a tutorial and as a reference deployment), measured with the lab's reference deployments.
+### Performance
 
-UI: platoon selection and the auto/manual toggle; README and checks updated; golden hashes re-recorded.
+Like for like on the Medium battle's first 700 s, alone on one core: 2.25 ms a step before, 2.64 ms after
+(+17%), with the same worst step (52 ms). Profiled: movement, the path solves and the soldiers' own update
+dominate as before; the company layer (`_formStep`, `_walkLine`, `_companyThink`) is about 9%.
+
+## 9. Still open
+
+- Golden hashes have to be re-recorded once the rules settle.
+- Crossbows halt at volley range but do not yet time their volleys to the ladders going up.
+- Feints and a visible reserve for the horde; answering a sally.
+- The `rifles` yardstick and the behavior checks are reported in the pull request.

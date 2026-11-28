@@ -118,7 +118,7 @@ export const moraleMethods = {
       for (let h = 0; h < this.ng; h++) {
         if (h === g || this.gTeam[h] !== ORC || this.gExempt[h] || this.gState[h] >= G_ROUT) continue;
         const dx = this.gCx[h] - this.gCx[g], dy = this.gCy[h] - this.gCy[g];
-        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8));
+        if (dx * dx + dy * dy < 140 * 140) this.gMorale[h] = Math.max(0, this.gMorale[h] - (this.gInsp[h] ? 2 : 8) * Math.min(1, cnt / Math.max(1, this.gAlive[h]))); // (a small party running shakes a big company less)
       }
       this._brokeN = (this._brokeN || 0) + 1;
       if (this.time > this._moraleLogT[0]) {

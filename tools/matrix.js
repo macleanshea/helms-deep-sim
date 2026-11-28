@@ -8,11 +8,11 @@ import os from 'node:os';
 
 const args = process.argv.slice(2);
 const get = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
-const presets = get('presets', 'first-night,garrison,three-hundred').split(',');
+const presets = get('presets', 'first-night,garrison,three-hundred,escalade,siege-train,flood').split(',');
 const policies = get('policies', 'none,auto').split(',');
 const seeds = Array.from({ length: +get('seeds', 3) }, (_, i) => i + 1);
 const extra = [];
-for (let i = 0; i < args.length; i++) if (args[i] === '--opt' || args[i] === '--max') extra.push(args[i], args[i + 1]);
+for (let i = 0; i < args.length; i++) if (args[i] === '--opt' || args[i] === '--max' || args[i] === '--garrison') extra.push(args[i], args[i + 1]);
 
 const jobs = [];
 for (const p of presets) for (const pol of policies) for (const s of seeds) jobs.push({ p, pol, s });

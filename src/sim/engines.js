@@ -40,8 +40,9 @@ export const engineMethods = {
     this.eEver[i] |= pts >= cr.need ? 5 : 1; this.eIdle[i] = 0;
     if (this.time < this.eHalt[i]) return 0;
     let v = speed * Math.min(1, pts / cr.need);
-    // carried among locked shields, it keeps to their pace
-    if (this.stuck[i]) { this.stuck[i]--; if (v > 3.36) v = 3.36; }
+    // carried among locked shields, it keeps to their pace; the ladders make a run for it over the last stretch
+    const rush = d.role === R.LADDER && this._fortDist(this.x[i], this.y[i]) < 250;
+    if (this.stuck[i]) { this.stuck[i]--; if (v > 3.36 && !rush) v = 3.36; }
     return v;
   },
 
@@ -84,7 +85,7 @@ export const engineMethods = {
       if (this.eIdle[e] > 0) this.eIdle[e] = this.time; // a fresh party gets its chance to take hold
       if (this.state[j] === S_WAIT) { this.state[j] = S_MOVE; this.linkT[j] = this.time; }
       // a replacement has to run in and take hold: the engine waits for him
-      if (this.eEver[e] & 4) this.eHalt[e] = Math.max(this.eHalt[e], this.time + 2.5);
+      if (this.eEver[e] & 4) this.eHalt[e] = Math.max(this.eHalt[e], this.time + (d.role === R.LADDER && this._fortDist(x, y) < 250 ? 1.2 : 2.5));
     }
   },
 
@@ -166,15 +167,19 @@ export const engineMethods = {
     }
     if (!def) { if (this.cd2[L] > 0) this.cd2[L] = Math.max(0, this.cd2[L] - 0.25); return; }
     const fx = (hx / FINE) | 0, fy = (hy / FINE) | 0;
+    let att = 0;
     for (let yy = Math.max(0, fy - 3); yy <= Math.min(FH - 1, fy + 3); yy++) for (let xx = Math.max(0, fx - 3); xx <= Math.min(FW - 1, fx + 3); xx++) {
       for (let j = this.head[yy * FW + xx]; j >= 0; j = this.next[j]) {
         if (this.team[j] !== ORC || !this.el[j] || !this.alive[j]) continue;
         const dx = this.x[j] - hx, dy = this.y[j] - hy;
-        if (dx * dx + dy * dy < 36) { this.cd2[L] = 0; return; } // the head is held
+        if (dx * dx + dy * dy < 36) att++;
       }
     }
+    // the head is held by the horde unless the garrison has twice as many men at it: then the ladder can still be heaved
+    // off, with the men at the top cut down or carried with it, though more slowly
+    if (att && def < att * 2) { this.cd2[L] = 0; return; }
     const loaded = this.time < this.linkT[L] - 0.75 + LADDER_TIME;
-    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? 0.35 : 1); // three men, six seconds; far longer with climbers' weight on it
+    this.cd2[L] += 0.085 * Math.min(def, 3) * (loaded ? 0.35 : 1) * (att ? 0.5 : 1); // three men, six seconds; far longer with climbers' weight on it
     if (this.cd2[L] < 3) return;
     const k = this.aux2[L], s = this.segs[k], x = this.x[L], y = this.y[L];
     this.stats.thrown++;

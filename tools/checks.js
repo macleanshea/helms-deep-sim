@@ -125,7 +125,8 @@ function play(setup, opts = {}) {
         if (t % 10 < 0.05 && FOOT(d)) {
           const k = i, moved = pg[i] === sim.gen[i] ? Math.hypot(sim.x[i] - px[i], sim.y[i] - py[i]) : 99;
           px[i] = sim.x[i]; py[i] = sim.y[i]; pg[i] = sim.gen[i];
-          const free = sim.state[i] === S_MOVE && !sim.gOrder[g] && sim.crewOf[i] < 0 && !sim.el[i] && sim.gState[g] < 2 && sim.gPin[g] < 2 && !d.cmd && d.role !== 1
+          // (waiting on purpose is not being stuck: closing up at the forming-up line, or a company's own step-off delay)
+          const free = sim.state[i] === S_MOVE && !sim.gOrder[g] && !sim._forming(g) && !sim.gHold[g] && sim.gWaitT[g] <= sim.time && sim.crewOf[i] < 0 && !sim.el[i] && sim.gState[g] < 2 && sim.gPin[g] < 2 && !d.cmd && d.role !== 1
             && sim._fortDist(sim.x[i], sim.y[i]) > 14 && sim.x[i] < AP.wallLine && sim._nearDef(i, sim.x[i], sim.y[i], 0) < 0 && !crowded(sim, i);
           if (free && moved < 1.5) { const v = (P.stuck.run.get(k) || 0) + 10; P.stuck.run.set(k, v); if (v > P.stuck.worst) P.stuck.worst = v; if (v === 60) P.stuck.n60++; }
           else P.stuck.run.delete(k);
@@ -170,7 +171,7 @@ function crowded(sim, i) {
   return full >= 2;
 }
 
-const preset = (key, seed, sandbox = false) => { const s = buildPreset(map, key, sandbox); s.options.seed = seed; return s; };
+const preset = (key, seed, sandbox = false) => { const s = buildPreset(map, key, sandbox, 'ref'); s.options.seed = seed; return s; }; // (a Build challenge with its suggested garrison)
 const results = [];
 /** `open`: a known, unsolved problem. It is reported as OPEN and does not fail the run. */
 function verdict(name, ok, what, detail, open = false) { results.push({ name, ok, open }); console.log(`${ok ? 'PASS' : open ? 'OPEN' : 'FAIL'}  ${name}: ${what}\n      ${detail}`); }
@@ -219,8 +220,9 @@ const CHECKS = {
   }],
   catapults: ['Catapults hurt, but are not most of what kills the garrison', () => {
     const share = [];
-    for (const { P } of battles()) { const by = P.sim.stats.defLostBy; let tot = 0; for (const k in by) tot += by[k]; share.push(tot ? (by.rock || 0) / tot : 0); }
-    verdict('catapults', Math.max(...share) <= 0.5, `share of defender losses to catapult rocks: ${share.map(pct).join(', ')} (limit 50%)`, each((P) => `rocks ${P.sim.stats.defLostBy.rock || 0}, catapults lost ${P.sim.stats.lostOrc.catapult || 0}/${P.sim.stats.startOrc.catapult || 0}`));
+    // (a battle in which the garrison lost fewer than twenty men says nothing about what kills it)
+    for (const { P } of battles()) { const by = P.sim.stats.defLostBy; let tot = 0; for (const k in by) tot += by[k]; share.push(tot >= 20 ? (by.rock || 0) / tot : 0); }
+    verdict('catapults', Math.max(...share) <= 0.5, `share of defender losses to catapult rocks, where the garrison lost twenty or more: ${share.map(pct).join(', ')} (limit 50%)`, each((P) => `rocks ${P.sim.stats.defLostBy.rock || 0}, catapults lost ${P.sim.stats.lostOrc.catapult || 0}/${P.sim.stats.startOrc.catapult || 0}`));
   }],
   captains: ['Captains can be killed by a commander who goes after them, and do not clump when placed in a heap', () => {
     // a hunter: marks any captain inside 300 m with focus fire, and spends air strikes on the nearest

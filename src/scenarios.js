@@ -391,7 +391,7 @@ function garrison(map, scale = 1) {
 export const PRESETS = [
   {
     key: 'first-night', name: 'First Night', level: 'Easy',
-    blurb: 'A short night to learn the siege: 3,200 attackers in 3 waves, with ladders, a ram and sappers',
+    blurb: 'A short night to learn the siege: 4,200 attackers in 3 waves, with ladders, a ram and sappers',
     build: (map, sb) => ({
       groups: [
         ...alongWall(map, 'rifle', 44, 0.3, 0.7), ...alongWall(map, 'mg', 4, 0.36, 0.64), ...alongWall(map, 'marksman', 4, 0.4, 0.6), ...alongWall(map, 'grenadier', 6, 0.34, 0.66),
@@ -401,7 +401,7 @@ export const PRESETS = [
         // a platoon kept below the wall: the enemy cannot count it, and it can be sent up wherever the ladders land
         makeGroup('rifle', 16, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30),
         ...alongWall(map, 'wire', 44, 0.28, 0.72, 50), ...alongWall(map, 'claymore', 6, 0.4, 0.6, 26),
-        ...horde(3200, { waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 12, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
+        ...horde(4200, { waves: sb ? 1 : 3, kinds: ['escalade', 'assault', 'final'], sizes: sb ? null : [0.8, 1, 1.2], ladders: 14, trolls: 2, rams: 1, sappers: 2, catapults: 1, chiefs: 3, towers: 0 }),
       ],
       options: { dawn: 600, cpStart: 10, cpRate: 3 / 60 },
     }),
@@ -426,6 +426,50 @@ export const PRESETS = [
         makeGroup('rifle', 20, PO.courtPlatoon[0], PO.courtPlatoon[1], Math.PI / 2, 24), makeGroup('rifle', 24, PO.reserve[0], PO.reserve[1], Math.PI / 2, 40),
         makeGroup('cmd', 1, map.wallAt(0.45).x, map.wallAt(0.45).y),
         ...fieldWorks(map, 0.6), ...horde(10000, { waves: sb ? 1 : 3, kinds: ['escalade', 'siege', 'final'] }),
+      ],
+      options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
+    }),
+  },
+  // The design challenges: the horde is known, the garrison is the player's to choose and place within a budget. Each
+  // carries a suggested garrison (`ref`), the one its difficulty was measured with: it holds with a careful commander
+  // most nights, while the same budget spent on riflemen alone does not (see docs/engine-redesign.md).
+  {
+    key: 'escalade', name: 'The Escalade', level: 'Medium', design: true, budget: 2600,
+    blurb: 'Build the garrison: 6,500 attackers with 30 ladders and many berserkers, no engines',
+    build: (map, sb) => ({
+      groups: horde(6500, { waves: sb ? 1 : 3, kinds: ['escalade', 'escalade', 'final'], uruk: 0.6, archer: 0.22, berserker: 0.12, warg: 0.06, ladders: 30, trolls: 0, rams: 0, sappers: 2, catapults: 0, towers: 0, chiefs: 6 }),
+      ref: () => [
+        ...alongWall(map, 'rifle', 90, 0.12, 0.88), ...alongWall(map, 'mg', 8, 0.16, 0.84), ...alongWall(map, 'grenadier', 10, 0.2, 0.8), ...alongWall(map, 'marksman', 4, 0.3, 0.7),
+        makeGroup('mortar', 4, PO.mortarsEasy[0], PO.mortarsEasy[1], Math.PI / 2, 24), makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y),
+        makeGroup('rifle', 20, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30), ...alongWall(map, 'wire', 80, 0.2, 0.8, 55), ...alongWall(map, 'claymore', 6, 0.35, 0.65, 26),
+      ],
+      options: { dawn: 720, cpStart: 8, cpRate: 2 / 60 },
+    }),
+  },
+  {
+    key: 'siege-train', name: 'The Siege Train', level: 'Hard', design: true, budget: 4100,
+    blurb: 'Build the garrison: 8,000 attackers with siege towers, rams, trolls and catapults',
+    build: (map, sb) => ({
+      groups: horde(8000, { waves: sb ? 1 : 3, kinds: ['siege', 'siege', 'final'], towers: 4, rams: 2, trolls: 14, catapults: 8, sappers: 8, ladders: 20, chiefs: 8 }),
+      ref: () => [
+        ...alongWall(map, 'rifle', 80, 0.1, 0.9), ...alongWall(map, 'mg', 6, 0.15, 0.85), ...alongWall(map, 'at', 12, 0.15, 0.85), ...alongWall(map, 'grenadier', 8, 0.2, 0.8), ...alongWall(map, 'marksman', 4, 0.3, 0.7),
+        ...alongRing('at', 2, 175, 205), makeGroup('mortar', 6, PO.mortarsHard[0], PO.mortarsHard[1], Math.PI / 2, 40), makeGroup('howitzer', 2, PO.deepHowitzers[0], PO.deepHowitzers[1], Math.PI / 2, 30),
+        makeGroup('tank', 1, PO.tankDeep[0], PO.tankDeep[1], Math.PI / 2, 20), makeGroup('cmd', 1, map.wallAt(0.5).x, map.wallAt(0.5).y), makeGroup('cache', 1, map.wallAt(0.3).x + 26, map.wallAt(0.3).y), makeGroup('cache', 1, map.wallAt(0.7).x + 26, map.wallAt(0.7).y),
+        makeGroup('rifle', 20, PO.reserve[0], PO.reserve[1], Math.PI / 2, 30), ...alongWall(map, 'hedgehog', 30, 0.15, 0.85, 40), ...alongWall(map, 'wire', 60, 0.3, 0.7, 60),
+      ],
+      options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
+    }),
+  },
+  {
+    key: 'flood', name: 'The Flood', level: 'Hard', design: true, budget: 4200,
+    blurb: 'Build the garrison: 11,500 attackers in 4 waves, nearly all on foot',
+    build: (map, sb) => ({
+      groups: horde(11500, { waves: sb ? 1 : 4, kinds: ['escalade', 'assault', 'assault', 'final'], uruk: 0.68, archer: 0.25, berserker: 0.04, warg: 0.03, ladders: 60, towers: 1, trolls: 6, rams: 1, catapults: 2, sappers: 4 }),
+      ref: () => [
+        ...alongWall(map, 'rifle', 140, 0.06, 0.9), ...alongWall(map, 'mg', 16, 0.08, 0.88), ...alongWall(map, 'grenadier', 16, 0.1, 0.85),
+        makeGroup('mortar', 8, PO.deepMortars[0], PO.deepMortars[1], Math.PI / 2, 60), makeGroup('cmd', 1, map.wallAt(0.3).x, map.wallAt(0.3).y), makeGroup('cmd', 1, map.wallAt(0.7).x, map.wallAt(0.7).y),
+        makeGroup('cache', 1, map.wallAt(0.3).x + 26, map.wallAt(0.3).y), makeGroup('cache', 1, map.wallAt(0.7).x + 26, map.wallAt(0.7).y),
+        makeGroup('rifle', 24, PO.reserve[0], PO.reserve[1], Math.PI / 2, 40), ...alongWall(map, 'wire', 100, 0.12, 0.88, 60), ...alongWall(map, 'mine', 60, 0.25, 0.8, 92),
       ],
       options: { dawn: 900, cpStart: 8, cpRate: 2 / 60 },
     }),
@@ -462,17 +506,24 @@ export function forceCost(groups) {
  * and the win conditions start at SANDBOX_OPTIONS (no relief; the horde gives up when only a
  * remnant is left) for the player to change.
  */
-export function buildPreset(map, key, sandbox = false) {
+export function buildPreset(map, key, sandbox = false, garrison) {
   const p = PRESETS.find((q) => q.key === key) || PRESETS[0];
   nextId = 1; // formation jitter is seeded by group id: a preset must lay out the same way every time it is loaded
   twoDeep = !p.hidden;
   const s = p.build(map, sandbox);
+  // a design challenge: the garrison starts empty (in a challenge), or as its suggested garrison, or (a yardstick for the
+  // tools) the whole budget spent on riflemen along the wall
+  if (p.design) {
+    const g = garrison || (sandbox ? 'ref' : 'empty');
+    if (g === 'ref') s.groups = s.groups.concat(s.ref());
+    else if (g === 'rifles') s.groups = s.groups.concat(alongWall(map, 'rifle', Math.floor(p.budget / UNITS[U.rifle].cost), 0.04, 0.9));
+  }
   twoDeep = false;
   // (a belt of wire or a row of obstacles is as many pieces as the cells its line crosses: counted here, so it is paid for as laid)
   for (const g of s.groups) { const d = UNITS[U[g.type]]; if (d.cls === C.OBST && (d.ob === 'wire' || d.ob === 'av') && g.w > 0) { g.count = 1e4; g.count = groupPositions(map, g).length / 2; } }
   const options = { ...DEFAULT_OPTIONS, ...s.options, support: { ...DEFAULT_OPTIONS.support, ...(s.options.support || {}) } };
   if (sandbox || !s.groups.length) Object.assign(options, SANDBOX_OPTIONS);
-  return { groups: s.groups, options, budget: forceCost(s.groups) };
+  return { groups: s.groups, options, budget: p.design ? p.budget : forceCost(s.groups), design: !!p.design };
 }
 
 /** Where a sandbox's win conditions start: no relief column, and the horde gives up at 1% of its strength. */

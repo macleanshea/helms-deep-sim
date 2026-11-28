@@ -49,11 +49,12 @@ export const TR = { RIFLE: 0, MG: 1, SNIPER: 2, CANNON: 3, ARROW: 4 };
 
 // `sup`: how much a shot or burst suppresses the company it lands on (see morale.js)
 export const WEAPONS = {
-  rifle:      { name: 'Rifle', sup: 0.05,            range: 210, min: 0,   reload: 1.4,  dmg: 60,  acc: 0.55, accFar: 0.18, kind: K.BULLET, tracer: TR.RIFLE,  flash: 1.0, snd: 'rifle' },
+  rifle:      { name: 'Rifle', sup: 0.05,            range: 210, min: 0,   reload: 1.4,  dmg: 60,  acc: 0.6, accFar: 0.21, kind: K.BULLET, tracer: TR.RIFLE,  flash: 1.0, snd: 'rifle' },
   mg:         { name: 'Machine gun', sup: 1,      range: 360, min: 0,   reload: 0.2,  dmg: 50,  acc: 0.36, accFar: 0.1,  kind: K.BULLET, tracer: TR.MG,     flash: 1.4, snd: 'mg', multi: 0.3 },
-  sniper:     { name: 'Marksman rifle',   range: 360, min: 0,   reload: 2.4,  dmg: 260, acc: 0.95, accFar: 0.75, kind: K.BULLET, tracer: TR.SNIPER, flash: 1.2, snd: 'sniper', pref: 1 },
+  sniper:     { name: 'Marksman rifle',   range: 300, min: 0,   reload: 2.4,  dmg: 260, acc: 0.9, accFar: 0.35, kind: K.BULLET, tracer: TR.SNIPER, flash: 1.2, snd: 'sniper', pref: 1 },
   gl:         { name: 'Grenade launcher', sup: 0.4, range: 200, min: 14,  reload: 2.8,  dmg: 130, aoe: 4.5,   speed: 75,  kind: K.HE, flash: 1.0, snd: 'thump', fxk: 3 },
   rocket:     { name: 'Guided rocket', sup: 0.3,    range: 340, min: 20,  reload: 7,    dmg: 950, aoe: 5,   speed: 150, kind: K.AP, flash: 2.2, snd: 'rocket', pref: 2, prefOnly: true, fxk: 0, trail: true },
+  rocketHE:   { name: 'Rocket (HE)', sup: 0.4,  range: 340, min: 20,  reload: 7,    dmg: 300, aoe: 4.5, speed: 150, kind: K.HE, flash: 2.2, snd: 'rocket', fxk: 0, trail: true }, // the anti-armor team's round for massed foot
   mortar:     { name: 'Mortar', sup: 0.6,           range: 650, min: 60,  reload: 5.0,  dmg: 170, aoe: 6.5, arc: true, flight: 2.6, scatter: 6,  kind: K.HE, flash: 1.6, snd: 'mortar', fxk: 0 },
   howitzer:   { name: 'Howitzer', sup: 1,         range: 2400, min: 150, reload: 9,   dmg: 420, aoe: 11,  arc: true, flight: 3.6, scatter: 9,  kind: K.HE, flash: 3.5, snd: 'cannon', fxk: 1 },
   autocannon: { name: 'Autocannon', sup: 0.6,       range: 400, min: 0,   reload: 0.25, dmg: 110, aoe: 2.6, speed: 420, kind: K.HEAVY, flash: 1.8, snd: 'autocannon', fxk: 3, tracer: TR.CANNON },
@@ -87,12 +88,12 @@ export const UNITS = [
     desc: 'Cheap, reliable line infantry.' },
   { key: 'mg', cost: 30, team: DEF, name: 'Machine Gunner', cls: C.INF, hp: 110, speed: 2.8, rad: 0.6, size: 3.9, spr: 1, w: 'mg', ammo: 320, spacing: 2.6, supply: 2,
     desc: 'Pins attackers: they slow down and stop shooting.' },
-  { key: 'marksman', cost: 25, team: DEF, name: 'Marksman', cls: C.INF, hp: 90, speed: 3.4, rad: 0.5, size: 3.4, spr: 2, w: 'sniper', ammo: 40, spacing: 2.4, supply: 1,
+  { key: 'marksman', cost: 35, team: DEF, name: 'Marksman', cls: C.INF, hp: 90, speed: 3.4, rad: 0.5, size: 3.4, spr: 2, w: 'sniper', ammo: 40, spacing: 2.4, supply: 1,
     desc: 'Picks off captains, sappers and ladder crews.' },
   { key: 'grenadier', cost: 25, team: DEF, name: 'Grenadier', cls: C.INF, hp: 100, speed: 3.3, rad: 0.5, size: 3.4, spr: 3, w: 'gl', ammo: 30, spacing: 2.2, supply: 2,
     desc: 'Hits attackers massed at the foot of the wall.' },
-  { key: 'at', cost: 35, team: DEF, name: 'Anti-Armor Gunner', cls: C.INF, hp: 100, speed: 3.0, rad: 0.55, size: 3.6, spr: 4, w: 'rocket', ammo: 8, spacing: 2.6, supply: 3,
-    desc: 'Guided rockets. Fires only at trolls and siege engines.' },
+  { key: 'at', cost: 35, team: DEF, name: 'Anti-Armor Gunner', cls: C.INF, hp: 100, speed: 3.0, rad: 0.55, size: 3.6, spr: 4, w: 'rocket', ammo: 10, spacing: 2.6, supply: 3,
+    desc: 'Rockets for trolls and siege engines first, massed attackers when there are none.' },
   { key: 'mortar', cost: 60, team: DEF, name: 'Mortar Gunner', cls: C.INF, hp: 140, speed: 2.2, rad: 1.0, size: 5.2, spr: 5, w: 'mortar', ammo: 30, spacing: 6, supply: 4,
     desc: 'Fires over walls. Holds fire near your own troops.' },
   { key: 'howitzer', cost: 220, team: DEF, name: 'Howitzer', cls: C.GUN, hp: 500, speed: 0, rad: 2.4, size: 10, spr: 6, w: 'howitzer', ammo: 24, spacing: 14, supply: 6,
