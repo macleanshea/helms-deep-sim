@@ -7,12 +7,13 @@ import { PRESETS, waveSummary, forceCost } from '../scenarios.js';
 const $ = (id) => document.getElementById(id);
 export const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const mmss = (s) => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
-/** How far a unit reaches, as shown on its card and in battle: weapon range, or re-arming radius. */
+/** How far a unit reaches, as shown on its card and in battle: weapon range, blast radius, or re-arming radius. */
 export function reachOf(d) {
   const w = d.wdef || (d.ob === 'claymore' ? WEAPONS.claymore : null);
   // indirect fire is shown with its minimum: it cannot land rounds any closer
   const mn = w && w.arc && w.min;
   if (w && w.range) return { text: w.range >= 1500 ? 'Map-wide' : `${mn ? mn + '–' : ''}${w.range} m`, what: d.ob ? 'Blast range' : `${w.name} range${mn ? ', minimum to maximum' : ''}` };
+  if (d.ob === 'mine') return { text: `${WEAPONS.mine.aoe} m`, what: 'Blast radius' };
   if (d.pool) return { text: `${SUPPLY_R} m`, what: 'Re-arm range' };
   return null;
 }

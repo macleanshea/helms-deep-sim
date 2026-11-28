@@ -110,7 +110,7 @@ export const UNITS = [
   { key: 'hedgehog', cost: 3, team: DEF, name: 'Anti-Vehicle Obstacle', cls: C.OBST, ob: 'av', hp: 1, speed: 0, rad: 1.6, size: 4.4, spr: 15, spacing: 4,
     desc: 'Blocks siege engines until dragged aside. Shields anyone behind it.' },
   { key: 'mine', cost: 4, team: DEF, name: 'Anti-Personnel Mine', cls: C.OBST, ob: 'mine', hp: 1, speed: 0, rad: 0.5, size: 2.4, spr: 27, spacing: 3,
-    desc: 'Hidden from attackers. Explodes once, 5 m radius.' },
+    desc: 'Hidden from attackers. Explodes once when stepped on.' },
   { key: 'claymore', cost: 15, team: DEF, name: 'Claymore', cls: C.OBST, ob: 'claymore', hp: 1, speed: 0, rad: 0.5, size: 2.6, spr: 28, spacing: 7,
     desc: 'Directional mine. Blasts a cone when a group closes in.' },
   { key: 'crate', team: DEF, name: 'Ammo Crate', cls: C.CACHE, hp: 200, speed: 0, rad: 1.2, size: 4, spr: 12, pool: 60, spacing: 6, hidden: true,

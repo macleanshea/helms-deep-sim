@@ -187,7 +187,7 @@ app.selectPlaceTool = (type) => {
   app.selGroup = null;
   ui.refreshPalette(); ui.refreshInspector();
   const d = type && UNITS[U[type]];
-  ui.hint(type ? `<b>${d.name}</b> · ${d.cls === C.OBST ? 'drag to lay a line' : 'click to place · drag for a line'} · right-click to finish` : null);
+  ui.hint(type ? `<b>${d.name}</b> · ${d.cls === C.OBST && d.ob !== 'mine' && d.ob !== 'claymore' ? 'drag to lay a line' : 'click to place · drag for a line'} · right-click to finish` : null);
 };
 app.setTypeCount = (type, n) => {
   const gs = app.setup.groups.filter((g) => g.type === type);
@@ -696,14 +696,15 @@ function rangeRings(c, def, x, y, alpha) {
     c.beginPath(); const p = ring(c, x, y, z0, reach); c.stroke(); c.setLineDash([]);
     label(p, reach, `Steadies ${reach} m`, col);
   }
-  const w = def.wdef || (def.ob === 'claymore' ? WEAPONS.claymore : def.pool ? { range: SUPPLY_R, supply: true } : null);
+  // (a mine's ring is its blast: it has no reach of its own)
+  const w = def.wdef || (def.ob === 'claymore' ? WEAPONS.claymore : def.ob === 'mine' ? { range: WEAPONS.mine.aoe } : def.pool ? { range: SUPPLY_R, supply: true } : null);
   if (!w || !w.range) return;
   const k = def.team === DEF && def.cls === C.INF && map.seg[map.cellOf(x, y)] >= 0 ? (heightAt(x, y) > 15 ? 1.2 : 1.12) : 1;
   const col = w.supply ? '111,220,154' : def.team === DEF ? '140,220,255' : '255,140,110';
   if (w.range * k < 1500) {
     c.strokeStyle = `rgba(${col},${alpha})`; c.lineWidth = 1.4; c.setLineDash([9, 6]);
     c.beginPath(); const p = ring(c, x, y, z0, w.range * k); c.stroke(); c.setLineDash([]);
-    label(p, w.range * k, w.supply ? `Re-arms ${SUPPLY_R} m` : `${Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, col);
+    label(p, w.range * k, w.supply ? `Re-arms ${SUPPLY_R} m` : `${w.range < 10 ? w.range : Math.round(w.range * k)} m${k > 1 ? ' from the wall' : ''}`, col);
   }
   if (w.min > 0) {
     c.strokeStyle = `rgba(${col},${alpha * 0.6})`; c.lineWidth = 1; c.beginPath(); const p = ring(c, x, y, z0, w.min); c.stroke();
